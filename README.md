@@ -1,9 +1,32 @@
 # FM4 Content Converter
 
-Prototipe offline untuk mengonversi konfigurasi mobil stock dan aset FM3 ke
-format FM4. Source utama berada di [`work/fm-car-converter`](work/fm-car-converter/README.md).
-Hasil konversi masih memerlukan validasi game; proyek ini belum merupakan
-converter seluruh mobil atau pembuat DLC siap pasang.
+**`fm4-content-converter`** dikembangkan untuk mengonversi konten kendaraan dari
+berbagai game ke **Forza Motorsport 4**. FM4 menjadi format tujuan, sementara
+dukungan format sumber akan diperluas secara bertahap. Cakupan yang dituju
+meliputi konfigurasi kendaraan, model, tekstur, dan metadata presentasi.
+
+## Status dan arah pengembangan
+
+Project masih berupa prototipe riset. Jalur yang saat ini diimplementasikan
+adalah **FM3 → FM4**; dukungan game sumber lain masih direncanakan.
+
+| Sumber | Status | Cakupan saat ini |
+|---|---|---|
+| Forza Motorsport 3 | Prototipe | Konversi database mobil stock, model dan tekstur, metadata UI, serta audit offline |
+| Game lain | Direncanakan | Format dan cakupan akan ditentukan untuk setiap adapter sumber |
+
+Jalur fisika FM3 telah dievaluasi pada panel 30 mobil. Impor aset dikembangkan
+melalui Chevrolet Cobalt SS 2005: kandidat v6 pernah menjalani uji game singkat,
+sedangkan kandidat v7 dengan perbaikan UI masih memerlukan uji game. Hasil ini
+belum membuktikan dukungan seluruh mobil, kesamaan handling, atau DLC siap pasang.
+Source dan dokumentasi implementasi FM3 berada di
+[`work/fm-car-converter`](work/fm-car-converter/README.md).
+
+Arah pengembangan berikutnya adalah menambahkan adapter pembaca untuk game
+sumber lain, memetakan data dan asetnya ke kebutuhan FM4, serta memvalidasi
+hasil setiap jalur melalui audit offline dan pengujian di game. Perbedaan
+satuan, struktur, dan fitur antar-game perlu ditangani pada setiap adapter;
+cakupan dukungan akan dicatat bersama batas validasinya.
 
 ## Setup Python
 
@@ -21,7 +44,7 @@ diabaikan Git. Versi NumPy dan Pillow dipin di `requirements.txt` agar setup
 dapat direproduksi. Gunakan interpreter `.venv` yang sama untuk menjalankan
 script dan tes.
 
-Converter inti `converter.py`, termasuk adapter `--code-semantics`, hanya
+Converter inti FM3 `converter.py`, termasuk adapter `--code-semantics`, hanya
 memerlukan standard library. Untuk jalur ini, pembuatan `.venv` cukup; instalasi
 `requirements.txt` bersifat opsional. NumPy diperlukan untuk fitting riset;
 jalur thumbnail/pengemasan aset dan suite lengkap juga memerlukan Pillow.
@@ -37,7 +60,7 @@ jalur thumbnail/pengemasan aset dan suite lengkap juga memerlukan Pillow.
 
 Database dan aset game harus tersedia secara lokal. Default path database,
 opsi `--fm3`/`--fm4`, contoh konversi, serta batas validasi dijelaskan di
-[README converter](work/fm-car-converter/README.md). Tes database dapat skip
+[README jalur FM3 → FM4](work/fm-car-converter/README.md). Tes database dapat skip
 jika fixture lokal tidak tersedia; tes fitting dapat skip tanpa NumPy.
 Discovery suite lengkap memerlukan kedua paket Python di atas sejak import.
 Hasil tes lulus tidak membuktikan tampilan atau handling di game.

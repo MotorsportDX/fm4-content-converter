@@ -1,5 +1,10 @@
 # FM3 → FM4 stock-car database prototype
 
+Jalur FM3 ini adalah implementasi sumber pertama dalam
+[FM4 Content Converter](../../README.md), project untuk mengonversi konten
+kendaraan dari berbagai game ke Forza Motorsport 4. Dokumentasi berikut khusus
+untuk jalur FM3 → FM4; dukungan game sumber lain masih direncanakan.
+
 Prototype offline yang dimulai dari Toyota 2000GT 1969 (`TOY_2000GT_69`) dan diperluas ke benchmark 30 mobil. Membaca database asli melalui SQLite read-only, mengekstrak konfigurasi stock berdasarkan relasi, menghasilkan database terpisah dengan schema FM4, lalu membandingkannya dengan konfigurasi asli FM4 berdasarkan peran komponen.
 
 Prototype database memerlukan Python 3.11+ dan standard library. Jalur pengemasan/validasi aset juga memerlukan NumPy dan Pillow, helper model CPU, serta decoder lokal yang dijelaskan di bawah. Perintah converter tidak menjalankan game, memasang DLC, mengubah database sumber, atau mengedit save/profile.
