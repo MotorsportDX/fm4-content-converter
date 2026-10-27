@@ -1,0 +1,4 @@
+# Optional dependencies for research fitting, asset packaging and the full test suite.
+# converter.py and its core tests use only the Python 3.11+ standard library.
+numpy==2.3.5
+Pillow==12.0.0
