@@ -3,6 +3,8 @@
 Format reference: FMdangaina/ForzaEditor at 8807c7d137646dab8d9eecab7e8d5a6602ef58aa,
 CarbinModel.cs and CarbinModelMotorsport3.cs. This separate reader checks the
 external converter's output; structural success is not a rendering test.
+Credit: FMdangaina and the Forza Studio work of Mike Davis. Upstream notices
+are retained in CREDITS.md and THIRD_PARTY_NOTICES.md at repository root.
 SPDX-License-Identifier: GPL-3.0-only
 """
 from collections import Counter

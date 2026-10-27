@@ -1,0 +1,166 @@
+{
+  "reviewed_on": "2026-10-27",
+  "scope": "License and notice snapshots only; source implementations, binaries and game data are not included here.",
+  "records": [
+    {
+      "project": "ForzaEditor",
+      "upstream": "https://github.com/FMdangaina/ForzaEditor",
+      "revision": "8807c7d137646dab8d9eecab7e8d5a6602ef58aa",
+      "source_notice": "LICENSE",
+      "notice_file": "third_party/forzaeditor/LICENSE",
+      "sha256": "0b383d5a63da644f628d99c33976ea6487ed89aaa59f0b3257992deac1171e6b"
+    },
+    {
+      "project": "ForzaEditor",
+      "upstream": "https://github.com/FMdangaina/ForzaEditor",
+      "revision": "8807c7d137646dab8d9eecab7e8d5a6602ef58aa",
+      "source_notice": "THIRD-PARTY-NOTICES.md",
+      "notice_file": "third_party/forzaeditor/THIRD-PARTY-NOTICES.md",
+      "sha256": "221170ff836d4ac05a32c1f9a8bfdb7ff60f3ecc195107210507a14ff6718b23"
+    },
+    {
+      "project": "ForzaTechStudio",
+      "upstream": "https://github.com/D3FEKT/ForzaTechStudio",
+      "revision": "4f373c5fb192551ce5249e320dd79b1399b693ca",
+      "source_notice": "LICENSE",
+      "notice_file": "third_party/forzatechstudio/LICENSE",
+      "sha256": "ae5b45dc5ad5f3842e872140de9296242976143166f3431c6c1b7d6eb1bbe50c"
+    },
+    {
+      "project": "ReXGlue SDK",
+      "upstream": "https://github.com/rexglue/rexglue-sdk",
+      "revision": "f5337cdc947ff6d4c4196737e2c807a48f2a1fc2",
+      "source_notice": "LICENSE",
+      "notice_file": "third_party/rexglue/LICENSE",
+      "sha256": "8e065be1da2ff9a16b1f063d4636d8b67e6a654bb90583ea4332e66ac421bb18"
+    },
+    {
+      "project": "Xenia",
+      "upstream": "https://github.com/xenia-project/xenia",
+      "revision": null,
+      "source_notice": "LICENSE from historical local Xenia source snapshot; commit not recorded",
+      "notice_file": "third_party/xenia/LICENSE",
+      "sha256": "369ea6b0f7ba57544067e9d470ca82a927da787fb0a749b11cb55f1fd0ba47ae"
+    },
+    {
+      "project": "XenonRecomp",
+      "upstream": "https://github.com/hedge-dev/XenonRecomp",
+      "revision": "ddd128bcca99fe8bfbb99bea583c972351fa6ace",
+      "source_notice": "LICENSE.md",
+      "notice_file": "third_party/xenonrecomp/LICENSE.md",
+      "sha256": "7fd801bac4a25e8d8bcdaa5a025f02ea245fd4c039b513ab4fc11cb5a0cfd3f7"
+    },
+    {
+      "project": "libmspack",
+      "upstream": "https://github.com/kyz/libmspack",
+      "revision": "305907723a4e7ab2018e58040059ffb5e77db837",
+      "source_notice": "libmspack/COPYING.LIB",
+      "notice_file": "third_party/libmspack/COPYING.LIB",
+      "sha256": "885a03f54b157961236f46843e79972abfcd6890b6cbb368bc7eca328ff95a12"
+    },
+    {
+      "project": "libmspack",
+      "upstream": "https://github.com/kyz/libmspack",
+      "revision": "305907723a4e7ab2018e58040059ffb5e77db837",
+      "source_notice": "libmspack/AUTHORS",
+      "notice_file": "third_party/libmspack/AUTHORS",
+      "sha256": "8b18efe9cce9796b73a1985658799e86c52565e1973d6d35ff16793362ea458c"
+    },
+    {
+      "project": "xxHash",
+      "upstream": "https://github.com/Cyan4973/xxHash",
+      "revision": null,
+      "source_notice": "XenonRecomp local thirdparty/xxHash/LICENSE",
+      "notice_file": "third_party/xenonrecomp-dependencies/xxHash/LICENSE",
+      "sha256": "6ffedbc0f7878612d2b23589f1ff2ab15633e1df7963a5d9fc750ec5500c7e7a"
+    },
+    {
+      "project": "fmt",
+      "upstream": "https://github.com/fmtlib/fmt",
+      "revision": null,
+      "source_notice": "XenonRecomp local thirdparty/fmt/LICENSE",
+      "notice_file": "third_party/xenonrecomp-dependencies/fmt/LICENSE",
+      "sha256": "25b5db04aa6070c12ac518b91cbd0a59725c050ecb091456e6ebc3d3eeb369cf"
+    },
+    {
+      "project": "toml++",
+      "upstream": "https://github.com/marzer/tomlplusplus",
+      "revision": null,
+      "source_notice": "XenonRecomp local thirdparty/tomlplusplus/LICENSE",
+      "notice_file": "third_party/xenonrecomp-dependencies/tomlplusplus/LICENSE",
+      "sha256": "529bc3900a9571e49db285b0df432397e70b881cc3bf48de6667ae74ff4b06d8"
+    },
+    {
+      "project": "SIMDe",
+      "upstream": "https://github.com/simd-everywhere/simde",
+      "revision": null,
+      "source_notice": "XenonRecomp local thirdparty/simde/COPYING",
+      "notice_file": "third_party/xenonrecomp-dependencies/simde/COPYING",
+      "sha256": "83e48417dd53d380432ca08c1aabc35af5a8b8d4cac037f066510d0bcda8f2c0"
+    },
+    {
+      "project": "Ghidra",
+      "upstream": "https://github.com/NationalSecurityAgency/ghidra",
+      "revision": "12.1.3",
+      "source_notice": "LICENSE from installed Ghidra 12.1.3 PUBLIC",
+      "notice_file": "third_party/ghidra/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "project": "NumPy",
+      "upstream": "https://github.com/numpy/numpy",
+      "revision": "2.3.5",
+      "source_notice": "numpy-2.3.5.dist-info/LICENSE.txt from installed Windows wheel",
+      "notice_file": "third_party/numpy/LICENSE.txt",
+      "sha256": "596b953e1dcbe829b32ae444387efa15003fc6abdeca8a2179f364a6364c286e"
+    },
+    {
+      "project": "Pillow / PIL",
+      "upstream": "https://github.com/python-pillow/Pillow",
+      "revision": "12.0.0",
+      "source_notice": "pillow-12.0.0.dist-info/licenses/LICENSE from installed Windows wheel",
+      "notice_file": "third_party/pillow/LICENSE",
+      "sha256": "9a083a15f1026b3d7096629be74f79cc80544ebf443e652d434c19f2594574d7"
+    },
+    {
+      "project": "pip",
+      "upstream": "https://github.com/pypa/pip",
+      "revision": "24.0",
+      "source_notice": "pip-24.0.dist-info/LICENSE.txt",
+      "notice_file": "third_party/pip/LICENSE.txt",
+      "sha256": "634300a669d49aeae65b12c6c48c924c51a4cdf3d1ff086dc3456dc8bcaa2104"
+    },
+    {
+      "project": "setuptools",
+      "upstream": "https://github.com/pypa/setuptools",
+      "revision": "65.5.0",
+      "source_notice": "setuptools-65.5.0.dist-info/LICENSE; local environment, not an isolated-build version pin",
+      "notice_file": "third_party/setuptools/LICENSE",
+      "sha256": "db3f0246b1f9278f15845b99fec478b8b506eb76487993722f8c6e254285faf8"
+    },
+    {
+      "project": "libmspack LZX",
+      "upstream": "https://github.com/kyz/libmspack",
+      "revision": "305907723a4e7ab2018e58040059ffb5e77db837",
+      "source_notice": "lzxd.c opening comment only; LF-normalized; no implementation copied",
+      "notice_file": "third_party/libmspack/LZX-NOTICE.txt",
+      "sha256": "f6b524f3dd0633f7320fcdcb2b062f84c867a690e48e0a7ec4b2f12fc7ca6cfb"
+    },
+    {
+      "project": "GNU binutils PowerPC disassembler",
+      "upstream": "https://www.gnu.org/software/binutils/",
+      "revision": null,
+      "source_notice": "ppc-dis.c opening comment only; LF-normalized; no implementation copied",
+      "notice_file": "third_party/binutils/PPC-DIS-NOTICE.txt",
+      "sha256": "02f4778290a1c2bd62e2e1a5fd30697ab40401f56db5f6a45207a677227ee6a5"
+    },
+    {
+      "project": "TinySHA1",
+      "upstream": "https://github.com/mohaps/TinySHA1",
+      "revision": null,
+      "source_notice": "TinySHA1.hpp opening comment only; LF-normalized; no implementation copied",
+      "notice_file": "third_party/xenonrecomp-dependencies/tinysha1/NOTICE.txt",
+      "sha256": "ac2981808bb038e18467c4371b0afcba0b93821d32702d9aa20a7d42cf90c40f"
+    }
+  ]
+}

@@ -36,6 +36,7 @@ tests/                  Tes regresi dan verifikasi package
 docs/                   Panduan converter dan struktur project
 tools/                  Source helper CPU C# dan wrapper LZX
 research/               Source serta laporan riset lintas versi
+third_party/            Snapshot teks lisensi/notice dan metadata atribusi
 outputs/                Hasil/evidence lokal; diabaikan Git
 external/, work/        Dependensi dan eksperimen lokal; diabaikan Git
 ```
@@ -98,3 +99,27 @@ Pillow. Dependensi native disiapkan terpisah.
 Data game, database hasil, DLL/EXE, virtual environment, cache, dan checkout
 pihak ketiga tidak masuk Git. Folder `research/` hanya mengizinkan source dan laporan
 yang tercantum secara eksplisit dalam `.gitignore`.
+
+## Credits
+
+Project ini menggunakan karya dan penelitian komunitas, termasuk **ForzaEditor
+(FMdangaina)**, **Forza Studio (Mike Davis)**, **MonoGame/Mono.Xna**, **Xenia**,
+**ReXGlue**, **libmspack**, dan **ForzaTech Studio**, serta tool dan referensi
+format lainnya.
+
+Daftar pembuat, bentuk penggunaan, revisi referensi, dependensi dan tool riset
+tersedia di [CREDITS.md](CREDITS.md). Pemetaan source dan teks lisensi/notice
+yang dipertahankan tersedia di [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Lisensi
+
+FM4 Content Converter menggunakan **GNU General Public License v3.0 only**
+(`GPL-3.0-only`). Teks lengkap tersedia di [LICENSE](LICENSE).
+
+Kode dapat digunakan, dipelajari, dimodifikasi dan didistribusikan, termasuk
+secara komersial, sesuai ketentuan GPL v3. Distribusi versi modifikasi harus
+mempertahankan lisensi dan menyediakan corresponding source sebagaimana
+diwajibkan GPL. Notice dan lisensi komponen pihak ketiga tetap berlaku.
+
+Lihat [cakupan lisensi](docs/licensing.md) untuk source project, notice upstream,
+data game dan batas distribusi helper native yang masih memakai MonoGame Ms-PL.

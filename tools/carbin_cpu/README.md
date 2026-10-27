@@ -13,6 +13,10 @@ The original MIT notices are preserved in that repository's
 `THIRD-PARTY-NOTICES.md`. The adapter and derived audit modules carry
 `GPL-3.0-only`; see [GPL-3.0.txt](GPL-3.0.txt).
 
+Repository-wide [credits](../../CREDITS.md) and
+[third-party notices](../../THIRD_PARTY_NOTICES.md) retain the upstream authors,
+license snapshots and file-level usage, including Xenia's texture-format work.
+
 `build_carbin_cpu.py` checks the source revision and clean checkout. It downloads
 the pinned MonoGame 3.6.0.1625 NuGet package, verifies its SHA-256, and extracts
 only `MonoGame.Framework.dll` for XNA-compatible vector, matrix and quaternion

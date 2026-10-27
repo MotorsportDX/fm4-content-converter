@@ -3,6 +3,8 @@
 Format reference: ForzaEditor ShaderTextures.cs, revision
 8807c7d137646dab8d9eecab7e8d5a6602ef58aa. This bounded reader retains pass
 provenance and all samplers, including resources provided by the engine.
+Credit: FMdangaina / ForzaEditor and Mike Davis / Forza Studio. Retained
+upstream notices: CREDITS.md and THIRD_PARTY_NOTICES.md at repository root.
 SPDX-License-Identifier: GPL-3.0-only
 """
 import struct

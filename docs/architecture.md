@@ -15,6 +15,7 @@ tools/
   lzx_bridge/          Source wrapper decoder LZX
 research/
   physics-2026-10-20/   Source dan laporan riset lintas versi
+third_party/           Snapshot teks lisensi/notice upstream dan manifest hash
 outputs/               Hasil konversi, evidence dan decoder lokal; diabaikan Git
 external/              Checkout pihak ketiga lokal; diabaikan Git
 work/                  Workspace eksperimen lama lokal; diabaikan Git
@@ -69,3 +70,8 @@ riset ketika dijalankan; script tersebut bukan bagian dari test discovery.
 `.gitignore` menggunakan daftar file yang diizinkan secara eksplisit. Saat
 menambahkan source atau dokumentasi baru, tambahkan path file tersebut ke daftar;
 hasil ekstraksi dan binary tetap lokal.
+
+Kredit dan asal komponen dicatat di [CREDITS.md](../CREDITS.md), dengan pemetaan
+penggunaan pada [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). Isi
+`third_party/` hanya teks lisensi/notice serta metadata atribusi; source dan
+binary dependency eksternal tetap disiapkan terpisah.

@@ -1,3 +1,5 @@
 * text=auto eol=lf
 # Unified patches intentionally contain single-space context lines.
 *.patch whitespace=-blank-at-eol
+# Preserve upstream notice bytes so attribution snapshot hashes survive checkout.
+third_party/** -text

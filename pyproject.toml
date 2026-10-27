@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,16 @@ version = "0.1.0.dev0"
 description = "Vehicle content conversion and offline audits targeting Forza Motorsport 4"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "GPL-3.0-only"
+license-files = [
+    "LICENSE",
+    "CREDITS.md",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/licensing.md",
+    "third_party/**/*",
+    "tools/carbin_cpu/GPL-3.0.txt",
+    "tools/carbin_cpu/MonoGame-LICENSE.txt",
+]
 dependencies = []
 
 [project.optional-dependencies]

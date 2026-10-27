@@ -3,6 +3,8 @@
 Layout independently implemented from locally available ReXGlue/Xenia structures:
 work/rexglue-sdk/include/rex/filesystem/devices/stfs_xbox.h and
 work/rexglue-sdk/src/filesystem/devices/stfs_container_device.cpp.
+Credit: Tom Clay / ReXGlue and Ben Vanik / Xenia contributors. Retained BSD
+notices and upstream revisions: CREDITS.md and THIRD_PARTY_NOTICES.md at repo root.
 Does not mount, install, execute, or modify a package. Block SHA1 can be checked;
 this is not verification of the Microsoft signature or authenticity.
 """

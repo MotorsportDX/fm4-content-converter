@@ -2,6 +2,8 @@
 
 Format references: ForzaEditor XdsTexture*.cs and XenosTiling.cs at revision
 8807c7d137646dab8d9eecab7e8d5a6602ef58aa (Xenos addressing from Xenia).
+Credit: FMdangaina / ForzaEditor, Mike Davis / Forza Studio, and Ben Vanik
+with Xenia contributors. See CREDITS.md and THIRD_PARTY_NOTICES.md at repo root.
 SPDX-License-Identifier: GPL-3.0-only
 """
 import hashlib
