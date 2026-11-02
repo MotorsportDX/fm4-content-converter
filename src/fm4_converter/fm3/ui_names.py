@@ -147,53 +147,111 @@ def plan(source_car, label):
     for field in ("DisplayName", "ModelShort"):
         key = reference(source_car[field])
         result[field] = {"reference":source_car[field], "key":key,
-                         "symbol":f"IDS_{field}_{source_car['Id']}", "text":label}
+                         "symbol":f"IDS_{field}_{source_car['Id']}",
+                         "text":label[field] if isinstance(label, dict) else label}
     if len({v["key"] for v in result.values()}) != 2:
         raise NameError("Car name keys must be distinct")
     return result
 
 
-def build_archives(source_root, target_root, bindings, archive_read, sha):
+# The mount resolver serves each guest path from the highest-priority ZIP. Disc
+# 2 and every DLC pack ship a cumulative <lang>/Data_Car.str (priority 151 to
+# 25039 on the test profile) over the disc's (80), so names added to the disc
+# table never show (Cobalt v7 in Motorsport DX, 1 November 2026). A ZIP named
+# `media\stringtables.zip` mounts its `<lang>/` members at media\stringtables\
+# like DLCZips\StringTables_pri_N.zip; above the winning table it overrides
+# only Data_Car.str and leaves every other table to its current provider.
+OVERRIDE = Path("Media/stringtables.zip")
+_PRIORITY = re.compile(r"_pri_(\d+)\.zip$", re.IGNORECASE)
+
+
+def winning_tables(target_root, content_root, archive_read, sha):
+    """Per language, the Data_Car.str the game reads now, with its priority."""
+    import xml.etree.ElementTree as ET
+    mounts = {z.attrib["path"].casefold():int(z.attrib["priority"])
+              for z in ET.fromstring((target_root/"zipmanifest.xml").read_bytes()).findall("Zip")}
+    inputs, tables = {}, {}
+    for path in sorted((target_root/"StringTables").glob("*.zip")):
+        priority = mounts.get(("game:\\media\\stringtables\\"+path.name).casefold())
+        if priority is None:
+            raise NameError(f"Unmounted language archive: {path.name}")
+        inputs[str(path)] = sha(path)
+        with zipfile.ZipFile(path) as z:
+            matches = [m for m in z.namelist() if m.casefold()=="data_car.str"]
+            if len(matches)!=1:
+                raise NameError("Missing or ambiguous native car string table")
+            tables[path.stem.casefold()] = (priority,path.stem,str(path),archive_read(z,matches[0]))
+    packs = sorted(Path(content_root).glob("*/Media/DLCZips/StringTables_pri_*.zip")) if content_root else []
+    for path in packs:
+        priority = int(_PRIORITY.search(path.name).group(1))
+        inputs[str(path)] = sha(path)
+        with zipfile.ZipFile(path) as z:
+            for member in z.namelist():
+                language, _, name = member.replace("\\","/").partition("/")
+                if name.casefold()!="data_car.str":
+                    continue
+                current = tables.get(language.casefold())
+                if current and current[0]==priority:
+                    raise NameError(f"Two {language} car tables share priority {priority}")
+                if not current or priority>current[0]:
+                    tables[language.casefold()] = (priority,language,f"{path}:{member}",archive_read(z,member))
+    if "en" not in tables:
+        raise NameError("No native English car string table")
+    return tables, inputs
+
+
+def rekey(bindings, taken):
+    """Move bindings whose key a target table already uses to the highest free key.
+
+    FM4 DLC packs reuse some FM3 Data_Car keys for other cars (FM3 Aston Martin
+    DBR9's DisplayName is FM4's Lotus Eleven); `taken` holds every key of every
+    winning language table plus keys already handed out, and is updated."""
+    moved = {}
+    for field, row in bindings.items():
+        key = reference(row["reference"])
+        if key & 65535 not in taken:
+            taken.add(key & 65535)
+            continue
+        free = next((k for k in range(65534, 0, -1) if k not in taken), None)
+        if free is None:
+            raise NameError("No free Data_Car string key")
+        taken.add(free)
+        row["source_reference"], row["reference"] = row["reference"], f"_&{(key & ~65535) | free}"
+        row["key"] = reference(row["reference"])
+        moved[field] = row["reference"]
+    return moved
+
+
+def build_archives(source_root, target_root, bindings, archive_read, sha, content_root=None):
     source_path = source_root/"StringTables/EN.zip"
     inputs = {str(source_path):sha(source_path)}
     with zipfile.ZipFile(source_path) as z:
         source = StringTable(archive_read(z,"Data_Car.str"))
     additions = []
     for row in bindings.values():
-        key = reference(row["reference"])
+        # A rekeyed binding (see rekey) is still checked against its FM3 key.
+        key = reference(row.get("source_reference", row["reference"]))
         if key >> 16 != 0xCD49 or source.names.get(key & 65535) != row["symbol"]:
             raise NameError("Source key does not identify the expected Data_Car symbol")
-        additions.append((key,row["symbol"],row["text"]))
-    archives, reports = {}, []
-    for path in sorted((target_root/"StringTables").glob("*.zip")):
-        inputs[str(path)] = sha(path)
-        stream = io.BytesIO()
-        with zipfile.ZipFile(path) as original, zipfile.ZipFile(stream,"w",compression=zipfile.ZIP_STORED) as output:
-            members = original.infolist()
-            if len({m.filename.casefold() for m in members}) != len(members):
-                raise NameError("Duplicate string archive member")
-            matches = [m.filename for m in members if m.filename.casefold()=="data_car.str"]
-            if len(matches)!=1:
-                raise NameError("Missing or ambiguous native car string table")
-            preserved = 0
-            for member in members:
-                data = archive_read(original, member)
-                if member.filename == matches[0]:
-                    table = StringTable(data)
-                    data = table.add(additions)
-                    checked = StringTable(data)
-                    if any(checked.texts[k]!=v for k,v in table.texts.items()):
-                        raise NameError("Existing localized text changed")
-                else:
-                    preserved += 1
-                info = zipfile.ZipInfo(member.filename,(1980,1,1,0,0,0))
-                output.writestr(info,data)
-        archives[Path("Media/StringTables")/path.name] = stream.getvalue()
-        reports.append({"language":path.stem,"original_names_preserved":len(table.texts),
-                        "other_members_preserved":preserved,"new_entries":bindings,
-                        "optional_metadata_preserved":True})
-    if not reports or not any(r["language"].upper()=="EN" for r in reports):
-        raise NameError("No native language archives")
-    return archives, {"passed":True,"cpu_only":True,"runtime_tested":False,
-                      "inputs":inputs,"languages":reports,
-                      "scope":"LSB2 references and preservation; runtime display still requires a game test"}
+        additions.append((reference(row["reference"]),row["symbol"],row["text"]))
+    tables, found = winning_tables(target_root,content_root,archive_read,sha)
+    inputs.update(found)
+    stream, reports = io.BytesIO(), []
+    with zipfile.ZipFile(stream,"w",compression=zipfile.ZIP_STORED) as output:
+        for _,(priority,language,origin,data) in sorted(tables.items()):
+            table = StringTable(data)
+            encoded = table.add(additions)
+            checked = StringTable(encoded)
+            if any(checked.texts[k]!=v for k,v in table.texts.items()):
+                raise NameError("Existing localized text changed")
+            output.writestr(zipfile.ZipInfo(f"{language}/Data_Car.str",(1980,1,1,0,0,0)),encoded)
+            reports.append({"language":language,"winning_table":origin,"winning_priority":priority,
+                            "original_names_preserved":len(table.texts),"new_entries":bindings,
+                            "optional_metadata_preserved":True})
+    priority = max(r["winning_priority"] for r in reports)+1
+    return {OVERRIDE:stream.getvalue()}, {
+        "passed":True,"cpu_only":True,"runtime_tested":False,"inputs":inputs,"languages":reports,
+        "mount":{"path":"game:\\media\\stringtables.zip","priority":priority},
+        "content_root":str(content_root) if content_root else None,
+        "scope":("Per-file Data_Car.str override above the winning table of the given disc and "
+                 "content set; a pack installed later with a higher priority hides these names again")}

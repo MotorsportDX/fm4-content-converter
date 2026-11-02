@@ -132,15 +132,19 @@ def skeletons(assets):
 
 
 def selection(attributes):
-    root = ET.fromstring(attributes)
-    alternate = root.find("Use10_2Animations")
-    if alternate is None or alternate.get("value") not in ("0", "1"):
-        raise DriverError("Missing/invalid Use10_2Animations")
-    driver = root.find("Driver")
-    if driver is None or driver.get("HasPaddleShifter") not in ("0", "1"):
-        raise DriverError("Missing/invalid HasPaddleShifter")
-    use_alt = alternate.get("value") == "1"
-    paddle = driver.get("HasPaddleShifter") == "1"
+    # FM4 ships native cars whose carattribs.xml lacks Use10_2Animations (layout
+    # version 4) or is absent (FOR_5_FGFalcon_11); those take the standard clips.
+    root = ET.fromstring(attributes) if attributes is not None else None
+    alternate = root.find("Use10_2Animations") if root is not None else None
+    if alternate is not None and alternate.get("value") not in ("0", "1"):
+        raise DriverError("Invalid Use10_2Animations")
+    driver = root.find("Driver") if root is not None else None
+    if driver is not None and driver.get("HasPaddleShifter") not in ("0", "1"):
+        raise DriverError("Invalid HasPaddleShifter")
+    defaults = [name for name, node in (("Use10_2Animations", alternate), ("HasPaddleShifter", driver))
+                if node is None]
+    use_alt = alternate is not None and alternate.get("value") == "1"
+    paddle = driver is not None and driver.get("HasPaddleShifter") == "1"
     suffix = "_B" if use_alt else ""
     files = [f"SteerLock2Lock{size}{suffix}.gr2" for size in ("Small", "Large")]
     files += ([f"RotatingPaddleShift{side}.gr2" for side in ("Left", "Right")] if paddle
@@ -151,7 +155,7 @@ def selection(attributes):
             "steering_clip_ids": [4, 5, 6, 7] if use_alt else [0, 1, 2, 3],
             "shift_clip_ids_checked": [16, 17] if paddle else [18, 19],
             "shift_scope": "Both handedness branches checked; runtime chooses one stick-shift side",
-            "files": files}
+            "assumed_absent_defaults": defaults, "files": files}
 
 
 def audit(attributes, assets):

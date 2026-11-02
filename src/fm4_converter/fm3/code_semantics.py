@@ -21,6 +21,7 @@ EVIDENCE={
     "fm4_main_mass_center_y":"0x8281E308..0x8281E314",
     "scope":"Retail base FM3 USA / FM4 Japan-Asia; stock, unchanged body geometry, zero selected WeightDistDiff",
 }
+MAX_STOCK_WEIGHT_DELTA=1e-3
 
 
 def f32(value):
@@ -46,7 +47,7 @@ def inputs(graph,version):
     if not .01 <= dist <= .99:
         raise c.MappingError("Code semantics supports stock CMBackFront in [.01,.99]")
     origin=finite(body[ORIGIN],ORIGIN)
-    selected=[]
+    selected,nonzero=[],[]
     for role,node in graph["nodes"].items():
         if not role.startswith("List_Upgrade"):
             continue
@@ -55,10 +56,16 @@ def inputs(graph,version):
             raise c.MappingError("Code semantics requires selected stock parts: "+role)
         if "WeightDistDiff" in part:
             delta=finite(part["WeightDistDiff"],role+".WeightDistDiff")
-            if delta != 0:
-                raise c.MappingError("Nonzero selected WeightDistDiff requires a full selection trace")
-            selected.append(role)
+            (nonzero.append({"role":role,"delta":delta}) if delta != 0 else selected.append(role))
+    # How a selected delta combines with CMBackFront is not traced. Only a delta
+    # too small to matter under any additive reading is accepted (stock oil
+    # coolers of the FM3 "IE" cars: about 2e-4), with its bound recorded.
+    bound=sum(abs(x["delta"]) for x in nonzero)
+    if bound > MAX_STOCK_WEIGHT_DELTA:
+        raise c.MappingError("Nonzero selected WeightDistDiff requires a full selection trace")
     result={"height":height,"distribution":dist,"origin_y":origin,"zero_weight_delta_roles":selected}
+    if nonzero:
+        result.update(nonzero_weight_delta_roles=nonzero,distribution_uncertainty=bound)
     if version=="fm4":
         car=row(graph,"car")
         front=finite(car["FrontStockRideHeight"],"FrontStockRideHeight")
@@ -67,6 +74,8 @@ def inputs(graph,version):
             raise c.MappingError("Negative stock ride-height reference unsupported")
         result.update(front_height=front,rear_height=rear,
                       weighted_height=rear+(front-rear)*dist)
+        if nonzero:
+            result["weighted_height_uncertainty_m"]=abs(front-rear)*bound
     elif version!="fm3":
         raise c.MappingError("Unknown coordinate convention")
     return result

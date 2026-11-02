@@ -372,6 +372,334 @@ Paket v7 belum dipasang dan belum dijalankan; `runtime_tested=false` serta
 masih memerlukan uji game setelah izin berikutnya. Pada tahap v7 ini tidak
 ada peluncuran game atau pemakaian GPU oleh converter.
 
+## Uji e2e Motorsport DX, kelas/PI dan nama di bawah DLC — v9
+
+Lanjutan 1 November 2026. Kandidat diuji di Motorsport DX (FM4-PC) melalui
+harness e2e: BuildRoot `I:\FM4-build-usa`, `--native`, profil salinan dengan
+Disc 2 dan delapan paket DLC terimpor, data game dari salinan disc uji Japan/Asia.
+Langkah OCR memilih Free Play → Quick Race → Chevrolet → mobil "2005 Chevrolet",
+balapan dikendarai AI (`engageaionstart`), lalu menu pause dibuka.
+
+`test_disc.py` membuat salinan disc uji: semua berkas asli di-hardlink dan setiap
+berkas overlay mengganti link-nya dengan salinan baru, sehingga disc asli tidak
+pernah ditulis (hash berkas yang diganti diperiksa sebelum dan sesudah).
+
+```powershell
+python -m fm4_converter.fm3.test_disc --disc "<FM4 Disc 1>" --package <package-directory> --out <new-test-dir>\disc
+```
+
+Uji v7 menemukan dua masalah yang tidak terlihat secara offline:
+
+- **Kelas/PI.** FM4 menampilkan angka PI dengan menginterpolasi
+  `Data_Car.PerformanceIndex` mentah pada batas `CarClasses.MaxPerformanceIndex`,
+  tetapi huruf kelas diambil dari `ClassID`. Seluruh 503 mobil FM4 dan 415 mobil FM3
+  konsisten dengan batas game masing-masing, namun batasnya berbeda. PI mentah FM3
+  Cobalt (0,164646) tampil sebagai **D 209**, padahal PI 209 di FM4 adalah kelas E.
+  `performance_index.py` memetakan skala mentah FM3 → FM4 dari pasangan
+  `calibration.collect` (split engine yang sama). Kandidat identity/linear/hinge
+  (knot di batas kelas FM3) dipilih dengan CV 5-fold per engine pada training;
+  kandidat paling sederhana dalam 1,05× MAE CV terbaik dipilih sebelum validation.
+  Terpilih linear `FM4 = 0,16879 + 0,77211 × FM3` (domain training 0–0,99445).
+  Validation: kelas benar **62/73** (identity 11/73), MAE 0,0179 (identity 0,1005);
+  gerbang ≥75% lolos. `ClassID` selalu diturunkan dari batas FM4 untuk PI yang
+  ditulis; di luar domain atau model tidak diterima, PI mentah dipertahankan.
+  Cobalt menjadi **C 366**, sama kelas dengan Golf GTI 2006/2010 dan Ion 2006 yang
+  di FM3 berada di sekitar PI yang sama.
+- **Nama mobil kosong di Car Select dan daftar peserta.** Disc 2 dan setiap DLC
+  membawa `StringTables_pri_N.zip` berisi `<lang>/Data_Car.str` kumulatif
+  (prioritas 151–25039), sedangkan arsip bahasa disc dipasang pada prioritas 80.
+  Resolver mount melayani setiap path dari ZIP berprioritas tertinggi, sehingga entri
+  v7 di arsip disc tidak pernah dibaca. Eksperimen di game mengonfirmasi bahwa ZIP
+  `game:\media\stringtables.zip` memasang anggota `<lang>/` di
+  `media\stringtables\` dan, di atas tabel pemenang, hanya menggantikan
+  `Data_Car.str`. `ui_names.py` kini mengambil tabel pemenang per bahasa dari disc
+  dan `--content-root` (paket terpasang), menambah dua entri, dan memasang
+  `stringtables.zip` pada prioritas pemenang + 1. Arsip bahasa disc tidak lagi
+  diubah. Nama seluruh 18 Chevrolet lain, termasuk mobil DLC, identik dengan run
+  tanpa override.
+
+```powershell
+python -m fm4_converter.fm3.performance_index --out outputs/fm-car-converter/pi-class-new/pi-model.json
+python -m fm4_converter.fm3.offline_package --media-name CHE_Cobalt_05 --display-name "Cobalt SS (FM3)" --model-helper <helper-directory>/carbin-cpu.exe --rules outputs/fm-car-converter/benchmark30-refinements-v1/rules.json --pi-model outputs/fm-car-converter/pi-class-new/pi-model.json --content-root "<user-data>\0000000000000000\4D530910\00000002" --out <new-package-directory>
+```
+
+Override nama terikat pada set konten yang diberikan: paket yang dipasang kemudian
+dengan prioritas lebih tinggi kembali menyembunyikan nama ini (tanpa merusak nama
+lain), dan paket harus dibangun ulang. `--content-root` juga menambahkan patch
+database semua paket terpasang ke pemeriksaan benturan ID.
+
+Hasil run e2e (captures dan log tetap di `I:\FM4-build-usa\e2e\`, tidak masuk Git):
+
+| Run | Kandidat | Car Select | Daftar peserta |
+|---|---|---|---|
+| `cobalt-v7-1` | v7 | "2005 Chevrolet", nama kosong, D 209 | memilih Cobalt 2010 bawaan karena OCR "Cobalt" (langkah uji diperbaiki) |
+| `cobalt-v8-1` | v7 + PI | nama kosong, **C 366** | nama kosong, C 366; lawan kelas C 352–382 |
+| `cobalt-v8x-1` | v8 + override eksperimen | **Cobalt SS (FM3)**, C 366 | **Cobalt SS (FM3)** |
+| `cobalt-v9-1` | v9 dari converter | **Cobalt SS (FM3)**, C 366 | **Cobalt SS (FM3)**, C 366; lawan C/D 332–383, posisi 3/12 di lap 1 |
+
+Paket v9 berisi enam berkas (sebelumnya 23): mobil, roda, thumbnail, database,
+`stringtables.zip` (prioritas 25040) dan `zipmanifest.xml`. Dibanding v7, database
+hanya berbeda pada `PerformanceIndex` dan `ClassID` baris `Data_Car` 305.
+Semua run mencapai balapan tanpa crash. Kunci error runtime sama pada setiap run
+(`update:\media.zip` tidak ditemukan, satu pesan XAM, dua `BaseHeap::Release`) dan
+tidak spesifik pada mobil impor. Slot thumbnail besar tampil benar di atas latar
+garasi game; slot kecil masih memakai sudut 3/4 depan, bukan profil samping seperti
+mobil native. Laporan dan frame penting: `outputs/fm-car-converter/pi-class-v1/`.
+Paket tetap `accepted=false`: handling, suara, kamera selain kokpit, dan
+upgrade belum dinilai. PI yang dipetakan adalah estimasi skala, bukan PI hasil
+perhitungan fisika FM4.
+
+## Skala dan konvensi nilai FM3 → FM4 — v10
+
+Lanjutan 1 November 2026. `value_scales.py` menjalankan jalur paket saat ini
+(aturan refined conservative + `code_semantics`) pada seluruh 309 pasangan mobil
+yang sama di kedua game dan membandingkan setiap kolom hasil konversi dengan mobil
+native FM4: 612 kolom, 182 memiliki selisih, 29 di antaranya sistematis (≥20% mobil
+training berbeda). Untuk setiap kolom sistematis, kandidat `constant` (nilai tunggal
+di ≥99% baris FM4), `lookup` (enum, hanya pemetaan yang konsisten ≥95% dengan
+dukungan ≥3 mobil), `linear` dan `loglinear` (monoton, hanya di domain training)
+dipilih dengan CV 5-fold per engine pada training, lalu dibekukan sebelum
+validation. Gerbang: kategori ≥95% tepat dan lebih baik dari identity; kontinu
+MAE validation ≤ 0,5 × MAE identity. Hasil float dibulatkan ke grid desimal
+terkasar (0,01/0,005/0,0025/0,001) yang memuat ≥99% baris FM4 kolom tersebut, atau ke
+6 desimal bila tidak ada; integer mengikuti kelipatan nilai FM4 training.
+
+Kolom milik adapter lain tidak dipelajari: identitas, metadata integrasi,
+`PerformanceIndex`/`ClassID` (`performance_index.py`), tinggi stock dan `CMHeight`
+(`code_semantics`), kurva torsi, serta rate pegas/damper/antiroll. Rate tersebut
+dinormalisasi identik oleh kedua game (558/558 koefisien yang ditelusuri), sehingga
+selisih FM4 adalah setelan ulang per mobil, bukan satuan; adapter juga mengaudit
+batas ekstensi terhadap rate itu.
+
+| Kolom | Aturan | Validation (aturan / identity) | Status |
+|---|---|---|---|
+| Speed/Handling/Launch Rating | linear | MAE 0,116 / 0,549; 0,116 / 0,334; 0,186 / 1,256 | diterima |
+| Acceleration/Braking Rating | loglinear | MAE 0,070 / 1,623; 0,136 / 0,274 | diterima |
+| SimLatGees60/120MPH, SimTimeTo60MPH | linear | MAE 0,014 / 0,108; 0,021 / 0,104; 0,173 / 0,353 s | diterima |
+| `MakeIcon` → `BOING`, `GaugeID` → −1 | constant | 73/73 (0/73, 41/73) | diterima |
+| `List_Wheels.DisplayName` '' → `NULL` | lookup | 73/73 (0/73) | diterima |
+| Grip chassis 4 kolom | linear | MAE 0,0026 / 0,0073 (depan); 0,0028 / 0,0063 (belakang) | diterima, **fisika: opt-in** |
+| `GameFrictionScaleBraking` | linear, grid 0,0025 | MAE 0,0007 / 0,0088; 53/73 tepat (identity 54/73 tepat dengan galat lebih besar pada sisanya) | diterima, **fisika: opt-in** |
+| Sim top speed, jarak rem, quarter mile, 0–100 | linear/loglinear | perbaikan < 50% | ditolak |
+| `BaseCost`, `FamilyBodyID`, `GameDragScale`, `GameTorqueScale`, inertia transmisi | — | tidak lebih baik dari identity | ditolak |
+| `GasTankSize`, `HasRaceLivery` | — | tidak ada kandidat sah | ditolak |
+
+Aturan metadata dan konvensi diterapkan secara default melalui `--value-scales`.
+Aturan fisika lolos gerbang tetapi mengubah handling, sehingga hanya berlaku dengan
+`--physics-scales`. Kolom ditolak tetap memakai nilai FM3. Untuk mobil yang hanya
+ada di FM3, nilai hasil aturan adalah estimasi skala FM4, bukan nilai yang pernah
+dibuat Turn 10; kecocokan persis hanya dapat diperiksa pada pasangan.
+
+```powershell
+python -m fm4_converter.fm3.value_scales --rules outputs/fm-car-converter/benchmark30-refinements-v1/rules.json --out outputs/fm-car-converter/value-scales-new/rules.json
+python -m fm4_converter.fm3.offline_package ... --pi-model <pi-model.json> --value-scales <rules.json> [--physics-scales] --content-root <...> --out <new-package-directory>
+```
+
+Cobalt v10 (default, tanpa fisika): Speed 5,22→5,06, Handling 4,92→4,61,
+Acceleration 3,93→5,82, Launch 4,77→6,19, Braking 4,68→4,48, 0–60 6,85→7,12 s,
+lateral G 60 mph 0,890→0,811. Nilai ini berada di antara rekan kelas C FM4
+(Golf GTI 2006/2010, Ion 2006, Focus ST 2006, Civic Type R 2007). Hanya baris
+`Data_Car` 305 dan velg yang berubah dibanding v9.
+
+Run e2e `cobalt-v10-1` (pengaturan sama dengan v9): Car Select menampilkan
+"Cobalt SS (FM3)", C 366 dan rating 5,1 / 4,6 / 5,8 / 6,2 / 4,5; logo Chevrolet
+tetap tampil dengan `MakeIcon = BOING` karena FM4 mengambil logo dari
+`List_CarMake`. Daftar peserta: Cobalt SS (FM3) C 366, posisi 3 di antara lawan
+C/D 330–383. Tanpa crash; kunci error runtime sama dengan run sebelumnya.
+Cobalt v11 (`--physics-scales`) mengubah grip chassis depan 0,9725→0,982288 dan
+belakang 1,0→0,99422; rem tetap 1,0 karena hasil aturan pada grid FM4 sama dengan
+nilai FM3. Database v11 hanya berbeda dari v10 pada empat kolom grip tersebut.
+Uji pembanding dengan `FM4_FIXED_SEED=1` dan `FM4_FIXED_FRAME_TIME=1` (grid, lawan
+dan AI driver sama) hingga balapan 2 lap selesai:
+
+| Run | Durasi start → finis pemain | Posisi |
+|---|---|---|
+| `cobalt-v11-fin` | 280,7 s | 1st |
+| `cobalt-v10-fin` | 280,5 s | 1st |
+| `cobalt-v10-fin2` | 280,8 s | 1st |
+
+Selisih v11 berada di dalam variasi dua run v10 (±0,3 s), jadi perubahan grip ±1%
+tidak terukur dengan AI driver pada satu lintasan. Durasi diukur dari event layar
+(waktu dinding), bukan dari timer balapan. Uji ini membuktikan v11 dimuat dan
+dikendarai sampai finis tanpa crash atau error baru; tidak membuktikan handling
+lebih mirip FM4. Kemenangan AI di ketiga run juga belum berarti mobil terlalu cepat
+untuk kelasnya: pembandingnya mobil native yang dikendarai AI driver yang sama.
+
+## Semua mobil FM3-only dalam satu paket — fm3-only-v1
+
+Lanjutan 2 November 2026. Daftar mobil dihitung ulang, bukan diambil dari disc
+saja: FM3 USA punya 415 mobil, 100 di antaranya tidak ada di database Disc 1 FM4,
+tetapi 19 dari 100 itu (misalnya Porsche 911 GT2 '95, 959, Carrera GT) sudah
+dibawa patch DLC FM4 yang terpasang. Tersisa **81 mobil FM3-only**. Aset 55 mobil ada
+di `Media/Cars` Disc 1 FM3; 26 lainnya hanya ada di paket STFS Disc 2 FM3
+(`4D53084D0CCF0013/14/15`, ZIP `<n>_pri_65.zip` berisi folder `media/cars/<nama>/`).
+
+FM4 hanya membaca satu `gamedb.slt`, satu `Data_Car.str` per bahasa dan satu mount
+atlas thumbnail, sehingga paket per mobil tidak bisa digabung dengan menyalin file.
+`batch_package.py` merencanakan mobil satu per satu terhadap database paket yang terus
+bertambah. Dengan begitu kunci baru tidak saling bertabrakan, sementara setiap kunci di
+patch DLC yang terpasang tetap dicadangkan (`reserved`). Hasilnya satu overlay: satu
+database, ZIP per mobil dan per velg, satu `Thumbnails.zip`, satu `stringtables.zip`
+dan satu `zipmanifest.xml`.
+
+```powershell
+python -m fm4_converter.fm3.batch_package --model-helper <carbin-cpu-v4>\carbin-cpu.exe --rules <rules.json> --pi-model <pi-model.json> --value-scales <rules.json> --content-root <...\4D530910\00000002> --out <paket-baru>
+```
+
+Aturan tambahan yang dibutuhkan agar banyak mobil bisa lolos. Semuanya punya preseden
+di FM4 sendiri atau sudah dibuktikan; selain itu tetap ditolak:
+
+- **Velg**: velg yang sudah dibawa FM4 (disc atau DLC terpasang) dipakai ulang dan
+  ikut diaudit, tetapi tidak dikirim lagi. Velg yang dipakai beberapa mobil impor
+  hanya dikonversi sekali.
+- **Registry DLC**: make Porsche (ID 39) hanya ada di Porsche Expansion
+  (`34_pri_65.zip`). Converter memakai baris registry DLC hanya bila disc tidak
+  punya padanannya, lalu mencatatnya di `requires` mobil tersebut.
+- **Kunci nama**: patch DLC FM4 memakai ulang beberapa kunci `Data_Car.str` FM3
+  (kunci DisplayName DBR9 FM3 = Lotus Eleven FM4, Corvette C6.R = Scion FR-S).
+  `ui_names.rekey` memindahkan mobil semacam itu ke kunci bebas tertinggi di semua
+  tabel bahasa, sehingga tidak ada nama FM4 yang ditimpa.
+- **`carattribs.xml` versi lama**: FM4 membawa mobil native dengan CarAttributes
+  4/10/11/12/13/14 dan mobil tanpa file itu (FOR_5_FGFalcon_11, MER_1_CClass_11).
+  Audit menerima versi/tata letak gauge yang sama dengan preseden native. Bila
+  `Use10_2Animations`/`HasPaddleShifter` tidak ada, dipakai klip standar dan
+  asumsinya dicatat.
+- **Material**: override `shadersettings.xml` yang tidak terikat ke konstanta efek
+  (CockpitPaintScale ada di 22 mobil native), elemen kosong (GMC_Syclone_92), tidak
+  adanya `shadersettings.xml` (63 mobil native), normal map cockpit tertentu yang
+  tidak ada (`plastic2_NRM` pada AST_One77_10 dan tiga lainnya, `leather2_NRM` pada
+  CHE_CobaltSS_10 dan tiga lainnya, `wood.xds` pada MER_SLSAMG_11), serta nama teknik tanpa efek yang persis
+  dipakai mobil native (`Material__1` pada TVR_Sagaris_05,
+  `cockpit_Tail_light_lod0` pada CHE_CamaroSS_10). Semua kasus ini dicatat di
+  `appearance_validation.json`.
+- **Geometri**: beberapa section FM3 punya vertex di luar bounds-nya sendiri (|q|
+  sampai 4,1 pada lampu FER_30_333SP_98). Encoder FM4 meng-clamp vertex itu sampai
+  0,45 m. Helper `carbin-cpu-v4` menambahkan patch tercatat (`build_carbin_cpu.PATCHES`,
+  `tools/carbin_cpu/Motorsport3Bounds.cs`) yang hanya untuk section tersebut menghitung
+  ulang bounds menurut konvensi FM4 (pusat AABB, simetris). Output untuk section
+  lain identik byte demi byte dengan v3 (Cobalt 11/11 carbin).
+- **Audit geometri** kini memodelkan perilaku konverter untuk half UV NaN (dibaca 0;
+  satu UV2 pada FER_88_550Maranello_03) dan untuk sumbu tangent sumber nol atau
+  sejajar normal (fallback +Z/+X).
+- **Thumbnail**: render FM3 yang memotong mobil di tepi gambar (sayap MC12) diterima
+  bila paling banyak 10% piksel border tertutup mobil.
+- **`WeightDistDiff`**: oil cooler stock pada tiga mobil "IE" bernilai sekitar 2e-4.
+  Delta stock dengan jumlah ≤ 1e-3 diterima, beserta batas efeknya pada tinggi
+  berbobot (`weighted_height_uncertainty_m`). Delta yang lebih besar tetap ditolak.
+- **PaintScale cockpit** (lihat bagian "Interior cockpit putih" di bawah): converter
+  menambahkan konstanta paint-scale FM4 untuk setiap teknik cockpit yang dipakai
+  model ke `shadersettings.xml`. Nilai dan isi sumber lain tidak diubah; audit
+  menerima perubahan pada file itu hanya bila hasilnya sama persis dengan aturan.
+- **Blok spion tengah**: header model cockpit FM4 (word 0x104..0x153) diisi dari mesh
+  `mirrorMiddle` (`carbin_audit.mirror_block`, cocok untuk 261/261 cockpit native).
+
+Hasil `outputs/fm-car-converter/fm3-only-v1/package` dengan aturan refined
+conservative, model PI, `--value-scales` tanpa fisika, dan content root uji:
+**73 dari 81 mobil terkemas** dalam satu overlay (110 file, 1,93 GiB). Asal velg: 33
+dikonversi, 27 velg disc FM4, 5 velg DLC terpasang, dan 8 velg dipakai bersama di paket.
+Sebanyak 24 mobil berasal dari Disc 2 FM3, dan 11 mendapat kunci nama baru. Ada 12 mobil
+yang butuh Porsche Expansion dan/atau pack `0003`; daftarnya di `requires` manifest.
+Sebaran kelas: R3 24, R2 21, S 8, R1 6, B 4, C 4, A 2, D 2, E 1, X 1.
+
+Delapan mobil tetap ditolak karena tidak ada preseden FM4:
+
+| Mobil | Alasan |
+|---|---|
+| PON_GTO_68 | material `bump_plastic` pada part `wheel` LOD3, teknik tidak ada |
+| TOY_35_Supra_04 | material bernama `LOD1` pada `bumperFrameF` |
+| FER_71_F430GT_08 | material `body2` pada bumper depan |
+| CAD_8_CTSV_08 | `shadersettings.xml` sumber rusak (tag penutup berlebih) |
+| HON_FitSportIE_09, NIS_VersaIE_09, TOY_YarisSIE_08, CHE_Aveo5IE_09 | massa bodi stock ≠ `CurbWeight` × 100 (part pengurang bobot stock); tidak ada mobil native FM4 dengan pola ini |
+
+Uji e2e Motorsport DX (Quick Race, Disc 2 + 8 DLC, AI driver, tanpa crash, kunci
+error runtime sama dengan baseline Cobalt):
+
+| Run | Mobil | Yang diuji | Car Select | Hasil |
+|---|---|---|---|---|
+| fm3only72-dbr9 | #008 Bell Motorsports DBR9 (FM3) | kunci nama dipindah, paket 72 | R2 842 | balapan, cockpit + tangan driver |
+| fm3only-dodge | SRT4 (FM3) | sumber Disc 2 FM3 | C 423 | balapan |
+| fm3only-porsche | Boxster S (FM3) | make dari DLC, CarAttributes v10 | B 463 | balapan |
+| fm3only-a4 | A4 Touring Car (FM3) | tanpa carattribs, bounds direfit | R2 830 | balapan; lawan AI "GT500 SC430 (FM3)" |
+
+Target OCR pemilihan make memakai teks sejarah pabrikan. Logo di strip bisa
+memuat nama pabrikan lain (logo "ASTON MARTIN" terbaca saat Alfa Romeo masih terpilih).
+Empat run tidak membuktikan 69 mobil lainnya; handling, suara, upgrade dan tune belum
+dinilai.
+
+### Interior cockpit putih — penyebab dan perbaikan
+
+Paket di atas menampilkan interior mobil jalanan putih polos (SRT4, juga Cobalt sejak
+v9). Penyebabnya dicari dengan bisect di Motorsport DX memakai SRT4 ACR native FM4
+(model dan tekstur interiornya hampir sama dengan SRT4 FM3) sebagai pembanding.
+Frame tersimpan di `outputs/fm-car-converter/cockpit-paint-v1/runtime/`.
+
+| Varian SRT4 (FM3) | Interior |
+|---|---|
+| paket asli | putih |
+| + blok spion tengah di header cockpit | putih |
+| carbin cockpit diganti carbin native SRT4 ACR | putih |
+| shadersettings, carattribs, interior_lod0, leather2_nrm, versiondata dan buildnumber dari ACR | gelap normal |
+| hanya `shadersettings.xml` dari ACR | gelap normal |
+| kontrol: SRT4 ACR native | gelap normal |
+
+Efek cockpit FM4 mengalikan tekstur interior dengan konstanta paint-scale
+(`PaintScale`, `CockpitPaintScale`, `CockpitPlasticPaintScale`). Mobil tanpa setting
+memakai default global `Shared.zip/ShaderSettings/Normal.xml`, misalnya 0,5 untuk
+plastic/leather/cloth/solid, 0,35 untuk mottled, 0,3 untuk bump_plastic, dan 0,002
+untuk metal. Bila teknik tidak ada di file itu, dipakai initializer effect 1,0
+(dibaca dari `shaders_v16.fxobj`; cara bacanya dicek dengan `MinCockpitShadow` 0 dan
+`ShadowDarkeningRamp` 4). Efek FM3 tidak punya konstanta ini.
+
+Pada 117 mobil yang ada di kedua game, FM4 menampilkan material cockpit di sekitar 0,38×
+default dikali albedo tekstur FM3-nya. Ada dua cara: tekstur digelapkan (mayoritas,
+tanpa setting) atau tekstur dipertahankan dengan setting rendah (SRT4 ACR: plastic 0,108).
+Tekstur FM3 pada nilai default menjadi sekitar 2,6× terlalu terang.
+
+Percobaan pertama mengira default-nya 1,0, sehingga nilai yang dipakai dua kali terlalu
+tinggi (plastic 0,325). Hasilnya interior SRT4 masih putih.
+
+Rasio yang diukur adalah (albedo FM4 × setting atau default) / albedo FM3, berupa
+luminans linear yang disampel pada UV vertex LOD0 tiap mesh
+(`cockpit-paint-v1/ratio_all.py`). Mediannya: wood 0,096*, bump_plastic 0,113,
+bump_plastic3 0,115*, mottled 0,137, solid 0,153, rubber 0,159, plastic 0,169,
+bump_leather 0,183, bump_plastic2 0,187, stitching dan bump_leather3 0,191*, cloth
+0,206, badge 0,208, bump_leather2 0,216, leather 0,220, reflector 0,398,
+gauge_emissive 0,416, metal 0,002. Teknik bertanda * dipakai kurang dari 20 mobil,
+sehingga nilainya = default × 0,382, median gabungan rasio/default non-metal (1.118
+sampel). `appearance_audit.COCKPIT_PAINT_SCALES` menuliskan nilai ini untuk teknik yang
+dipakai model cockpit. Setting yang sudah ada di sumber dibiarkan. `cockpit_body` (cat
+bodi) dan `cockpit_shadowMap` tidak disentuh. Teknik tanpa data pembanding
+(`cockpit_metal2`, `cockpit_smooth_metal`) dicatat dan dibiarkan pada default. Tekstur
+tidak diubah.
+
+Ke-73 mobil paket `fm3-only-v1/package-paint` mendapat setting ini, tanpa teknik yang tak
+terukur. Paket ini menggantikan `fm3-only-v1/package`. Hasilnya tetap 73 dari 81 mobil
+dengan delapan penolakan yang sama. Satu jebakan sempat ditemukan: DOD_57_ViperGTSR_00
+menulis elemen `cockpit_carbon_fiber` dua kali, sehingga verifikasi kini membandingkan
+semua entri sumber secara berurutan.
+
+Uji e2e pada disc `fm3-only-paint` (Quick Race, AI driver, tanpa crash, kunci error sama
+dengan baseline):
+
+| Run | Mobil | Interior |
+|---|---|---|
+| paint-srt4 | SRT4 (FM3) | abu-abu dengan shading, sedikit lebih terang dari SRT4 ACR native (setting median 0,169 vs 0,108 milik ACR) |
+| paint-cobalt | Cobalt SS (FM3) | abu-abu, dasbor dan panel pintu terbaca |
+| paint-a4b | A4 Touring Car (FM3) | interior balap hitam, tidak berubah |
+
+Penilaian ini visual pada satu lintasan dan satu waktu siang. Belum ada pengukuran
+luminans per patch terhadap mobil native, dan 70 mobil lainnya belum dilihat di game.
+
+Header cockpit native juga memuat blok 0x104..0x153 berisi kotak mesh `mirrorMiddle`
+(pusat, baris rotasi identitas, setengah ukuran; batas atas dimulai dari 0) dan word
+0x150 = 0. Cockpit tanpa spion tengah (44 mobil balap native) berisi 1. Helper
+`carbin-cpu` menulis nol/1, dan converter kini mengisinya (49 dari 73 cockpit). Fungsi
+blok ini di game belum diketahui: run SRT4 dengan dan tanpa blok terlihat sama.
+
+Masih terbuka: normal map cockpit FM3 (`*_nrm.xds`) berformat DXT1, sedangkan semua
+261 normal map cockpit di `Media/Cars` FM4 (termasuk `Shared.zip`) berformat DXN. Pengaruhnya pada bump interior belum
+diukur.
+
 ## Hasil prototype fisika
 
 - `candidate_stock.slt`: tabel FM4 dengan baris stock hasil konversi dan ID eksperimen yang tidak berbenturan dengan database dasar target.

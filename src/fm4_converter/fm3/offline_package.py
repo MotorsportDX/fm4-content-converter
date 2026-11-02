@@ -60,7 +60,8 @@ def overlay_collisions(result, paths):
     return reports
 
 
-def build(source, target, out, media, helper, rules=None, display_name=None, overlays=()):
+def build(source, target, out, media, helper, rules=None, display_name=None, overlays=(), pi_model=None,
+          content_root=None, scales=None, physics_scales=False):
     source,target,out = (Path(p).resolve() for p in (source,target,out))
     for original in (source.parents[2],target.parents[2]):
         if out==original or out in original.parents or original in out.parents:
@@ -69,7 +70,12 @@ def build(source, target, out, media, helper, rules=None, display_name=None, ove
         raise c.MappingError("Choose a new package directory")
     with closing(c.connect(source)) as a, closing(c.connect(target)) as b:
         rule_data = json.loads(Path(rules).read_text()) if rules else None
-        src,plan = integration.build_plan(a,b,media,rule_data,display_name)
+        pi_data = json.loads(Path(pi_model).read_text()) if pi_model else None
+        scale_data = json.loads(Path(scales).read_text()) if scales else None
+        src,plan = integration.build_plan(a,b,media,rule_data,display_name,pi_data,scale_data,physics_scales)
+        if content_root:
+            # Every installed pack's database patch, not only the ones named.
+            overlays = sorted(set(map(Path,overlays))|set(Path(content_root).glob("*/Media/DLCZips/*.zip")))
         collision_report = overlay_collisions(plan,overlays)
     out.mkdir(parents=True)
     media_root = out/"files/Media"
@@ -78,7 +84,8 @@ def build(source, target, out, media, helper, rules=None, display_name=None, ove
     shutil.copyfile(target.parents[1]/"zipmanifest.xml",media_root/"zipmanifest.xml")
     try:
         manifest = integration.stage_probe(source,target,out/"files",out/"reports",media,
-                                            rules,display_name,helper)
+                                            rules,display_name,helper,pi_model,content_root,
+                                            scales,physics_scales)
         result = json.loads((out/"reports/result.json").read_text())
         with closing(c.connect(target)) as db:
             # The import patch contains both physics and presentation metadata.
@@ -125,6 +132,13 @@ if __name__=="__main__":
     p.add_argument("--rules",type=Path)
     p.add_argument("--display-name")
     p.add_argument("--overlay-zip",type=Path,action="append",default=[])
+    p.add_argument("--pi-model",type=Path,help="performance_index study output (accepted model)")
+    p.add_argument("--content-root",type=Path,
+                   help="installed content packages (...\4D530910\00000002): DLC collisions and car names")
+    p.add_argument("--value-scales",type=Path,help="value_scales study output (accepted rules)")
+    p.add_argument("--physics-scales",action="store_true",
+                   help="also apply its handling rules (chassis grip, brake friction)")
     a = p.parse_args()
-    r = build(a.fm3,a.fm4,a.out,a.media_name,a.model_helper,a.rules,a.display_name,a.overlay_zip)
+    r = build(a.fm3,a.fm4,a.out,a.media_name,a.model_helper,a.rules,a.display_name,a.overlay_zip,
+              a.pi_model,a.content_root,a.value_scales,a.physics_scales)
     print(json.dumps({k:v for k,v in r.items() if k not in ("inputs","assets","files")},indent=2))

@@ -85,25 +85,175 @@ def load_flags(expression, flags):
     return result
 
 
+# Legacy layouts FM4 itself ships in Disc 1 Media/Cars (count of native cars,
+# 2 November 2026): (CarAttributes, Driver) version -> elements every native
+# file of that version has, and the gauge layout. Version 4 predates the
+# cockpit/hands block; 10/11 keep gauges at the top level. Native race cars
+# without carattribs.xml (FOR_5_FGFalcon_11, MER_1_CClass_11) also exist.
+_COCKPIT = ("DriverHandsOffset", "DriverHandsScale", "CockpitNearPlane", "CockpitShadowScale",
+            "DriverHandsSteeringWheelOverride", "SteeringWheelAngleOverride")
+NATIVE_LAYOUTS = {
+    ("4", "5"): ((), None), ("4", "6"): ((), None),
+    ("10", "6"): (_COCKPIT, ["Speed", "Tach", "Fuel"]),
+    ("11", "6"): (_COCKPIT, ["Speed", "Tach", "Fuel", "Boost"]),
+    **{(v, "6"): (_COCKPIT, "Gauges") for v in ("12", "13", "14", "15")},
+}
+
+
+# Car-folder textures some native FM4 cars omit although they use the technique
+# (Disc 1 scan, 2 November 2026); the game runs those cars, so their absence
+# is accepted for these exact pairs and recorded.
+ABSENT_TEXTURE_PRECEDENT = {
+    ("cockpit_bump_plastic2", "plastic2_nrm.xds"): "AST_One77_10, MER_SLR_05, PEU_308RCZ_10, PON_FirebirdTransAm_69",
+    ("cockpit_bump_leather2", "leather2_nrm.xds"): "CAD_CTSV_09, CHE_CobaltSS_10, FER_360_99, MAZ_RX7SpiritR_02",
+    ("cockpit_bump_plastic3", "plastic3_nrm.xds"): "FER_599_06",
+    ("cockpit_wood", "wood.xds"): "MER_SLSAMG_11",
+}
+
+
+# Mapped technique names FM4's own cars use although its effects lack them
+# (Disc 1 scan, 2 November 2026). The game draws those cars, so a mesh with
+# exactly such a name is accepted and listed; any other unknown name is not.
+NATIVE_UNKNOWN_TECHNIQUES = {
+    "Material__1": "TVR_Sagaris_05 wheel LOD0",
+    "cockpit_Tail_light_lod0": "CHE_CamaroSS_10 interior LOD0",
+}
+
+
+# FM4's cockpit effects multiply the interior texture by a paint-scale constant;
+# a car without a setting gets the global default of Shared.zip
+# ShaderSettings/Normal.xml (0.5 for plastic/leather/cloth, 0.002 for metal...),
+# else the effect initializer 1.0. FM3's effects have no such constant. On the
+# 117 cars both games ship, FM4 shows a cockpit material at about 0.38x the
+# default times its FM3 texture albedo, through darker textures or lower
+# settings: median of (FM4 albedo x setting or default) / FM3 albedo, linear
+# luminance at the mesh's LOD0 vertex UVs
+# (outputs/fm-car-converter/cockpit-paint-v1/ratio_all.py). FM3 textures at the
+# default render flat white (SRT4 ACR, the FM4 port of an FM3 car, sets 0.108 for
+# plastic). Medians of >= 20 cars; the rest take default x 0.382, the pooled
+# non-metal ratio. Not set: cockpit_body (car paint), cockpit_shadowMap, and
+# techniques no shared car uses (listed in the record).
+COCKPIT_PAINT_SCALES = {
+    "cockpit_plastic": ("CockpitPlasticPaintScale", 0.169),
+    "cockpit_mottled": ("CockpitPlasticPaintScale", 0.137),
+    "cockpit_gauge_emissive": ("CockpitPlasticPaintScale", 0.416),
+    "cockpit_badge": ("PaintScale", 0.208),
+    "cockpit_cloth": ("PaintScale", 0.206),
+    "cockpit_leather": ("PaintScale", 0.220),
+    "cockpit_metal": ("PaintScale", 0.002),
+    "cockpit_reflector": ("PaintScale", 0.398),
+    "cockpit_rubber": ("PaintScale", 0.159),
+    "cockpit_solid": ("PaintScale", 0.153),
+    "cockpit_stitching": ("PaintScale", 0.191),
+    "cockpit_wood": ("PaintScale", 0.096),
+    "cockpit_bump_leather": ("CockpitPaintScale", 0.183),
+    "cockpit_bump_leather2": ("CockpitPaintScale", 0.216),
+    "cockpit_bump_leather3": ("CockpitPaintScale", 0.191),
+    "cockpit_bump_plastic": ("CockpitPaintScale", 0.113),
+    "cockpit_bump_plastic2": ("CockpitPaintScale", 0.187),
+    "cockpit_bump_plastic3": ("CockpitPaintScale", 0.115),
+}
+UNMEASURED_PAINT_TECHNIQUES = ("cockpit_metal2", "cockpit_smooth_metal")
+
+
+def cockpit_paint_settings(settings, techniques):
+    """Source shadersettings.xml plus FM4 paint scales for `techniques`.
+
+    Source text and values are kept; a technique the source already scales is
+    left alone. Returns (bytes or None, added, unmeasured)."""
+    wanted = [(t, *COCKPIT_PAINT_SCALES[t]) for t in sorted(techniques) if t in COCKPIT_PAINT_SCALES]
+    unmeasured = sorted(t for t in techniques if t in UNMEASURED_PAINT_TECHNIQUES)
+    root = xml(settings) if settings is not None else ET.Element("ShaderSettings")
+    wanted = [w for w in wanted if not root.findall(w[0]+"/"+w[1])]
+    if not wanted:
+        return settings, [], unmeasured
+    bom = b"\xef\xbb\xbf" if settings is not None and settings.startswith(b"\xef\xbb\xbf") else b""
+    text = settings[len(bom):].decode("utf-8") if settings is not None else "<ShaderSettings>\r\n</ShaderSettings>\r\n"
+    newline = "\r\n" if "\r\n" in text else "\n"
+
+    def before(match):
+        # At the start of the closing tag's line when only indentation precedes it.
+        start = text.rfind("\n", 0, match.start())+1
+        return start if not text[start:match.start()].strip() else match.start()
+    tail = []
+    for name, key, value in wanted:
+        line = f'    <{key} value="{value:.3f}"/>{newline}'
+        if root.find(name) is None:
+            tail.append(f"  <{name}>{newline}{line}  </{name}>{newline}")
+            continue
+        closing = list(re.finditer(rf"</{name}\s*>", text))
+        empty = list(re.finditer(rf"<{name}\s*/>", text))
+        if len(closing)+len(empty) != 1:
+            raise AppearanceError(f"Ambiguous shadersettings element: {name}")
+        if closing:
+            at = before(closing[0])
+            text = text[:at]+(line if at < closing[0].start() or text[at-1:at] == "\n" else newline+line)+text[at:]
+        else:
+            m = empty[0]
+            text = text[:m.start()]+f"<{name}>{newline}{line}  </{name}>"+text[m.end():]
+    end = list(re.finditer(r"</ShaderSettings\s*>", text))
+    if len(end) != 1:
+        raise AppearanceError("Malformed shadersettings.xml root")
+    at = before(end[0])
+    lead = "" if not tail or text[at-1:at] in ("\n", "") else newline
+    text = text[:at]+lead+"".join(tail)+text[at:]
+    result = bom+text.encode("utf-8")
+    # Every source entry, in order (some FM3 files repeat an element).
+    entries = lambda r, skip=(): [(n.tag, p.tag, p.attrib) for n in r for p in n if (n.tag, p.tag) not in skip]
+    if entries(xml(result), {(n, k) for n, k, _ in wanted}) != entries(root):
+        raise AppearanceError("Source shadersettings value changed")
+    return result, [{"technique": n, "parameter": k, "value": round(v, 3)} for n, k, v in wanted], unmeasured
+
+
+def cockpit_techniques(payloads, media):
+    path = next((p for p in payloads if p.as_posix().casefold()
+                 == f"media/cars/{media}/{media}_cockpit.carbin".casefold()), None)
+    if path is None:
+        return set()
+    model = carbin_audit.parse(payloads[path], "FM4")
+    return {technique(s["name"], m["name"], m["lod"]) for s in model["sections"] for m in s["meshes"]}
+
+
+def with_cockpit_paint_scales(payloads, media):
+    """Write FM4 paint scales for the cockpit's techniques into shadersettings.xml."""
+    car = f"Media/Cars/{media}/"
+    path = next((p for p in payloads if p.as_posix().casefold() == (car+"shadersettings.xml").casefold()),
+                Path(car)/"shadersettings.xml")
+    result, added, unmeasured = cockpit_paint_settings(payloads.get(path), cockpit_techniques(payloads, media))
+    payloads = dict(payloads)
+    if result is not None:
+        payloads[path] = result
+    return payloads, {"added": added, "unmeasured_techniques_left_at_default": unmeasured}
+
+
 def driver_attributes(data):
+    if data is None:
+        return {"car_attributes_version": None, "native_precedent": "no carattribs.xml",
+                "source_attributes_preserved": True}
     root = xml(data)
-    if root.tag != "CarAttributes" or root.get("Version") != "15":
-        raise AppearanceError("Only reviewed legacy CarAttributes version 15 is supported")
     driver = root.find("Driver")
-    if driver is None or driver.get("Version") != "6":
-        raise AppearanceError("Expected reviewed driver attributes version 6")
-    for node in (driver, root.find("DriverHandsOffset"), root.find("DriverHandsScale"),
-                 root.find("CockpitNearPlane"), root.find("CockpitShadowScale"),
-                 root.find("DriverHandsSteeringWheelOverride"), root.find("SteeringWheelAngleOverride")):
+    version = (root.get("Version"), driver.get("Version") if driver is not None else None)
+    if root.tag != "CarAttributes" or version not in NATIVE_LAYOUTS:
+        raise AppearanceError(f"CarAttributes/Driver version {version} has no native FM4 precedent")
+    required, layout = NATIVE_LAYOUTS[version]
+    for node in (driver, *(root.find(n) for n in required)):
         if node is None or not all(math.isfinite(float(v)) for v in node.attrib.values()):
             raise AppearanceError("Missing/nonfinite driver or cockpit attribute")
     for node, attr in ((driver, "BodyScale"), (root.find("DriverHandsScale"), "value"),
                        (root.find("CockpitNearPlane"), "value")):
-        if float(node.get(attr, "0")) <= 0:
+        if node is not None and float(node.get(attr, "0")) <= 0:
             raise AppearanceError("Driver scale or cockpit near plane must be positive")
-    gauges = root.find("Gauges")
-    if gauges is None or [g.tag for g in gauges] != ["Speed", "Tach", "Fuel", "Boost"]:
-        raise AppearanceError("Unreviewed legacy gauge layout")
+    if layout == "Gauges":
+        gauges = root.find("Gauges")
+        if gauges is None or [g.tag for g in gauges] != ["Speed", "Tach", "Fuel", "Boost"]:
+            raise AppearanceError("Unreviewed legacy gauge layout")
+        gauges = list(gauges)
+    elif layout:
+        gauges = [root.find(n) for n in layout]
+        if any(g is None for g in gauges):
+            raise AppearanceError("Unreviewed legacy gauge layout")
+    else:
+        gauges = []
     counts = {}
     for gauge in gauges:
         ticks = [(float(t.attrib["Param"]), float(t.attrib["Value"])) for t in gauge]
@@ -114,11 +264,13 @@ def driver_attributes(data):
         if any(ticks[i][1] >= ticks[i+1][1] for i in range(len(ticks)-1)):
             raise AppearanceError("Gauge input values are not strictly increasing")
         counts[gauge.tag] = len(ticks)
-    offset = [float(root.find("DriverHandsOffset").attrib["value."+a]) for a in "xyz"]
-    return {"car_attributes_version": 15, "driver_version": 6, "gauge_tick_counts": counts,
-            "hands_offset": offset, "hands_auto_offset": all(x == 0 for x in offset),
+    hands, near = root.find("DriverHandsOffset"), root.find("CockpitNearPlane")
+    offset = [float(hands.attrib["value."+a]) for a in "xyz"] if hands is not None else None
+    return {"car_attributes_version": int(version[0]), "driver_version": int(version[1]),
+            "gauge_tick_counts": counts, "hands_offset": offset,
+            "hands_auto_offset": offset is None or all(x == 0 for x in offset),
             "body_scale": float(driver.attrib["BodyScale"]),
-            "near_plane": float(root.find("CockpitNearPlane").attrib["value"]),
+            "near_plane": float(near.attrib["value"]) if near is not None else None,
             "source_attributes_preserved": True}
 
 
@@ -155,10 +307,16 @@ def audit(source, target, target_root, media, wheel, archive_read):
     wheel_root = f"Media/Wheels/{wheel}/".casefold()
     for filename in ("carattribs.xml", "shadersettings.xml"):
         old = next((b for p, b in source.items() if p.as_posix().casefold() == car+filename), None)
-        if old is None or old != lookup.get(car+filename):
+        if filename == "shadersettings.xml":
+            # Only the FM4 cockpit paint scales may be added (see COCKPIT_PAINT_SCALES).
+            old, paint_added, paint_unmeasured = cockpit_paint_settings(old, cockpit_techniques(target, media))
+        # Absent in both is native too (63 Disc 1 cars ship no shadersettings.xml).
+        if old != lookup.get(car+filename):
             raise AppearanceError(f"Source {filename} was not preserved")
-    driver = driver_attributes(lookup[car+"carattribs.xml"])
-    overrides = xml(lookup[car+"shadersettings.xml"])
+    attributes = lookup.get(car+"carattribs.xml")
+    driver = driver_attributes(attributes)
+    settings_xml = lookup.get(car+"shadersettings.xml")
+    overrides = xml(settings_xml) if settings_xml is not None else ET.Element("ShaderSettings")
     inputs, libraries = {}, {}
     for mode, filename in (("race", "shaders_v16.fxobj"), ("ui", "shaders_ui_v16.fxobj")):
         path = target_root/"Shaders/Cars"/filename
@@ -185,11 +343,11 @@ def audit(source, target, target_root, media, wheel, archive_read):
                 raise AppearanceError(f"Missing native driver dependency: {required}")
         driver_payloads = {n: archive_read(z, n) for n in sorted(entries.values())}
         driver_files = [{"path": n, "sha256": sha(b)} for n, b in driver_payloads.items()]
-        driver_animation = driver_audit.audit(lookup[car+"carattribs.xml"], driver_payloads)
+        driver_animation = driver_audit.audit(attributes, driver_payloads)
         decoder = granny_audit.decoder_path()
         inputs[str(decoder)] = sha(decoder.read_bytes())
 
-    bindings, rows, undeclared, checked_overrides = {}, [], set(), []
+    bindings, rows, undeclared, checked_overrides, absent, unknown_techniques = {}, [], set(), [], [], []
     with zipfile.ZipFile(shared_path) as shared:
         names = {n.casefold(): n for n in shared.namelist()}
         definitions = xml(archive_read(shared, names["textures.xml"]))
@@ -197,15 +355,27 @@ def audit(source, target, target_root, media, wheel, archive_read):
                     for n in ("normal", "metallic", "ui")]
         for node in overrides:
             for parameter in node:
-                for mode, effects in libraries.items():
-                    if node.tag not in effects or parameter.tag not in effects[node.tag]["constants"]:
-                        raise AppearanceError(f"Unknown {mode} material override: {node.tag}/{parameter.tag}")
-                if not parameter.attrib or not all(math.isfinite(float(v)) for v in parameter.attrib.values()):
-                    raise AppearanceError("Nonfinite/empty material override")
-                checked_overrides.append({"technique": node.tag, "parameter": parameter.tag, **parameter.attrib})
+                # Native FM4 shadersettings also name techniques/constants its
+                # effects lack (e.g. CockpitPaintScale on 22 Disc 1 cars,
+                # tail_light_LOD0 on ACU_NSX_97): the binder leaves them unused.
+                unbound = [mode for mode, effects in libraries.items()
+                           if node.tag not in effects or parameter.tag not in effects[node.tag]["constants"]]
+                # Empty elements carry nothing to bind; FM4 ships some too
+                # (GMC_Syclone_92, LEX_1_SC430_10).
+                if not all(math.isfinite(float(v)) for v in parameter.attrib.values()):
+                    raise AppearanceError("Nonfinite material override")
+                if unbound and {"technique": node.tag, "parameter": parameter.tag} in [
+                        {k: a[k] for k in ("technique", "parameter")} for a in paint_added]:
+                    raise AppearanceError("Added cockpit paint scale is not an effect constant")
+                checked_overrides.append({"technique": node.tag, "parameter": parameter.tag,
+                                          "unbound_in": unbound, **parameter.attrib})
 
-        def dependency(root, name):
+        def dependency(root, name, technique_name=None):
             key = (root + name).casefold()
+            if key not in lookup and (technique_name, name.casefold()) in ABSENT_TEXTURE_PRECEDENT:
+                absent.append({"technique": technique_name, "texture": root+name,
+                               "native_precedent": ABSENT_TEXTURE_PRECEDENT[(technique_name, name.casefold())]})
+                return key
             if key not in bindings:
                 if root == "Shared/":
                     if name.casefold() not in names:
@@ -227,6 +397,12 @@ def audit(source, target, target_root, media, wheel, archive_read):
             for section in model["sections"]:
                 for mesh in section["meshes"]:
                     name = technique(section["name"], mesh["name"], mesh["lod"])
+                    if name in NATIVE_UNKNOWN_TECHNIQUES and all(name not in e for e in libraries.values()):
+                        unknown_techniques.append({"model": path.as_posix(), "part": section["name"],
+                                                   "material": mesh["name"], "lod": mesh["lod"],
+                                                   "index_count": mesh["indices"]["count"],
+                                                   "native_precedent": NATIVE_UNKNOWN_TECHNIQUES[name]})
+                        continue
                     samplers = set()
                     for mode, effects in libraries.items():
                         if name not in effects:
@@ -255,7 +431,7 @@ def audit(source, target, target_root, media, wheel, archive_read):
                                     "%SHAREDCARFOLDER%": "Shared/"}.get(texture.get("searchPath"))
                             if root is None:
                                 raise AppearanceError("Unknown texture search path")
-                            deps.add(dependency(root, texture.attrib["value"]))
+                            deps.add(dependency(root, texture.attrib["value"], name))
                     rows.append({"model": path.as_posix(), "part": section["name"],
                                  "material": mesh["name"], "lod": mesh["lod"],
                                  "technique": name, "file_bindings": sorted(deps)})
@@ -289,5 +465,9 @@ def audit(source, target, target_root, media, wheel, archive_read):
             "samplers_without_xml_file_binding": sorted(undeclared),
             "sampler_validation": samplers, "driver_animation_validation": driver_animation,
             "material_overrides": checked_overrides, "driver": driver,
+            "cockpit_paint_scales": {"added": paint_added,
+                                     "unmeasured_techniques_left_at_default": paint_unmeasured},
+            "absent_textures_with_native_precedent": absent,
+            "techniques_without_effect_native_precedent": unknown_techniques,
             "archive_validation": "Native driver files decoded on CPU; every ZIP size and CRC verified",
             "native_driver_assets": driver_files}

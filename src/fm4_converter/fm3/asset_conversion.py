@@ -68,8 +68,11 @@ def convert_payloads(payloads, exe):
                                    capture_output=True,text=True,timeout=60,check=False)
                 if p.returncode:
                     raise ValueError(f"Model conversion failed for {path}: {p.stderr.strip()}")
-                result = target.read_bytes()
+                # The helper leaves FM4's interior-mirror header block empty;
+                # native cockpits always carry it (carbin_audit.mirror_block).
+                result = carbin_audit.with_mirror_block(target.read_bytes())
                 record["geometry"] = carbin_audit.audit_conversion(data,result)
+                record["mirror_block"] = carbin_audit.audit_mirror_block(result)
                 if re.search(r"_(?:caliper|rotor)(?:lf|lr|rf|rr)\.carbin$",path.name,re.I):
                     output_path = path.with_name(path.stem+"_lod0.carbin")
                 record["operation"] = "FM3 -> FM4 carbin"

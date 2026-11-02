@@ -215,7 +215,9 @@ def packed111110(data, offset):
 
 def normal3(pool, i):
     o = i*pool["stride"]+(16 if pool["stride"]==40 else 12)
-    return unit(packed111110(pool["data"], o))
+    normal = packed111110(pool["data"], o)
+    # A zero source normal becomes +Y in the converter's frame writer.
+    return unit(normal) if sum(v*v for v in normal) >= 1e-12 else (0.0, 1.0, 0.0)
 
 
 def normal4(pool, i):
@@ -228,7 +230,14 @@ def tangent_axis3(pool, i, normal):
     # components onto the normal plane before comparing the FM4 rotation.
     axis = packed111110(pool["data"], i*40+36)
     dot = sum(x*y for x,y in zip(normal, axis))
-    return unit([x-dot*y for x,y in zip(axis, normal)])
+    projected = [x-dot*y for x,y in zip(axis, normal)]
+    if sum(v*v for v in projected) < 1e-12:
+        # Zero or normal-parallel source axis (some FM3 parts): the converter's
+        # frame writer leans the frame on +Z, or +X for near-vertical normals.
+        axis = (0.0, 0.0, 1.0) if abs(normal[2]) < 0.9 else (1.0, 0.0, 0.0)
+        dot = sum(x*y for x,y in zip(normal, axis))
+        projected = [x-dot*y for x,y in zip(axis, normal)]
+    return unit(projected)
 
 
 def tangent_axis4(pool, i):
@@ -265,6 +274,64 @@ def audit_header(source, target):
             "legacy_gauge_frames_preserved": 4, "new_gauge_frames_neutral": 11}
 
 
+MIRROR_BLOCK = 0x104  # 20 words before the format block of FM4 car models (type 2)
+MIRROR_BLOCK_TOLERANCE = 1e-4
+
+
+def mirror_block(model):
+    """FM4's cockpit interior-mirror box, or None for a model without one.
+
+    Native FM4 car models carry the words 0x104..0x153 before the format
+    block. On the 261 native cockpits with a `mirrorMiddle` LOD0 mesh they
+    hold the box of that mesh's vertices (centre, identity rotation rows,
+    half extents; the maximum starts at the origin, so a box behind it
+    reaches z=0) and the last word is 0; every model without one has 1 there.
+    FM3 models have no such block. What the game uses it for is not known: an
+    SRT4 run with and without it looked the same (mirror drawn in both).
+    """
+    points = []
+    for section in model["sections"]:
+        meshes = [m for m in section["meshes"] if m["name"]=="mirrorMiddle" and m["lod"]==0]
+        if meshes:
+            pool = positions(section, section["lod0"], model["family"])
+            points += [pool[i] for m in meshes for i in set(index_values(m))]
+    if not points:
+        return None
+    low = [min(p[j] for p in points) for j in range(3)]
+    high = [max(max(p[j] for p in points), 0.0) for j in range(3)]
+    return ([(low[j]+high[j])/2 for j in range(3)] + [0, 1,0,0,0, 0,1,0,0, 0,0,1,0]
+            + [(high[j]-low[j])/2 for j in range(3)] + [0])
+
+
+def with_mirror_block(data):
+    """Write the mirror block into a converted FM4 car model (type 2)."""
+    if u32(data, 0) != 2:
+        return data
+    block = mirror_block(parse(data, "FM4"))
+    if block is None:
+        return data
+    return data[:MIRROR_BLOCK] + struct.pack(">20f", *block) + data[MIRROR_BLOCK+80:]
+
+
+def audit_mirror_block(data):
+    """A car model's flag and box must follow its mirrorMiddle mesh."""
+    if u32(data, 0) != 2:
+        return {"applies": False}
+    expected = mirror_block(parse(data, "FM4"))
+    words = struct.unpack_from(">20f", data, MIRROR_BLOCK)
+    flag = u32(data, MIRROR_BLOCK+76)
+    if expected is None:
+        if flag != 1:
+            raise FormatError("Model without an interior mirror must keep the mirror flag at 1")
+        return {"applies": True, "interior_mirror": False}
+    error = max(abs(a-b) for a, b in zip(expected, words))
+    if flag != 0 or not error <= MIRROR_BLOCK_TOLERANCE:
+        raise FormatError("Interior mirror block does not match the mirrorMiddle mesh")
+    return {"applies": True, "interior_mirror": True, "max_error": error,
+            "centre": [round(v, 5) for v in words[:3]],
+            "half_extents": [round(v, 5) for v in words[16:19]]}
+
+
 def audit_conversion(source, target, position_tolerance=0.001):
     """Validate each vertex and mesh against its source, without rendering."""
     a,b = parse(source,"FM3"),parse(target,"FM4")
@@ -273,7 +340,7 @@ def audit_conversion(source, target, position_tolerance=0.001):
         raise FormatError("Sections, draw lists, or trailer changed")
     maxima = {"position_error_m":0.0,"normal_error_degrees":0.0,
               "tangent_axis_error_degrees":0.0,"uv_error":0.0}
-    vertices, meshes, damage_words, uv_checks, tangent_checks = 0,0,0,0,0
+    vertices, meshes, damage_words, uv_checks, tangent_checks, nonfinite_uv = 0,0,0,0,0,0
     for s,t in zip(a["sections"],b["sections"]):
         if s["name"]!=t["name"] or len(s["meshes"])!=len(t["meshes"]):
             raise FormatError("Section identity or mesh count changed")
@@ -324,6 +391,11 @@ def audit_conversion(source, target, position_tolerance=0.001):
                 uv3 = struct.unpack_from(">"+str(channels)+"e",p["data"],i*p["stride"]+8)
                 uv4 = struct.unpack_from(">"+str(channels)+"H",q["data"],i*32+8)
                 for channel,(v,raw) in enumerate(zip(uv3,uv4)):
+                    if not math.isfinite(v):
+                        # The converter reads exponent-31 halves (NaN/inf, e.g. one
+                        # FER_88_550Maranello_03 UV2) as 0, ranges included.
+                        v = 0.0
+                        nonfinite_uv += 1
                     offset,scale = n["uv"][2*channel:2*channel+2]
                     actual = offset+scale*raw/65535
                     error = abs(v-actual)
@@ -334,7 +406,7 @@ def audit_conversion(source, target, position_tolerance=0.001):
             meshes += 1
     return {"passed":True,"vertices":vertices,"meshes":meshes,"sections":len(a["sections"]),
             "header":header,
-            "damage_words":damage_words,"uv_checks":uv_checks,
+            "damage_words":damage_words,"uv_checks":uv_checks,"nonfinite_source_uv_read_as_zero":nonfinite_uv,
             "stored_tangent_axes_checked":tangent_checks,**maxima,
             "position_tolerance_m":position_tolerance,
             "source_sha256":hashlib.sha256(source).hexdigest(),

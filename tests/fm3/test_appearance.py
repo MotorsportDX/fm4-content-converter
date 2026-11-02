@@ -80,6 +80,8 @@ class LocalAssetTests(unittest.TestCase):
             cls.source[thumb] = integration.archive_read(z, "Thumbnails/Thumbnail_305.xds")
         with zipfile.ZipFile(BASE/"Media/UI/Textures/Thumbnails.zip") as z:
             cls.target[thumb] = z.read("Thumbnail_305.xds")
+        # The v4 fixture predates the cockpit paint scales the converter now adds.
+        cls.target, cls.paint = a.with_cockpit_paint_scales(cls.target, "CHE_Cobalt_05")
 
     def appearance(self, target=None):
         return a.audit(self.source, target if target is not None else self.target,
@@ -99,7 +101,18 @@ class LocalAssetTests(unittest.TestCase):
         self.assertFalse(report["driver"]["hands_auto_offset"])
         self.assertLess(report["driver"]["rig"]["pivot_to_section_origin_m"], 0.024)
         self.assertFalse(report["runtime_tested"])
-        self.assertEqual([x["parameter"] for x in report["material_overrides"]], ["CockpitBumpScale"]*2)
+        added = [x["parameter"] for x in self.paint["added"]]
+        self.assertTrue(added)
+        self.assertEqual(sorted(x["parameter"] for x in report["material_overrides"]),
+                         sorted(["CockpitBumpScale"]*2+added))
+        self.assertEqual(report["cockpit_paint_scales"]["added"], self.paint["added"])
+
+    def test_changed_source_shadersettings_rejected(self):
+        target = dict(self.target)
+        path = CAR/"shadersettings.xml"
+        target[path] = target[path].replace(b'value="0.169"', b'value="1.000"')
+        with self.assertRaisesRegex(a.AppearanceError, "shadersettings.xml was not preserved"):
+            self.appearance(target)
 
     def test_missing_cockpit_texture_rejected(self):
         target = {p: b for p, b in self.target.items() if p.name.lower() != "interior_lod0.xds"}
@@ -223,6 +236,32 @@ class RigTests(unittest.TestCase):
             broken["header"] = bytes(header)
             with self.subTest(offset=hex(offset)), self.assertRaises(carbin_audit.FormatError):
                 carbin_audit.audit_header(source, broken)
+
+    def test_interior_mirror_block_written_and_audited(self):
+        data = (MODELS/"Cars-che_cobalt_05_cockpit.fm4.carbin").read_bytes()
+        with self.assertRaisesRegex(carbin_audit.FormatError, "Interior mirror"):
+            carbin_audit.audit_mirror_block(data)  # the helper leaves FM4's block empty
+        fixed = carbin_audit.with_mirror_block(data)
+        self.assertEqual(fixed[:0x104]+fixed[0x154:], data[:0x104]+data[0x154:])
+        record = carbin_audit.audit_mirror_block(fixed)
+        self.assertTrue(record["interior_mirror"])
+        self.assertEqual(carbin_audit.u32(fixed, 0x150), 0)
+        moved = bytearray(fixed)
+        struct.pack_into(">f", moved, 0x108, struct.unpack_from(">f", fixed, 0x108)[0]+0.01)
+        with self.assertRaisesRegex(carbin_audit.FormatError, "Interior mirror"):
+            carbin_audit.audit_mirror_block(bytes(moved))
+        exterior = (MODELS/"Cars-che_cobalt_05.fm4.carbin").read_bytes()
+        self.assertEqual(carbin_audit.with_mirror_block(exterior), exterior)
+        self.assertFalse(carbin_audit.audit_mirror_block(exterior)["interior_mirror"])
+
+    @unittest.skipUnless(c.FM4_DEFAULT.exists(), "FM4 disc unavailable")
+    def test_interior_mirror_block_matches_native_cockpits(self):
+        cars = c.FM4_DEFAULT.parents[1]/"Cars"
+        # Box behind the origin (z extended to 0), box ahead of it, and a race cockpit.
+        for car, mirror in (("DOD_SRT4ACR_05", True), ("AST_One77_10", True), ("ACU_15_ARX01b_08", False)):
+            with self.subTest(car=car), zipfile.ZipFile(cars/f"{car}.zip") as z:
+                data = integration.archive_read(z, f"{car.lower()}_cockpit.carbin")
+                self.assertEqual(carbin_audit.audit_mirror_block(data)["interior_mirror"], mirror)
 
     def test_degenerate_axis_rejected(self):
         model = carbin_audit.parse((MODELS/"Cars-che_cobalt_05_cockpit.fm4.carbin").read_bytes(), "FM4")

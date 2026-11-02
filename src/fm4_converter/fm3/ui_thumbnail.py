@@ -16,6 +16,9 @@ from PIL import Image, ImageFilter
 from .texture_audit import Texture, tiled_address
 
 
+MAX_CROPPED_BORDER = 0.1  # share of border pixels a cropped car may cover
+
+
 class ThumbnailError(ValueError):
     pass
 
@@ -43,11 +46,15 @@ def remove_white_matte(image):
     rgb = np.array(image.convert("RGB"))
     h,w,_ = rgb.shape
     eligible = rgb.min(axis=2) >= 250
-    if not (eligible[0].all() and eligible[-1].all() and eligible[:,0].all() and eligible[:,-1].all()):
+    border = ([(x,0) for x in range(w)] + [(x,h-1) for x in range(w)]
+              + [(0,y) for y in range(1,h-1)] + [(w-1,y) for y in range(1,h-1)])
+    # Some FM3 renders crop the car at an edge (MAS_35_MC12_05's wing): the
+    # matte is still the white border, minus the pixels the car covers there.
+    cropped = sum(not eligible[y,x] for x,y in border)
+    if cropped > len(border)*MAX_CROPPED_BORDER:
         raise ThumbnailError("Source thumbnail lacks the reviewed white border")
     background = np.zeros((h,w), dtype=bool)
-    queue = deque([(x,0) for x in range(w)] + [(x,h-1) for x in range(w)]
-                  + [(0,y) for y in range(1,h-1)] + [(w-1,y) for y in range(1,h-1)])
+    queue = deque((x,y) for x,y in border if eligible[y,x])
     for x,y in queue:
         background[y,x] = True
     while queue:
@@ -100,6 +107,7 @@ def remove_white_matte(image):
     return out, {"source_size":[w,h],"foreground_bounds":list(box),
                  "transparent_background_pixels":int(background.sum()),
                  "enclosed_ground_matte_islands_removed":ground_islands,
+                 "border_pixels_covered_by_car":int(cropped),
                  "unmatted_boundary_pixels":int(adjacent.sum())}
 
 

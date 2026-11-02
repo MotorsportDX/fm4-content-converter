@@ -16,9 +16,13 @@ adalah **FM3 → FM4**; dukungan game sumber lain masih direncanakan.
 | Game lain | Direncanakan | Format dan cakupan akan ditentukan untuk setiap adapter sumber |
 
 Jalur fisika FM3 telah dievaluasi pada panel 30 mobil. Impor aset dikembangkan
-melalui Chevrolet Cobalt SS 2005: kandidat v6 pernah menjalani uji game singkat,
-sedangkan kandidat v7 dengan perbaikan UI masih memerlukan uji game. Hasil ini
-belum membuktikan dukungan seluruh mobil, kesamaan handling, atau DLC siap pasang.
+melalui Chevrolet Cobalt SS 2005: kandidat v9 diuji dengan harness e2e Motorsport
+DX (Quick Race dengan Disc 2 dan DLC terpasang), termasuk nama mobil dan kelas/PI
+yang dipetakan ke skala FM4. `batch_package.py` kini mengemas 73 dari 81 mobil
+FM3 yang tidak ada di FM4 maupun DLC-nya ke satu overlay; lima di antaranya diuji
+sampai balapan di Motorsport DX. Interior cockpit yang sebelumnya tampil putih kini
+memakai PaintScale FM4 yang diukur dari mobil yang ada di kedua game. Hasil ini belum
+membuktikan semua mobil, kesamaan handling, atau DLC siap pasang.
 Source dan dokumentasi implementasi FM3 berada di
 [`src/fm4_converter/fm3`](src/fm4_converter/fm3/) dan [panduan FM3](docs/fm3.md).
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import Counter
 from contextlib import closing
+from hashlib import sha256
 import json
 import io
 from pathlib import Path, PurePosixPath
@@ -17,6 +18,8 @@ import zipfile
 
 from . import converter as c
 from . import code_semantics
+from . import performance_index
+from . import value_scales
 from . import ui_names
 from . import ui_thumbnail
 from .calibration import apply_to_result
@@ -46,18 +49,25 @@ def safe_member(name):
     return parts
 
 
-def build_plan(source_db, target_db, media, rules=None, display_name=None):
-    """Plan a new stock car without changing either database."""
+def build_plan(source_db, target_db, media, rules=None, display_name=None, pi_model=None,
+               scale_rules=None, physics_scales=False, reserved=None, registry_extra=None):
+    """Plan a new stock car without changing either database.
+
+    `reserved`/`registry_extra` describe installed DLC patches (see converter.convert)."""
     source = c.extract_stock(source_db, media)
     car_id = source["nodes"]["car"]["row"]["Id"]
     if not 1 <= car_id < 65535:
         raise c.MappingError("The source ordinal is outside this probe's 16-bit range")
     if c.rows(target_db, "Data_Car", "Id=? OR lower(MediaName)=lower(?)", (car_id, media)):
         raise c.MappingError("The car identity already exists in the target; replacement is unsupported")
-    result = c.convert(source_db, target_db, source, id_base=2000)
+    result = c.convert(source_db, target_db, source, 2000, reserved, registry_extra)
     if rules is not None:
         apply_to_result(result, source, rules, "conservative")
     code_semantics.apply(result, source)
+    if scale_rules is not None:
+        value_scales.apply(result, scale_rules, physics_scales)
+    elif physics_scales:
+        raise c.MappingError("Physics scales need a value_scales rules file")
     graph = result["candidate"]
     car = graph["nodes"]["car"]["row"]
     old_id = car["Id"]
@@ -67,8 +77,9 @@ def build_plan(source_db, target_db, media, rules=None, display_name=None):
             graph["nodes"][edge["from"]]["row"][edge["column"]] = car_id
     changes = []
     label = display_name or (media+" (FM3)")
-    if not label.strip() or label.startswith("_&") or "\0" in label:
-        raise c.MappingError("Use a nonempty literal display name, not a source localization key")
+    for text in (label.values() if isinstance(label, dict) else (label,)):
+        if not text.strip() or text.startswith("_&") or "\0" in text:
+            raise c.MappingError("Use a nonempty literal display name, not a source localization key")
     names = ui_names.plan(source["nodes"]["car"]["row"], label)
     for field, value in {
         "ModelId":car_id, "ContentId":0, "IsInstalled":1, "IsPurchased":1,
@@ -79,6 +90,12 @@ def build_plan(source_db, target_db, media, rules=None, display_name=None):
     }.items():
         changes.append({"role":"car", "column":field, "before":car[field], "after":value})
         car[field] = value
+    # FM4 shows PI on its own class bounds, but the letter from ClassID.
+    pi = performance_index.apply(car, target_db, pi_model)
+    for field in ("PerformanceIndex","ClassID"):
+        if pi["before"][field] != pi["after"][field]:
+            changes.append({"role":"car", "column":field, "before":pi["before"][field],
+                            "after":pi["after"][field]})
     for entry in result["id_map"]:
         if entry["table"] == "Data_Car":
             entry["target_id"] = car_id
@@ -107,8 +124,9 @@ def build_plan(source_db, target_db, media, rules=None, display_name=None):
             reused.append({"table":table, "rows":existing})
             continue
         source_columns = {x["name"] for x in sc[table]["columns"]}
-        generated_id = 1 + (target_db.execute(
-            "SELECT MAX(ID) FROM "+c.qi(table)).fetchone()[0] or 0) if table in {
+        generated_id = 1 + max([target_db.execute(
+            "SELECT MAX(ID) FROM "+c.qi(table)).fetchone()[0] or 0,
+            *(reserved or {}).get(table, ())]) if table in {
                 "CarPartPositions","Combo_Colors","Combo_Colors_Exceptions"} else None
         for original in selected:
             row = {}
@@ -140,6 +158,7 @@ def build_plan(source_db, target_db, media, rules=None, display_name=None):
         "accepted":False, "runtime_tested":False,
         "cockpit_reference":camera,
         "localized_names":names,
+        "performance_index":pi,
     }
     return source, result
 
@@ -164,21 +183,27 @@ def asset_archives(payloads, media, wheel):
     archives = {}
     accounted = set()
     for root in roots:
-        stream = io.BytesIO()
-        with zipfile.ZipFile(stream,"w",compression=zipfile.ZIP_STORED) as z:
-            for path,data in sorted(payloads.items()):
-                if path.is_relative_to(root):
-                    info = zipfile.ZipInfo(path.relative_to(root).as_posix(),(1980,1,1,0,0,0))
-                    info.compress_type = zipfile.ZIP_STORED
-                    z.writestr(info,data)
-                    accounted.add(path)
-        archives[root.with_suffix(".zip")] = stream.getvalue()
+        archives[root.with_suffix(".zip")] = stored_zip(payloads, root, accounted)
     if accounted != payloads.keys():
         raise c.MappingError("Asset has no reviewed ZIP mount")
     return archives
 
 
-def extend_zip_manifest(original, archives, replacements=()):
+def stored_zip(payloads, root, accounted=None):
+    """Uncompressed ZIP32 of the payloads below `root`, with fixed timestamps."""
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream,"w",compression=zipfile.ZIP_STORED) as z:
+        for path,data in sorted(payloads.items()):
+            if path.is_relative_to(root):
+                info = zipfile.ZipInfo(path.relative_to(root).as_posix(),(1980,1,1,0,0,0))
+                info.compress_type = zipfile.ZIP_STORED
+                z.writestr(info,data)
+                if accounted is not None:
+                    accounted.add(path)
+    return stream.getvalue()
+
+
+def extend_zip_manifest(original, archives, replacements=(), priorities=None):
     tree = ET.fromstring(original)
     if tree.tag != "ZipFiles" or tree.attrib.get("version") != "3":
         raise c.MappingError("Unsupported target ZIP manifest")
@@ -206,14 +231,67 @@ def extend_zip_manifest(original, archives, replacements=()):
                 raise c.MappingError("Ambiguous replacement ZIP mount")
             nodes[0].attrib.update(dirstart=str(start),dirsize=str(size),direntries=str(count))
         else:
-            ET.SubElement(tree,"Zip",{"version":"1","path":guest,"priority":"80",
+            priority = str((priorities or {}).get(path,80))
+            ET.SubElement(tree,"Zip",{"version":"1","path":guest,"priority":priority,
                                      "dirstart":str(start),"dirsize":str(size),"direntries":str(count)})
         paths.add(guest.casefold())
     return ET.tostring(tree,encoding="utf-8",xml_declaration=True)
 
 
+def convert_assets(payloads, target_root, media, wheel, model_helper, thumb_path, inputs, references=None):
+    """CPU model/material conversion, appearance audit and UI atlas for one car.
+
+    `references` are native FM4 payloads the car uses but the package does not
+    ship (a wheel FM4 already has); they take part in the appearance audit only."""
+    # FM4 retains several FM3 audio definitions. Require the exact car entry;
+    # no silently substituted engine or donor-car model is permitted.
+    audio = target_root/"audio/Cars/CarModelTuning.zip"
+    with zipfile.ZipFile(audio) as archive:
+        matches = [n for n in archive.namelist() if n.casefold()==(media+"_CMT.xml").casefold()]
+        if len(matches) != 1:
+            raise c.MappingError("Native FM4 car audio tuning is unavailable")
+        archive_read(archive,matches[0])
+    from .asset_conversion import convert_payloads
+    from .appearance_audit import audit as audit_appearance
+    source_payloads = payloads
+    payloads, asset_validation = convert_payloads(source_payloads,model_helper)
+    # FM3 cockpit textures need FM4's paint scales or the interior renders white.
+    from .appearance_audit import with_cockpit_paint_scales
+    payloads, paint = with_cockpit_paint_scales(payloads, media)
+    if paint["added"]:
+        path = next(p for p in payloads if p.name.casefold()=="shadersettings.xml"
+                    and p.parent.name.casefold()==media.casefold())
+        record = next((r for r in asset_validation["assets"] if r["path"]==path.as_posix()), None)
+        if record is None:
+            record = {"source_path":None,"source_sha256":None}
+            asset_validation["assets"].append(record)
+        record.update(path=path.as_posix(),operation="FM4 cockpit paint scales added",
+                      cockpit_paint_scales=paint,sha256=sha256(payloads[path]).hexdigest(),
+                      bytes=len(payloads[path]))
+    appearance_validation = audit_appearance(
+        source_payloads, {**(references or {}), **payloads}, target_root, media, wheel, archive_read)
+    inputs.update(appearance_validation["inputs"])
+    # Generic material conversion preserves pixels. The UI thumbnail has a
+    # different layout and is transformed/audited separately afterwards.
+    native_ui = target_root/"UI/Textures.zip"
+    inputs[str(native_ui)] = c.sha(native_ui)
+    with zipfile.ZipFile(native_ui) as z:
+        controls = [archive_read(z,f"Thumbnails/Thumbnail_{n}.xds") for n in (1002,1003,1305)]
+    if len({b[:52] for b in controls}) != 1:
+        raise c.MappingError("Native thumbnail control headers disagree")
+    payloads[thumb_path], thumbnail_validation = ui_thumbnail.convert(payloads[thumb_path],controls[0])
+    for record in asset_validation["assets"]:
+        if record["path"] == thumb_path.as_posix():
+            record.update(operation="FM4 UI atlas with transparent matte and two view slots",
+                          pixel_payload_unchanged=False,texture=thumbnail_validation["texture"],
+                          sha256=thumbnail_validation["target_sha256"],bytes=len(payloads[thumb_path]))
+    asset_validation["scope"] = "Model geometry/rig, material XDS preservation and separately audited UI atlas conversion"
+    return payloads, asset_validation, appearance_validation, thumbnail_validation
+
+
 def stage_probe(source_path, target_path, disc, out, media, rules_path=None, display_name=None,
-                model_helper=None):
+                model_helper=None, pi_model_path=None, content_root=None, scales_path=None,
+                physics_scales=False):
     """Populate a *copy* of the target disc; never accepts original roots."""
     source_path, target_path, disc, out = map(
         lambda x:Path(x).resolve(), (source_path, target_path, disc, out))
@@ -234,7 +312,10 @@ def stage_probe(source_path, target_path, disc, out, media, rules_path=None, dis
     payloads = {}
     with closing(c.connect(source_path)) as source_db, closing(c.connect(target_path)) as target_db:
         rules = json.loads(Path(rules_path).read_text(encoding="utf-8")) if rules_path else None
-        source, result = build_plan(source_db, target_db, media, rules, display_name)
+        pi_model = json.loads(Path(pi_model_path).read_text(encoding="utf-8")) if pi_model_path else None
+        scale_rules = json.loads(Path(scales_path).read_text(encoding="utf-8")) if scales_path else None
+        source, result = build_plan(source_db, target_db, media, rules, display_name, pi_model,
+                                    scale_rules, physics_scales)
         wheel = source["nodes"]["wheel"]["row"]["MediaName"]
         assets = []
         for folder, name in (("Cars",media), ("Wheels",wheel)):
@@ -259,51 +340,23 @@ def stage_probe(source_path, target_path, disc, out, media, rules_path=None, dis
         inputs[str(thumb_zip)] = c.sha(thumb_zip)
         with zipfile.ZipFile(thumb_zip) as archive:
             payloads[Path("Media/UI/Textures")/thumb_member] = archive_read(archive,thumb_member)
-        # FM4 retains several FM3 audio definitions. Require the exact car entry;
-        # no silently substituted engine or donor-car model is permitted.
-        audio = target_root/"audio/Cars/CarModelTuning.zip"
-        with zipfile.ZipFile(audio) as archive:
-            matches = [n for n in archive.namelist() if n.casefold()==(media+"_CMT.xml").casefold()]
-            if len(matches) != 1:
-                raise c.MappingError("Native FM4 car audio tuning is unavailable")
-            archive_read(archive,matches[0])
-        from .asset_conversion import convert_payloads
-        from .appearance_audit import audit as audit_appearance
-        source_payloads = payloads
-        payloads, asset_validation = convert_payloads(source_payloads,model_helper)
-        appearance_validation = audit_appearance(
-            source_payloads, payloads, target_root, media, wheel, archive_read)
-        inputs.update(appearance_validation["inputs"])
-        # Generic material conversion preserves pixels. The UI thumbnail has a
-        # different layout and is transformed/audited separately afterwards.
-        native_ui = target_root/"UI/Textures.zip"
-        inputs[str(native_ui)] = c.sha(native_ui)
-        with zipfile.ZipFile(native_ui) as z:
-            controls = [archive_read(z,f"Thumbnails/Thumbnail_{n}.xds") for n in (1002,1003,1305)]
-        if len({b[:52] for b in controls}) != 1:
-            raise c.MappingError("Native thumbnail control headers disagree")
         thumb_path = Path("Media/UI/Textures")/thumb_member
-        payloads[thumb_path], thumbnail_validation = ui_thumbnail.convert(payloads[thumb_path],controls[0])
-        for record in asset_validation["assets"]:
-            if record["path"] == thumb_path.as_posix():
-                record.update(operation="FM4 UI atlas with transparent matte and two view slots",
-                              pixel_payload_unchanged=False,texture=thumbnail_validation["texture"],
-                              sha256=thumbnail_validation["target_sha256"],bytes=len(payloads[thumb_path]))
-        asset_validation["scope"] = "Model geometry/rig, material XDS preservation and separately audited UI atlas conversion"
+        payloads, asset_validation, appearance_validation, thumbnail_validation = convert_assets(
+            payloads, target_root, media, wheel, model_helper, thumb_path, inputs)
         archives = asset_archives(payloads,media,wheel)
         name_archives, name_validation = ui_names.build_archives(
-            source_root,target_root,result["integration"]["localized_names"],archive_read,c.sha)
+            source_root,target_root,result["integration"]["localized_names"],archive_read,c.sha,
+            content_root)
         inputs.update(name_validation["inputs"])
         archives.update(name_archives)
+        priorities = {ui_names.OVERRIDE:name_validation["mount"]["priority"]}
         manifest_path = disc/"Media/zipmanifest.xml"
         original_manifest = target_root/"zipmanifest.xml"
         if c.sha(manifest_path) != c.sha(original_manifest):
             raise c.MappingError("Test disc ZIP manifest differs from the target")
-        manifest_data = extend_zip_manifest(manifest_path.read_bytes(),archives,name_archives)
+        manifest_data = extend_zip_manifest(manifest_path.read_bytes(),archives,(),priorities)
         for relative in archives:
-            target = disc/relative
-            if target.exists() and (relative not in name_archives or
-                    c.sha(target) != c.sha(target_root/relative.relative_to("Media"))):
+            if (disc/relative).exists():
                 raise c.MappingError(f"Refusing to replace an existing asset: {relative}")
         out.mkdir(parents=True)
         patch = c.write_patch(out/"stock.slt",target_db,result["candidate"])
@@ -369,7 +422,13 @@ if __name__ == "__main__":
     parser.add_argument("--rules",type=Path)
     parser.add_argument("--display-name",help="Literal name for the target menu")
     parser.add_argument("--model-helper",type=Path,required=True,help="Reviewed CPU-only carbin-cpu.exe")
+    parser.add_argument("--pi-model",type=Path,help="performance_index study output")
+    parser.add_argument("--content-root",type=Path,
+                        help="installed content packages (...\4D530910\00000002) whose car names must stay")
+    parser.add_argument("--value-scales",type=Path,help="value_scales study output")
+    parser.add_argument("--physics-scales",action="store_true",help="also apply its handling rules")
     args = parser.parse_args()
     result = stage_probe(args.fm3,args.fm4,args.disc,args.out,args.media_name,args.rules,args.display_name,
-                         args.model_helper)
+                         args.model_helper,args.pi_model,args.content_root,args.value_scales,
+                         args.physics_scales)
     print(json.dumps({k:v for k,v in result.items() if k not in ("assets","inputs")},indent=2))

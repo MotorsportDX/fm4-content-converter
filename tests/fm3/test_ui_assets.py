@@ -3,6 +3,7 @@
 Fixtures are read from the user's local games; none are embedded in source.
 """
 import io
+import tempfile
 from pathlib import Path
 import struct
 import unittest
@@ -155,6 +156,44 @@ class LocalUiTests(unittest.TestCase):
             thumbs.encode(Image.new("RGBA",(768,288)),bytes(modified))
         with self.assertRaises(thumbs.ThumbnailError):
             thumbs.convert(self.template,self.template)
+
+    def test_name_override_sits_above_the_winning_car_table(self):
+        bindings = names.plan(
+            {"Id":305,"DisplayName":"_&3444158669","ModelShort":"_&3444127938"},"Cobalt SS (FM3)")
+        archives,report = names.build_archives(c.FM3_DEFAULT.parents[1],c.FM4_DEFAULT.parents[1],
+                                               bindings,integration.archive_read,c.sha)
+        self.assertEqual(list(archives),[names.OVERRIDE])
+        self.assertEqual(report["mount"]["priority"],81)  # disc tables are mounted at 80
+        with zipfile.ZipFile(io.BytesIO(archives[names.OVERRIDE])) as z:
+            self.assertEqual(len(z.namelist()),18)
+            table = names.StringTable(z.read("EN/Data_Car.str"))
+        self.assertEqual(table.texts[0x38C2],"Cobalt SS (FM3)")
+        self.assertEqual(len(table.texts),len(names.StringTable(self.tables["EN"]).texts)+2)
+
+
+class ContentPriorityTests(unittest.TestCase):
+    def test_highest_priority_pack_table_wins_per_language(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/"disc/StringTables").mkdir(parents=True)
+            (root/"disc/zipmanifest.xml").write_text(
+                '<ZipFiles version="3"><Zip version="1" path="game:\\media\\stringtables\\en.zip" priority="80"/>'
+                '<Zip version="1" path="game:\\media\\stringtables\\de.zip" priority="80"/></ZipFiles>')
+            for lang in ("EN","DE"):
+                with zipfile.ZipFile(root/f"disc/StringTables/{lang}.zip","w") as z:
+                    z.writestr("Data_Car.str",b"disc-"+lang.encode())
+            for pack,priority in (("A",150),("B",25039)):
+                folder = root/f"content/{pack}/Media/DLCZips"
+                folder.mkdir(parents=True)
+                with zipfile.ZipFile(folder/f"StringTables_pri_{priority}.zip","w") as z:
+                    z.writestr("EN/Data_Car.str",f"pack-{priority}".encode())
+                    z.writestr("EN/Events.str",b"other")
+            read = lambda z,m: z.read(m)
+            tables,_ = names.winning_tables(root/"disc",root/"content",read,lambda p:"hash")
+            self.assertEqual({k:(v[0],v[3]) for k,v in tables.items()},
+                             {"en":(25039,b"pack-25039"),"de":(80,b"disc-DE")})
+            tables,_ = names.winning_tables(root/"disc",None,read,lambda p:"hash")
+            self.assertEqual(tables["en"][3],b"disc-EN")
 
 
 if __name__ == "__main__":

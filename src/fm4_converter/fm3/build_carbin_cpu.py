@@ -18,6 +18,19 @@ REPOSITORY = "https://github.com/FMdangaina/ForzaEditor"
 MONOGAME_VERSION = "3.6.0.1625"
 MONOGAME_SHA256 = "ec22a974a2b6fa99ed022dc339a82fbecdcf2c5c05db7216ac7a436cfe1ca8fe"
 SOURCES = ("CarbinModel.cs", "CarbinModelMotorsport3.cs", "ObjMesh.cs")
+# Exact, reviewed edits to copies of the pinned sources (the checkout stays
+# clean). Each anchor must occur once. Extensions live in tools/carbin_cpu.
+PATCHES = (
+    {"file":"CarbinModelMotorsport3.cs",
+     "reason":"Refit bounds of FM3 sections whose vertices lie outside them (Motorsport3Bounds.cs)",
+     "old":"            if (IsZeroBounds(section.Bounds))\r\n            {\r\n",
+     "new":("            if (!IsZeroBounds(section.Bounds) && ExceedsBounds(section, lodPositions, lod0Positions))\r\n"
+            "            {\r\n"
+            "                FitBounds(section, lodPositions, lod0Positions);\r\n"
+            "            }\r\n"
+            "            if (IsZeroBounds(section.Bounds))\r\n            {\r\n")},
+)
+EXTENSIONS = ("Motorsport3Bounds.cs",)
 
 
 def build(out, reference):
@@ -42,7 +55,19 @@ def build(out, reference):
     # The adapter never constructs a graphics device; native SDL/OpenGL binaries
     # are deliberately neither extracted nor supplied.
     adapter = TOOLS_ROOT/"carbin_cpu/Program.cs"
-    inputs = [reference/"ForzaStudio"/s for s in SOURCES] + [adapter]
+    originals = [reference/"ForzaStudio"/s for s in SOURCES]
+    (out/"src").mkdir()
+    for original in originals:
+        data = original.read_bytes()
+        for patch in PATCHES:
+            if patch["file"] == original.name:
+                old, new = patch["old"].encode(), patch["new"].encode()
+                if data.count(old) != 1:
+                    raise ValueError(f"Patch anchor not found exactly once in {original.name}")
+                data = data.replace(old, new)
+        (out/"src"/original.name).write_bytes(data)
+    inputs = ([out/"src"/s for s in SOURCES] + [TOOLS_ROOT/"carbin_cpu"/e for e in EXTENSIONS]
+              + [adapter])
     compiler = Path("C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe")
     exe = out/"carbin-cpu.exe"
     command = [str(compiler), "/nologo", "/target:exe", "/platform:x64",
@@ -52,6 +77,8 @@ def build(out, reference):
     sha = lambda data: hashlib.sha256(data).hexdigest()
     record = {
         "reference_repository": REPOSITORY, "reference_commit": COMMIT,
+        "reference_sources": {str(p):sha(p.read_bytes()) for p in originals},
+        "patches": [{k:v for k,v in p.items() if k in ("file","reason")} for p in PATCHES],
         "sources": {str(p):sha(p.read_bytes()) for p in inputs},
         "package_url":package_url, "package_sha256":sha(package),
         "helper_sha256":sha(exe.read_bytes()), "cpu_only":True,

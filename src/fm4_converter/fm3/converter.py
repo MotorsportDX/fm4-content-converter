@@ -199,8 +199,12 @@ def category(table, column):
     return "physics"
 
 
-def convert(source_db, target_db, source, id_base=ID_BASE):
-    """Build candidate WITHOUT reading the native target car's calibration."""
+def convert(source_db, target_db, source, id_base=ID_BASE, reserved=None, registry_extra=None):
+    """Build candidate WITHOUT reading the native target car's calibration.
+
+    `reserved` maps a table to keys owned elsewhere (installed DLC patches) that
+    allocation must skip; `registry_extra` maps a table to (origin, rows) whose
+    registry rows the game only has with that content installed."""
     sc, tc = schema(source_db), schema(target_db)
     candidate = {"media_name": source["media_name"], "nodes": {}, "edges": [], "scope": source["scope"]}
     mapping, drops, assumptions, external = [], [], [], []
@@ -214,6 +218,7 @@ def convert(source_db, target_db, source, id_base=ID_BASE):
         primary = pk(tc[table])
         if table not in occupied:
             occupied[table] = {r[0] for r in target_db.execute("SELECT " + qi(primary) + " FROM " + qi(table))}
+            occupied[table] |= set((reserved or {}).get(table, ()))
     for role, node in sorted(source["nodes"].items()):
         if role == "torque.zero":
             continue
@@ -238,12 +243,17 @@ def convert(source_db, target_db, source, id_base=ID_BASE):
             sp, tp = registry_pk(sc[table],table), registry_pk(tc[table],table)
             original = one(rows(source_db, table, qi(sp) + "=?", (value,)), str(key))
             label = registry_label(original, table, sp)
-            matches = [r for r in rows(target_db, table) if registry_label(r, table, tp) == label]
-            exact = [r for r in matches if r[tp] == value]
-            chosen = one(exact or matches, f"semantic registry match {key}")
+            matches = [(None, r) for r in rows(target_db, table) if registry_label(r, table, tp) == label]
+            if not matches:
+                # Only when the base game lacks it: the car then needs that content.
+                matches = [(origin, r) for origin, r in (registry_extra or {}).get(table, ())
+                           if registry_label(r, table, tp) == label]
+            exact = [m for m in matches if m[1][tp] == value]
+            origin, chosen = one(exact or matches, f"semantic registry match {key}")
             global_cache[key] = chosen[tp]
             external.append({"table": table, "pk": tp, "source_id": value, "target_id": chosen[tp],
-                             "identity": list(label), "row": chosen, "policy": "native_fm4_registry_by_semantic_identity"})
+                             "identity": list(label), "row": chosen, "policy": "native_fm4_registry_by_semantic_identity",
+                             **({"requires": origin} if origin else {})})
         return global_cache[key]
 
     def cohort_default(table, column, owner_column, excluded):

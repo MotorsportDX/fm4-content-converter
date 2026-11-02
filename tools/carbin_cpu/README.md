@@ -17,7 +17,10 @@ Repository-wide [credits](../../CREDITS.md) and
 [third-party notices](../../THIRD_PARTY_NOTICES.md) retain the upstream authors,
 license snapshots and file-level usage, including Xenia's texture-format work.
 
-`build_carbin_cpu.py` checks the source revision and clean checkout. It downloads
+`build_carbin_cpu.py` checks the source revision and clean checkout. It applies the reviewed edits in its `PATCHES` list to copies of the
+pinned sources (the checkout stays clean), compiles `Motorsport3Bounds.cs` with them, and records
+both in `build.json`. The only patch refits the bounds of FM3 sections whose vertices lie outside
+them; other sections convert byte for byte as before. It downloads
 the pinned MonoGame 3.6.0.1625 NuGet package, verifies its SHA-256, and extracts
 only `MonoGame.Framework.dll` for XNA-compatible vector, matrix and quaternion
 arithmetic. Its notices are in [MonoGame-LICENSE.txt](MonoGame-LICENSE.txt).
