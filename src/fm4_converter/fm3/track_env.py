@@ -18,7 +18,8 @@ audio and names. What FM4 needs, and why (research/tracks-2026-11-02/REPORT.md):
     python -m fm4_converter.fm3.track_env --out <new package> --content-root <...\\4D530910\\00000002>
         [--env NewYork --env Amalfi --env TestTrackinfield] [--base <car package>]
 """
-import argparse, io, json, re, shutil, sqlite3, struct, sys, zipfile
+import argparse, io, json, os, re, shutil, sqlite3, struct, sys, zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import integration, ui_names, track_grid, track_pvs, track_rmb
@@ -146,7 +147,10 @@ class RenamedSource:
         return {self._name(n): d for n, d in self.source.ai_files().items()}
 
     def audio_files(self):
-        return {self._name(n): d for n, d in self.source.audio_files().items()}
+        # The folder follows MediaName, but FM4 asks for the FMOD project by its own name
+        # (`Audio\Tracks\LeMansBugatti\lemans.fev`): original names, plus renamed copies.
+        files = self.source.audio_files()
+        return {**{self._name(n): d for n, d in files.items()}, **files}
 
 
 # media in FM4 -> source, FM4 TrackSettings donor, FM3 MediaName, FM3 track ids (None: all)
@@ -358,12 +362,26 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
     if Path(out).exists():
         raise SystemExit("Choose a new package directory")
     db_path = files / "Media/DB/gamedb.slt"
-    db_path.parent.mkdir(parents=True)
+    base_names, base_priority = {}, 0
+    if base:
+        # The car package's files (hard links); the files written below are replaced, not
+        # modified, so the base package stays as it is.
+        shutil.copytree(Path(base) / "files", files, copy_function=os.link)
+        db_path.unlink()
+        if (Path(base) / "files" / ui_names.OVERRIDE).exists():
+            with zipfile.ZipFile(Path(base) / "files" / ui_names.OVERRIDE) as z:
+                base_names = {n: z.read(n) for n in z.namelist()}
+            mounts = ET.fromstring((Path(base) / "files/Media/zipmanifest.xml").read_bytes()).findall("Zip")
+            base_priority = max(int(m.attrib["priority"]) for m in mounts
+                                if m.attrib["path"].casefold() == "\\".join(["game:", "media", "stringtables.zip"]))
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(Path(base) / "files/Media/DB/gamedb.slt" if base else fm4 / "DB/gamedb.slt", db_path)
     a = sqlite3.connect(f"file:{fm3_db}?mode=ro", uri=True)
     a.row_factory = sqlite3.Row
     b = sqlite3.connect(db_path)
     b.row_factory = sqlite3.Row
+    fm4_env_keys = {ui_names.reference(v) & 65535 for row in b.execute(
+        "select DisplayName, ShortDisplayName from Environments") for v in row}
     report, archives, loose, bins, ai_all = {}, {}, {}, {}, {}
     wanted = {"tracks.str": [], "environments.str": []}
     zones_dir = _find(_find(fm4 / "audio/tracks", DECISION_ZONES_DONOR[0]), DECISION_ZONES_DONOR[1])
@@ -415,6 +433,9 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
     fm3 = fm3_string_tables(string_roots or [FM3UC / "StringTables", FM3 / "StringTables"])
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_STORED) as zout:
+        for name, data in sorted(base_names.items()):
+            if name.rsplit("/", 1)[-1].lower() not in ("tracks.str", "environments.str"):
+                zout.writestr(zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0)), data)
         for table in ("Tracks.str", "Environments.str"):
             tables, _ = ui_names.winning_tables(fm4, content_root, archive_read, c.sha, table)
             en = fm3[("en", table.lower())]
@@ -427,15 +448,22 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
                     if k & 65535 in target.texts:
                         continue
                     text_src = fm3.get((code, origin), fm3[("en", origin)])
-                    adds.append((k, label, text_src.texts.get(k & 65535) or fm3[("en", origin)].texts[k & 65535]))
+                    text = text_src.texts.get(k & 65535) or fm3[("en", origin)].texts[k & 65535]
+                    # FM3 names Amalfi and AmalfiGP alike ("Rally di Positano"); a new environment
+                    # whose name FM4 already shows gets the "(FM3)" mark the cars carry.
+                    if table == "Environments.str" and "DisplayName" in label and text in {
+                            target.texts[e] for e in fm4_env_keys if e in target.texts}:
+                        text += " (FM3)"
+                    adds.append((k, label, text))
                 zout.writestr(zipfile.ZipInfo(f"{lang}/{table}", (1980, 1, 1, 0, 0, 0)), target.add(adds))
     names = stream.getvalue()
     prio_names = max(ui_names.winning_tables(fm4, content_root, archive_read, c.sha, t)[0]["en"][0]
                      for t in ("Tracks.str", "Environments.str")) + 1
+    prio_names = max(prio_names, base_priority)
     priorities = {ui_names.OVERRIDE: prio_names, **{p: 80 for p in archives}}
     manifest_src = (Path(base) / "files/Media/zipmanifest.xml") if base else fm4 / "zipmanifest.xml"
     manifest = integration.extend_zip_manifest(manifest_src.read_bytes(), {ui_names.OVERRIDE: names, **archives},
-                                               (), priorities)
+                                               (ui_names.OVERRIDE,) if base_names else (), priorities)
     for media, path in bins.items():
         with open(path, "rb") as f:
             f.seek(-22, 2)
@@ -446,6 +474,8 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         manifest = manifest.replace(b"</ZipFiles>", entry + b"</ZipFiles>")
     for rel, data in {**archives, **loose, ui_names.OVERRIDE: names, Path("Media/zipmanifest.xml"): manifest}.items():
         (files / rel).parent.mkdir(parents=True, exist_ok=True)
+        if (files / rel).exists():
+            (files / rel).unlink()   # a hard link to the base package
         (files / rel).write_bytes(data)
     report["names_priority"] = prio_names
     report["accepted"] = False
