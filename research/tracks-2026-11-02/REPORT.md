@@ -716,6 +716,34 @@ berlaku.
 Kriteria T3 ([fm3-acceptance.md](../../docs/fm3-acceptance.md)) terpenuhi untuk kendali
 Tsukuba FM3.
 
+### Tahap 7: NewYork 23 dapat dibalap dengan data FM3 sendiri (2 November 2026)
+
+`newyork_proto.py --convert` (PVS v27, RMB v5, nama AI kanonik, AI tanpa donor), run
+`track-ny-conv-8`: **balapan berjalan sampai menu pause, tanpa crash**, dan kota NewYork
+FM3 tampil di tampilan utama. Gambarnya masih gelap karena `TrackSettings.xml` FM3 tidak
+punya parameter pencahayaan FM4 (gejala yang sama dengan `tsukuba-fm3full`).
+
+Tiga penyebab yang dibuktikan dengan `crash_stack.py` (debugger yang mencetak stack,
+register guest r0..r31 dari konteks recompile di `rdi`, dan memori guest):
+
+1. **Sel istimewa PVS.** `CullPass3` membaca zona di luar `l4`. Ini terjadi dengan donor AI
+   CrownJewel (zona 136–138, sedangkan NewYork punya 59). Di FM4 sendiri, ribbon tanpa
+   sel `l68` (AmalfiGP 01) menaruh sel istimewa di slot 0 `a84`/`a100`, bukan slot 1.
+   `pvs.to_v27` kini mengikuti bentuk ribbon v27 FM4: `u4` = `0x4FFF0044`,
+   `a116 = [objek]`, slot 0 bila `l68` kosong.
+2. **Berkas MLP AI pendek di ZIP.** Pembaca MLP (`82CF42E0`) selalu membaca 1280 byte
+   pertama dalam satu panggilan. Dari ZIP yang di-mount, anggota yang lebih pendek gagal,
+   sehingga `.seg` NewYork_01 (973 byte) tidak termuat. Dump objek data AI menunjukkan
+   `.geo` lengkap (1454 waypoint, CRC cocok) tetapi `iNumSegments` 0 dan `iStart` null,
+   lalu `CMLPMatrix` crash. Tsukuba lolos karena AI-nya berkas lepas di disc, dan
+   CrownJewel 19_R karena semua berkasnya ≥ 1280 byte. Perbaikan: padding nol sampai
+   1280 byte (offset data MLP tidak berubah).
+3. Hipotesis `hash.manifest` diuji dan **gugur**: `.seg` FM4 Tsukuba yang satu bitnya
+   diubah tetap termuat (`track-tsukuba-seg-tamper2`).
+
+Bisect AI (run `track-ny-bis-a..d`): donor `.geo/.irt/.seg/.pit` lolos dari pembuatan AI,
+donor `.seg` saja mengubah crash, dan donor `.irt` saja tidak. Itu yang mengarah ke `.seg`.
+
 Catatan konvensi: `dirsize` entri `zipmanifest.xml` FM4 = ukuran direktori pusat +
 22. `integration.extend_zip_manifest` menulis tanpa +22, dan mount itu tetap bekerja
 (paket mobil, `stringtables.zip`).

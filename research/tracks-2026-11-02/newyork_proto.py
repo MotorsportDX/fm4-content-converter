@@ -29,6 +29,7 @@ UI_RIB = "GAME:\\Media\\UI\\Textures\\UI4\\Logos\\Mini_Track_Ribbons\\RIB_OldCou
 parser = argparse.ArgumentParser()
 parser.add_argument("out")
 parser.add_argument("--ai-donor")
+parser.add_argument("--ai-donor-parts", default="", help="comma list: only donor files whose path contains one of these")
 parser.add_argument("--convert", action="store_true", help="PVS v24 -> v27 and RMB v4 -> v5 (normal FM4 track path)")
 args = parser.parse_args()
 out = Path(args.out)/"files"
@@ -142,10 +143,20 @@ def zip_of(entries):
 track3 = F3/"Tracks"/MEDIA
 ai = {p.relative_to(F3/"AI/Tracks").as_posix(): p.read_bytes()
       for p in (F3/"AI/Tracks").rglob("*") if p.is_file() and "newyork" in p.as_posix().lower()}
+if args.convert:
+    # Mounted ZIPs are looked up by exact name: FM4 asks for <MediaName>_NN[_R] (CrownJewel_19_R).
+    import re as _re
+    canon = lambda n: _re.sub(r"_r(?=[./])", "_R", _re.sub("(?i)newyork", MEDIA, n))
+    ai = {canon(n): d for n, d in ai.items()}
+    # The MLP reader reads the first 1280 bytes of a file in one call (82CF42E0); from a
+    # mounted ZIP a member shorter than that fails to open as MLP, so pad with zeros.
+    ai = {n: d + bytes(1280 - len(d)) if d.startswith(b"MLPDataStart") and len(d) < 1280 else d
+          for n, d in ai.items()}
 if args.ai_donor:
     donor = {p.relative_to(F3/"AI/Tracks").as_posix().lower().replace(args.ai_donor.lower(), "*"): p
              for p in (F3/"AI/Tracks").rglob("*") if p.is_file() and args.ai_donor.lower() in p.as_posix().lower()}
-    for name in [n for n in ai if "newyork_01" in n.lower()]:
+    parts = [x.lower() for x in args.ai_donor_parts.split(",") if x]
+    for name in [n for n in ai if "newyork_01" in n.lower() and (not parts or any(x in n.lower() for x in parts))]:
         ai[name] = donor[name.lower().replace("newyork_01", "*")].read_bytes()
         report.setdefault("ai_donor", []).append(name)
 def track_file(p):

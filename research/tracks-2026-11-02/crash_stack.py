@@ -117,7 +117,7 @@ def guest_state(hproc, ctx_address, dump):
     print("  guest", " ".join(f"r{i}={v & 0xFFFFFFFF:x}" for i, v in enumerate(gpr)))
     for i, v in enumerate(gpr):
         v &= 0xFFFFFFFF
-        if dump and 0x40000000 <= v < 0xA0000000 and i not in (1, 2, 13):
+        if dump and 0x20000000 <= v < 0xA0000000 and i not in (1, 2, 13):
             mem = read(hproc, 0x100000000 + v, dump)
             print(f"  [r{i}={v:x}]", mem.hex(" ", 4))
 
