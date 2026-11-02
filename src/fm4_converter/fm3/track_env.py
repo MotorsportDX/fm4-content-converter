@@ -33,9 +33,7 @@ FM4 = Path(r"D:\Data\forza-motorsport-4\Forza Motorsport 4 (Japan, Asia) (Disc 1
 
 PVS_W3 = 0x401FB8          # header word of FM4's Tsukuba v27 ribbons
 MLP_READ = 1280            # bytes FM4's MLP reader takes in one call (82CF42E0)
-UI_LOGO = "GAME:\\Media\\UI\\Textures\\UI4\\Logos\\Track_Logos\\L_TRK_OldCourse.tga"
-UI_LOGO_SM = "GAME:\\Media\\UI\\Textures\\UI4\\Logos\\Track_Logos_SM\\L_TRK_OldCourse.tga"
-UI_RIB = "GAME:\\Media\\UI\\Textures\\UI4\\Logos\\Mini_Track_Ribbons\\RIB_OldCourse10.tga"
+UI_ROOTS = [FM3UC / "UI/Textures.zip", FM3 / "UI/Textures.zip"]   # FM3 logos, mini ribbons, images
 DECISION_ZONES_DONOR = ("Infin", "ribbon_00")
 
 
@@ -124,10 +122,42 @@ class PackSource:
         return self._loose(f"audio/tracks/{self.media}/")
 
 
+class RenamedSource:
+    """An FM3 environment under a new MediaName. FM4 builds file names from MediaName
+    (`%s.stx.bin`, `Ribbon_%02d\%s_%02d.pvs`, `%s_track_%02d.col`, AI `%s_%02d%s`,
+    `%s.fev`), so every file name carrying the old name is renamed; model names come from
+    the PVS (`lemansout.%05d.rmb.bin`) and stay."""
+
+    def __init__(self, source, media):
+        self.source, self.media = source, media
+        self.pattern = re.compile(rf"(?i){re.escape(source.media)}(?!out)")
+
+    def _name(self, name):
+        return self.pattern.sub(self.media, name)
+
+    def track_files(self):
+        return {self._name(n): d for n, d in self.source.track_files().items()}
+
+    def bin_members(self):
+        for name, data in self.source.bin_members():
+            yield self._name(name), data
+
+    def ai_files(self):
+        return {self._name(n): d for n, d in self.source.ai_files().items()}
+
+    def audio_files(self):
+        return {self._name(n): d for n, d in self.source.audio_files().items()}
+
+
+# media in FM4 -> source, FM4 TrackSettings donor, FM3 MediaName, FM3 track ids (None: all)
 SOURCES = {
-    "NewYork": (lambda: DiscSource("NewYork"), "Tsukuba"),
-    "Amalfi": (lambda: PackSource("Amalfi", FM3UC2 / "4D53084D0CCF0060", "0060"), "AmalfiGP"),
-    "TestTrackinfield": (lambda: PackSource("TestTrackinfield", FM3UC2 / "4D53084D0CCF0045", "0045"), "Tsukuba"),
+    "NewYork": (lambda: DiscSource("NewYork"), "Tsukuba", "NewYork", None),
+    "Amalfi": (lambda: PackSource("Amalfi", FM3UC2 / "4D53084D0CCF0060", "0060"), "AmalfiGP", "Amalfi", None),
+    "TestTrackinfield": (lambda: PackSource("TestTrackinfield", FM3UC2 / "4D53084D0CCF0045", "0045"), "Tsukuba",
+                         "TestTrackinfield", None),
+    # FM4 keeps LeMans 100/101 with its own models; FM3's Bugatti circuit (102, ribbon 0)
+    # needs FM3's whole LeMans set, so it becomes an environment of its own.
+    "LeMansBugatti": (lambda: RenamedSource(DiscSource("LeMans"), "LeMansBugatti"), "LeMans", "LeMans", (102,)),
 }
 
 
@@ -189,11 +219,17 @@ def _find(folder, name):
     return next(p for p in Path(folder).iterdir() if p.name.lower() == name.lower())
 
 
-def add_database(fm3_db, fm4_db, media, ai):
+def fm3_tracks(fm3_db, fm3_media, ids=None):
+    rows = [dict(r) for r in fm3_db.execute("select * from Tracks where MediaName=? order by id", (fm3_media,))]
+    return [r for r in rows if ids is None or r["id"] in ids]
+
+
+def add_database(fm3_db, fm4_db, media, ai, fm3_media=None, ids=None):
     """Environment, time of day, Tracks, StartGridPositions and SplitPoints of one FM3
-    environment into the FM4 database `fm4_db` (an open sqlite3 connection)."""
+    environment into the FM4 database `fm4_db` (an open sqlite3 connection), as `media`."""
     a, b = fm3_db, fm4_db
-    e3 = dict(a.execute("select * from Environments where MediaName=?", (media,)).fetchone())
+    fm3_media = fm3_media or media
+    e3 = dict(a.execute("select * from Environments where MediaName=?", (fm3_media,)).fetchone())
     if b.execute("select 1 from Environments where MediaName=?", (media,)).fetchone():
         raise ValueError(f"FM4 already has environment {media}")
     env = e3["Id"]
@@ -202,7 +238,7 @@ def add_database(fm3_db, fm4_db, media, ai):
         env = b.execute("select max(Id)+1 from Environments").fetchone()[0]
     cols = [r[1] for r in b.execute("pragma table_info(Environments)")]
     row = {k: e3.get(k) for k in cols}
-    row.update(Id=env, ImagePath=UI_LOGO, ThumbImageName="OldCourse", Description=e3["Location"],
+    row.update(Id=env, MediaName=media, Description=e3["Location"],
                ShowOnMap=0, MapX=0.0, MapY=0.0)
     b.execute(f"insert into Environments ({','.join(row)}) values ({','.join('?' * len(row))})", list(row.values()))
     tod = dict(b.execute("select * from EnvironmentTimeOfDay where EnvironmentId=4 and TimeOfDayIndex=0").fetchone())
@@ -210,7 +246,7 @@ def add_database(fm3_db, fm4_db, media, ai):
     b.execute(f"insert into EnvironmentTimeOfDay ({','.join(tod)}) values ({','.join('?' * len(tod))})", list(tod.values()))
     cols = [r[1] for r in b.execute("pragma table_info(Tracks)")]
     pits = {r[0] for r in b.execute("select id from PittingProfiles")}
-    tracks = [dict(r) for r in a.execute("select * from Tracks where MediaName=? order by id", (media,))]
+    tracks = fm3_tracks(a, fm3_media, ids)
     ids = [t["id"] for t in tracks]
     names = {n.lower() for n in ai}
     # ReverseIndex names the ribbon whose geometry a layout uses (Amalfi 122 drives ribbon
@@ -240,8 +276,9 @@ def add_database(fm3_db, fm4_db, media, ai):
         row = {k: t.get(k) for k in cols}
         row.update(IsRealWorld=0, IsReverse=int(reverse[t["id"]]), IsHomespace=0,
                    CarsPerUniverse=0, QuickRaceLapCountKinect=1, SatImageName=str(t["id"]),
-                   Logo=UI_LOGO, LogoSmall=UI_LOGO_SM, MiniRibbonPath=UI_RIB, RichPresence=70,
+                   RichPresence=70,
                    DefaultStartGridPositionsId=grid_ids[t["DefaultStartGridPositionsId"]], EnvironmentId=env,
+                   MediaName=media,
                    MPPitProfile=t["MPPitProfile"] if t["MPPitProfile"] in pits else 100)
         missing = [k for k, v in row.items() if v is None]
         if missing:
@@ -253,6 +290,31 @@ def add_database(fm3_db, fm4_db, media, ai):
         b.execute("insert into SplitPoints (ID, TrackId, Split) values (?,?,?)", (nxt, tid, split))
         nxt += 1
     return {"environment": env, "tracks": ids, "grids": grids}
+
+
+def ui_textures(env_row, tracks, fm4_names, sources):
+    """{texture path under Media/UI/Textures: xds bytes} FM4 lacks for one environment's
+    logo, small logo, mini ribbons (and _SM) and environment images (UI4/Track_Images/
+    <ThumbImageName>1..3), taken from FM3's UI archives. FM3 and FM4 UI .xds are both Xenos
+    texture headers plus data (FM3 8888, FM4 DXT)."""
+    bs = chr(92)
+    wanted = set()
+    for value in [env_row["ImagePath"]] + [t[k] for t in tracks for k in ("Logo", "LogoSmall", "MiniRibbonPath")]:
+        rel = value.replace(bs, "/").split("Textures/", 1)[-1].rsplit(".", 1)[0] + ".xds"
+        wanted.add(rel)
+        if "/Mini_Track_Ribbons/" in rel:
+            wanted.add(rel.replace("/Mini_Track_Ribbons/", "/Mini_Track_Ribbons_SM/"))
+    wanted.update(f"UI4/Track_Images/{env_row['ThumbImageName']}{k}.xds" for k in (1, 2, 3))
+    out = {}
+    for rel in sorted(wanted):
+        if rel.lower() in fm4_names:
+            continue
+        for z in sources:
+            hit = next((n for n in z.namelist() if n.lower() == rel.lower()), None)
+            if hit:
+                out[hit] = archive_read(z, hit)
+                break
+    return out
 
 
 def string_additions(media_rows, env_row, media):
@@ -295,16 +357,21 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
     wanted = {"tracks.str": [], "environments.str": []}
     zones_dir = _find(_find(fm4 / "audio/tracks", DECISION_ZONES_DONOR[0]), DECISION_ZONES_DONOR[1])
     zone_file = next(p for p in zones_dir.iterdir() if "decisionzones" in p.name.lower()).read_bytes()
+    fm4_ui = {n.lower() for n in zipfile.ZipFile(fm4 / "UI/Textures.zip").namelist()}
+    ui_sources = [zipfile.ZipFile(p) for p in UI_ROOTS if Path(p).exists()]
+    ui_all = {}
     for media in envs:
-        make, donor = SOURCES[media]
+        make, donor, fm3_media, ids = SOURCES[media]
         source = make()
         settings = _find(fm4 / "tracks" / donor, "TrackSettings.xml").read_bytes()
         ai = {canonical_ai_name(n, media): pad_mlp(d) for n, d in source.ai_files().items()}
         with b:
-            info = add_database(a, b, media, ai)
+            info = add_database(a, b, media, ai, fm3_media, ids)
         ai_all.update(ai)
-        rows = [dict(r) for r in a.execute("select * from Tracks where MediaName=? order by id", (media,))]
-        env_row = dict(a.execute("select * from Environments where MediaName=?", (media,)).fetchone())
+        rows = fm3_tracks(a, fm3_media, ids)
+        env_row = dict(a.execute("select * from Environments where MediaName=?", (fm3_media,)).fetchone())
+        ui = ui_textures(env_row, rows, fm4_ui, ui_sources)
+        ui_all.update(ui)
         for k, v in string_additions(rows, env_row, media).items():
             wanted[k] += v
         track = {n: convert_track_file(n, d, settings) for n, d in source.track_files().items()}
@@ -319,11 +386,18 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
                 audio[f"Ribbon_{rib:02d}/{media.lower()}ribbon_{rib:02d}decisionzones.xml"] = zone_file
         archives[Path(f"Media/audio/tracks/{media}.zip")] = zip_bytes(audio)
         loose.update({Path("Media/audio/tracks") / media / n: d for n, d in audio.items()})
-        report[media] = {**info, "settings_donor": donor, "models_v5": models, "track_files": len(track),
+        report[media] = {**info, "ui_textures": sorted(ui), "settings_donor": donor, "models_v5": models, "track_files": len(track),
                          "ai_files": len(ai), "audio_files": len(audio), "bin_members": members}
     assert b.execute("pragma integrity_check").fetchone()[0] == "ok"
     b.close()
     archives[Path("Media/AI/Tracks.zip")] = zip_bytes(ai_all)
+    # One ZIP per UI folder, mounted at that folder (game:\media\ui\textures\UI4\...\).
+    folders = {}
+    for name, data in ui_all.items():
+        folder, filename = name.rsplit("/", 1)
+        folders.setdefault(folder, {})[filename] = data
+    for folder, entries in folders.items():
+        archives[Path("Media/UI/Textures") / f"{folder}.zip"] = zip_bytes(entries)
     # Names: FM3 text per language, on top of the winning FM4 (and DLC) tables.
     fm3 = fm3_string_tables(string_roots or [FM3UC / "StringTables", FM3 / "StringTables"])
     stream = io.BytesIO()
@@ -333,8 +407,11 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
             en = fm3[("en", table.lower())]
             for code, (prio, lang, origin, data) in sorted(tables.items()):
                 src = fm3.get((code, table.lower()), en)
-                adds = [(k, s, src.texts.get(k & 65535) or en.texts[k & 65535]) for k, s in wanted[table.lower()]]
-                zout.writestr(zipfile.ZipInfo(f"{lang}/{table}", (1980, 1, 1, 0, 0, 0)), ui_names.StringTable(data).add(adds))
+                target = ui_names.StringTable(data)
+                # Keys FM4 already has (LeMans' environment names) are FM4's own text: reused.
+                adds = [(k, s, src.texts.get(k & 65535) or en.texts[k & 65535]) for k, s in wanted[table.lower()]
+                        if k & 65535 not in target.texts]
+                zout.writestr(zipfile.ZipInfo(f"{lang}/{table}", (1980, 1, 1, 0, 0, 0)), target.add(adds))
     names = stream.getvalue()
     prio_names = max(ui_names.winning_tables(fm4, content_root, archive_read, c.sha, t)[0]["en"][0]
                      for t in ("Tracks.str", "Environments.str")) + 1

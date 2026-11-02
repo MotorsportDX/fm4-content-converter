@@ -66,14 +66,16 @@ def slot(centreline, x, z, hx, hz, start=0.0, near=8.0):
 def convert(grid_id, fm3_row, centreline, max_offset=8.0, start=0.0):
     """FM4 StartGridPositions rows (16 slots) from one FM3 row.
 
-    FM3 grids for 8 cars (Amalfi) fill slots 8-11 with repeats or stray positions; a slot
-    from 8 on that is not behind the previous one or not on the AI line ends the grid, and
+    FM3 grids for 8 cars (Amalfi, LeMans) fill slots 8-11 with repeats or stray positions; a
+    slot from 8 on that repeats an earlier one, lies ahead of it or off the AI line ends the
+    grid, and
     the missing slots are extended by whole rows of four, as Turn 10 does for 12 -> 16."""
     rows = []
     for k in range(12):
         x, y, z, hx, hy, hz = fm3_row[1+6*k:7+6*k]
         dist, back, right, yaw = slot(centreline, x, z, hx, hz, start)
-        if k >= 8 and (dist > max_offset or back <= rows[-1][2]):
+        if k >= 8 and (dist > max_offset or back < rows[-1][2] - 2.0
+                       or any(math.hypot(back - r[2], right - r[3]) < 0.5 for r in rows)):
             break
         if dist > max_offset:
             raise ValueError(f'Slot {k} is {dist:.1f} m from the AI centreline')
@@ -82,6 +84,7 @@ def convert(grid_id, fm3_row, centreline, max_offset=8.0, start=0.0):
     while len(rows) < 16:
         k = len(rows)
         rows.append((grid_id, k, rows[k-4][2]+shift, rows[k-4][3], 0.0))
-    if any(b[2] <= a[2] for a, b in zip(rows, rows[1:])):
+    # Two-wide grids (LeMans) put a pair side by side, staggered by under a metre, as FM4 does.
+    if any(b[2] < a[2] - 2.0 for a, b in zip(rows, rows[1:])) or rows[-1][2] <= rows[0][2]:
         raise ValueError('Grid is not ordered back from the start line')
     return rows
