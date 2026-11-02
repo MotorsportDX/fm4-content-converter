@@ -18,6 +18,23 @@ from .texture_audit import Texture, tiled_address
 
 MAX_CROPPED_BORDER = 0.1  # share of border pixels a cropped car may cover
 
+# FM3 renders its thumbnails high-key on white; FM4's own are darker, with more
+# contrast and saturation. FM4's car select shows the atlas' large view as the
+# car picture, so FM3 pixels look washed out next to FM4 cars. Measured on the
+# 315 cars both games ship (outputs/fm-car-converter/exterior-paint-v1/
+# thumb_lcurve.py): median quantile map of car-pixel linear luminance, FM3 ->
+# FM4, over the 30..99.5% quantiles (FM4's ground shadow excluded), fitted on
+# half the cars; held-out luminance error 85.8 -> 9.9 sRGB levels. Hue is kept;
+# chroma then scales by the median FM4/FM3 saturation ratio (held-out 0.144 ->
+# 0.092). A tone map cannot add FM4's highlights or ground shadow.
+FM4_LUMINANCE = ((0.0, 0.0), (0.001, 0.0001), (0.0021, 0.0002), (0.0043, 0.0003),
+                 (0.0089, 0.0006), (0.0183, 0.0008), (0.0264, 0.0009), (0.0379, 0.0013),
+                 (0.0546, 0.0018), (0.0785, 0.0024), (0.1129, 0.0035), (0.1624, 0.0059),
+                 (0.2336, 0.0106), (0.336, 0.0186), (0.4833, 0.0373), (0.6952, 0.1012),
+                 (1.0, 0.4624))
+FM4_SATURATION_GAIN = 2.119
+LUMA = np.array([0.2126, 0.7152, 0.0722])
+
 
 class ThumbnailError(ValueError):
     pass
@@ -111,6 +128,21 @@ def remove_white_matte(image):
                  "unmatted_boundary_pixels":int(adjacent.sum())}
 
 
+def fm4_tone(cutout):
+    """Map the FM3 render's colours to FM4's thumbnail look (FM4_LUMINANCE)."""
+    rgba = np.array(cutout).astype(float)
+    c = rgba[:,:,:3]/255
+    linear = np.where(c <= 0.04045, c/12.92, ((c+0.055)/1.055)**2.4)
+    luminance = linear @ LUMA
+    xs, ys = zip(*FM4_LUMINANCE)
+    scaled = linear*(np.interp(luminance, xs, ys)/np.maximum(luminance, 1e-6))[:,:,None]
+    grey = (scaled @ LUMA)[:,:,None]
+    linear = np.clip(grey+(scaled-grey)*FM4_SATURATION_GAIN, 0, 1)
+    c = np.where(linear <= 0.0031308, 12.92*linear, 1.055*linear**(1/2.4)-0.055)
+    rgba[:,:,:3] = np.round(c*255)
+    return Image.fromarray(rgba.astype(np.uint8))
+
+
 def fit_view(cutout, size):
     # Preserve aspect ratio, leave gutters and put the floor close to the bottom.
     foreground = cutout.crop(cutout.getbbox())
@@ -150,6 +182,7 @@ def convert(data, template):
     if (source.width,source.height,source.codec,source.gamma) != (512,256,"RGBA8",0):
         raise ThumbnailError("Unreviewed FM3 thumbnail format")
     cutout, report = remove_white_matte(decode(data))
+    cutout = fm4_tone(cutout)
     large = fit_view(cutout,(608,288))
     small = fit_view(cutout,(288,160))
     atlas = Image.new("RGBA",(768,288))
@@ -161,7 +194,8 @@ def convert(data, template):
                   target_sha256=hashlib.sha256(encoded).hexdigest(),
                   atlas_size=[768,288],large_view=[0,0,608,288],
                   small_view_rotated_ccw=[608,0,768,288],
-                  premultiplied_alpha=True,source_car_rgb_interior_preserved_before_resize=True,
+                  premultiplied_alpha=True,source_car_rgb_interior_preserved_before_resize=False,
+                  fm4_tone={"luminance_knots":len(FM4_LUMINANCE),"saturation_gain":FM4_SATURATION_GAIN},
                   camera_limit="Both slots reuse the original FM3 front-quarter image; no new side render",
                   texture=Texture(encoded).audit())
     return encoded, report

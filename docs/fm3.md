@@ -688,7 +688,80 @@ dengan baseline):
 | paint-a4b | A4 Touring Car (FM3) | interior balap hitam, tidak berubah |
 
 Penilaian ini visual pada satu lintasan dan satu waktu siang. Belum ada pengukuran
-luminans per patch terhadap mobil native, dan 70 mobil lainnya belum dilihat di game.
+luminans per patch terhadap mobil native.
+
+### Uji sampel 15 mobil
+
+Sampel ini dipilih per jenis risiko, di luar lima mobil yang sudah diuji sebelumnya. Semua
+run memakai disc `fm3-only-paint`, Quick Race dengan AI driver, dan balapan sekitar 25
+detik. Frame tersimpan di `outputs/fm-car-converter/fm3-only-v1/runtime/sample15/`.
+
+| Mobil | Risiko yang diwakili | Kelas | Interior/cockpit |
+|---|---|---|---|
+| Aveo5 LT (FM3) | kelas terendah (E) | E | normal |
+| Solstice (FM3) | CarAttributes v10 | D | normal; panel dasbor terang (diduga sewarna bodi) |
+| X5 xDrive48i (FM3) | SUV jalanan | D | normal |
+| Tom's W123 MR-S (FM3) | Disc 2, CarAttributes v4 | C | normal |
+| GranTurismo (FM3) | kunci nama dipindah | B | dasbor abu muda; bagian bawah dan kursi sangat terang, belum dipastikan |
+| Cayman S (FM3) | make dari DLC Porsche | A | normal |
+| #1 Peugeot 207 Super 2000 (FM3) | Disc 2, velg DLC, butuh pack 0003 | A | normal |
+| 911 GT2 (997) (FM3) | kunci dipindah, Porsche | S | normal; lingkar setir abu muda |
+| #24 At-Speed S60 R (FM3) | Disc 2, velg dikonversi | S | normal |
+| #25 Britek FG Falcon (FM3) | kunci dipindah | R3 | normal |
+| #57 Carsport Viper GTS-R (FM3) | Disc 2, attr v4, elemen shadersettings ganda | R3 | normal |
+| #9 Vitaphone MC12 (FM3) | velg dibagi, tanpa spion tengah | R2 | normal |
+| C-Class Touring Car (FM3) | tanpa carattribs | R2 | normal |
+| #30 MOMO Doran F333 SP (FM3) | bounds lampu direfit | R1 | normal (kokpit terbuka) |
+| #8 Peugeot Sport 908 (FM3) | kelas X | X | normal |
+
+Semua 15 mobil lolos: bisa dipilih, nama dan kelas tampil, balapan berjalan, tanpa crash,
+dan tiga kunci error runtime sama dengan baseline.
+
+Beberapa run pertama memilih mobil yang salah, dan kesalahan ini diperbaiki sebelum hasil
+dicatat:
+- Teks OCR pemilihan make yang melintasi dua baris gagal terbaca ("Alfieri | Maserati").
+  "William Durant" ternyata juga ada di sejarah Buick, dan "Bavarian" di sejarah Audi.
+  Target kini dicek terhadap semua teks sejarah di `List_CarMake.str`.
+- Tiga target mobil lebih dulu cocok dengan mobil **bawaan** FM4 bernama mirip: #9 SP Tools
+  FG Falcon 2011, Peugeot 207 Super 2000, dan Mercedes-AMG C-Class Touring Car. Ketiganya
+  diulang dengan target yang memuat "(FM3)" (Falcon diganti #25 Britek, karena sponsor #9
+  juga ada di FM4). Setiap run kini dicek lewat teks kartu Car Select.
+
+Lawan AI dari paket juga muncul di Quick Race. Saat pemain memakai C-Class bawaan, posisi
+pertama dipegang AI dengan "#008 Aston DBR9 (FM3)". Sebelumnya juga ada "GT500 SC430
+(FM3)" di run A4. OCR hanya membaca satu-dua baris teratas klasemen.
+
+### Thumbnail dan gambar Car Select pucat
+
+Gambar mobil besar di Car Select bukan render 3D, melainkan tampilan 608×288 dari atlas
+thumbnail. Buktinya: frame Car Select Corvette Z06 2006 bawaan dan Z06 dengan aset hasil
+konversi FM3 identik piksel demi piksel (disc `ext-native` vs `ext-z06`), sedangkan
+cockpit-nya di balapan berbeda. Thumbnail FM3 adalah render terang di atas latar putih,
+sementara FM4 merender lebih gelap, lebih kontras dan lebih pekat. Karena converter
+mempertahankan piksel FM3, mobil konversi tampil pucat di antara mobil FM4.
+
+`ui_thumbnail.fm4_tone` kini memetakan warna piksel mobil ke gaya FM4. Pemetaannya diukur
+dari 315 mobil yang punya thumbnail di kedua game
+(`outputs/fm-car-converter/exterior-paint-v1/thumb_lcurve.py`):
+- Kurva luminans linear: median pemetaan kuantil 30–99,5% piksel mobil (bayangan tanah
+  FM4 dikecualikan), difit pada separuh mobil. Pada separuh lainnya, error kuantil
+  luminans turun dari 85,8 ke 9,9 level sRGB.
+- Rona dipertahankan, lalu chroma dikali 2,119 (median rasio saturasi FM4/FM3). Error
+  saturasi pada mobil uji turun dari 0,144 ke 0,092.
+
+Kurva per kanal RGB ditolak karena menggeser rona (kuning menjadi oranye). Tone map ini
+tidak bisa menambahkan pantulan kilap dan bayangan tanah render FM4, jadi hasilnya sedikit
+lebih kusam daripada thumbnail asli FM4. Di game (disc `fm3-only-v2`, run `v2-aveo` dan
+`v2-granturismo`, keduanya tanpa crash), Aveo5 dan GranTurismo kini tampil sekelas dengan
+mobil FM4 di sebelahnya, baik di gambar besar maupun di strip (frame
+`exterior-paint-v1/carselect_before_after.png`).
+
+Eksperimen yang sama juga menunjukkan interior Z06 versi konversi lebih terang daripada
+Z06 bawaan (setir abu muda vs hitam). Nilai PaintScale median terlalu terang untuk mobil
+ini, padahal median memang berarti separuh port Turn 10 lebih gelap. Ini belum dikoreksi.
+
+Total mobil paket yang sudah diuji di game: 20 dari 73. Sisanya, serta handling, suara,
+upgrade, tune dan mode karier, belum diuji.
 
 Header cockpit native juga memuat blok 0x104..0x153 berisi kotak mesh `mirrorMiddle`
 (pusat, baris rotasi identitas, setengah ukuran; batas atas dimulai dari 0) dan word

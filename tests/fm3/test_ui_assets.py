@@ -41,6 +41,21 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual(out.getpixel((95,65)),(0,0,0,0))
         self.assertEqual(report["enclosed_ground_matte_islands_removed"],1)
 
+    def test_fm4_tone_darkens_keeps_alpha_and_hue_order(self):
+        im = Image.new("RGBA",(4,1))
+        for x,colour in enumerate(((240,220,40,255),(220,30,30,128),(200,200,200,255),(0,0,0,0))):
+            im.putpixel((x,0),colour)
+        out = thumbs.fm4_tone(im)
+        for x in range(4):
+            a, b = im.getpixel((x,0)), out.getpixel((x,0))
+            self.assertEqual(a[3], b[3])
+            self.assertLessEqual(sum(b[:3]), sum(a[:3]))
+        yellow = out.getpixel((0,0))
+        self.assertTrue(yellow[0] >= yellow[1] > yellow[2])  # still yellow, more saturated
+        grey = out.getpixel((2,0))
+        self.assertEqual(grey[0], grey[1])
+        self.assertEqual(out.getpixel((3,0)), (0,0,0,0))
+
     def test_unknown_matte_is_not_silently_keyed_out(self):
         with self.assertRaisesRegex(thumbs.ThumbnailError,"white border"):
             thumbs.remove_white_matte(Image.new("RGBA",(160,80),"blue"))

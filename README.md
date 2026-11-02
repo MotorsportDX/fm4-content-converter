@@ -19,7 +19,7 @@ Jalur fisika FM3 telah dievaluasi pada panel 30 mobil. Impor aset dikembangkan
 melalui Chevrolet Cobalt SS 2005: kandidat v9 diuji dengan harness e2e Motorsport
 DX (Quick Race dengan Disc 2 dan DLC terpasang), termasuk nama mobil dan kelas/PI
 yang dipetakan ke skala FM4. `batch_package.py` kini mengemas 73 dari 81 mobil
-FM3 yang tidak ada di FM4 maupun DLC-nya ke satu overlay; lima di antaranya diuji
+FM3 yang tidak ada di FM4 maupun DLC-nya ke satu overlay; 20 di antaranya diuji
 sampai balapan di Motorsport DX. Interior cockpit yang sebelumnya tampil putih kini
 memakai PaintScale FM4 yang diukur dari mobil yang ada di kedua game. Hasil ini belum
 membuktikan semua mobil, kesamaan handling, atau DLC siap pasang.
