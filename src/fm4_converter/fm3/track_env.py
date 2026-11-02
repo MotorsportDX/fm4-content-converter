@@ -230,6 +230,8 @@ def add_database(fm3_db, fm4_db, media, ai, fm3_media=None, ids=None):
     a, b = fm3_db, fm4_db
     fm3_media = fm3_media or media
     e3 = dict(a.execute("select * from Environments where MediaName=?", (fm3_media,)).fetchone())
+    if fm3_media != media:
+        e3 = environment_named_after_layout(e3, fm3_tracks(a, fm3_media, ids))
     if b.execute("select 1 from Environments where MediaName=?", (media,)).fetchone():
         raise ValueError(f"FM4 already has environment {media}")
     env = e3["Id"]
@@ -292,6 +294,13 @@ def add_database(fm3_db, fm4_db, media, ai, fm3_media=None, ids=None):
     return {"environment": env, "tracks": ids, "grids": grids}
 
 
+def environment_named_after_layout(env_row, tracks):
+    """A split-off environment (LeMansBugatti next to FM4's LeMans) shows its layout's
+    name, so the two environments differ in the menus; the text comes from Tracks.str."""
+    return {**env_row, "DisplayName": tracks[0]["DisplayName"], "ShortDisplayName": tracks[0]["ShortDisplayName"],
+            "_DisplayName_table": "tracks.str", "_ShortDisplayName_table": "tracks.str"}
+
+
 def ui_textures(env_row, tracks, fm4_names, sources):
     """{texture path under Media/UI/Textures: xds bytes} FM4 lacks for one environment's
     logo, small logo, mini ribbons (and _SM) and environment images (UI4/Track_Images/
@@ -318,15 +327,17 @@ def ui_textures(env_row, tracks, fm4_names, sources):
 
 
 def string_additions(media_rows, env_row, media):
-    """{table: [(fm3 key, FM4 key name)]} of the names one environment needs."""
+    """{table: [(fm3 key, FM4 key name, FM3 table holding the text)]} one environment needs."""
     wanted = {"tracks.str": [], "environments.str": []}
     for t in media_rows:
-        wanted["tracks.str"] += [(ui_names.reference(t["DisplayName"]), f"IDS_DisplayName_{t['id']}"),
-                                 (ui_names.reference(t["ShortDisplayName"]), f"IDS_ShortDisplayName_{t['id']}")]
+        wanted["tracks.str"] += [(ui_names.reference(t["DisplayName"]), f"IDS_DisplayName_{t['id']}", "tracks.str"),
+                                 (ui_names.reference(t["ShortDisplayName"]), f"IDS_ShortDisplayName_{t['id']}",
+                                  "tracks.str")]
     for field in ("Location", "DisplayName", "ShortDisplayName"):
         # Labels only: FM4 finds the text by key. Labels by id can exist already
         # (FM4's tables name environments its database no longer has, e.g. 62).
-        wanted["environments.str"].append((ui_names.reference(env_row[field]), f"IDS_{field}_FM3_{media}"))
+        table = env_row.get(f"_{field}_table", "environments.str")
+        wanted["environments.str"].append((ui_names.reference(env_row[field]), f"IDS_{field}_FM3_{media}", table))
     return wanted
 
 
@@ -370,6 +381,8 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         ai_all.update(ai)
         rows = fm3_tracks(a, fm3_media, ids)
         env_row = dict(a.execute("select * from Environments where MediaName=?", (fm3_media,)).fetchone())
+        if fm3_media != media:
+            env_row = environment_named_after_layout(env_row, rows)
         ui = ui_textures(env_row, rows, fm4_ui, ui_sources)
         ui_all.update(ui)
         for k, v in string_additions(rows, env_row, media).items():
@@ -409,8 +422,12 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
                 src = fm3.get((code, table.lower()), en)
                 target = ui_names.StringTable(data)
                 # Keys FM4 already has (LeMans' environment names) are FM4's own text: reused.
-                adds = [(k, s, src.texts.get(k & 65535) or en.texts[k & 65535]) for k, s in wanted[table.lower()]
-                        if k & 65535 not in target.texts]
+                adds = []
+                for k, label, origin in wanted[table.lower()]:
+                    if k & 65535 in target.texts:
+                        continue
+                    text_src = fm3.get((code, origin), fm3[("en", origin)])
+                    adds.append((k, label, text_src.texts.get(k & 65535) or fm3[("en", origin)].texts[k & 65535]))
                 zout.writestr(zipfile.ZipInfo(f"{lang}/{table}", (1980, 1, 1, 0, 0, 0)), target.add(adds))
     names = stream.getvalue()
     prio_names = max(ui_names.winning_tables(fm4, content_root, archive_read, c.sha, t)[0]["en"][0]
