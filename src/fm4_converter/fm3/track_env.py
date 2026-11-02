@@ -177,11 +177,25 @@ def pad_mlp(data):
     return data
 
 
+ROAD_DETAIL = 0x10   # texture type in l20 flags (& 0xF0) that makes FM4 build its road detail array
+
+
+def without_road_detail(p):
+    """The PVS with its road detail texture made an ordinary one (flags 0x14 -> 0x04).
+
+    `CTrackPresentation::vf74` (82956C00) blurs every type-0x10 texture into a
+    `CRoadDetailTextureArray`; with NewYork's FM3 texture its state machine reads a null
+    texture in state 4 (8290F4E8 -> D3D::GetTextureDescInternal) in some runs."""
+    q = dict(p)
+    q["l20"] = [t[:6] + (t[6] & ~0xF0 if t[6] & 0xF0 == ROAD_DETAIL else t[6],) for t in p["l20"]]
+    return q
+
+
 def convert_track_file(name, data, settings):
     """A file of `Media/Tracks/<media>/` as FM4 needs it."""
     low = name.lower()
     if low.endswith(".pvs"):
-        return track_pvs.write(track_pvs.to_v27(track_pvs.parse(data), PVS_W3))
+        return track_pvs.write(without_road_detail(track_pvs.to_v27(track_pvs.parse(data), PVS_W3)))
     if low == "tracksettings.xml" and settings is not None:
         return settings
     return data
@@ -283,6 +297,9 @@ def add_database(fm3_db, fm4_db, media, ai, fm3_media=None, ids=None):
         row.update(IsRealWorld=0, IsReverse=int(reverse[t["id"]]), IsHomespace=0,
                    CarsPerUniverse=0, QuickRaceLapCountKinect=1, SatImageName=str(t["id"]),
                    RichPresence=70,
+                   # FM3 DLC rows name their content pack (Amalfi 96); FM4 hides tracks of
+                   # content it does not own. This overlay ships the track itself.
+                   ContentId=0, IsInstalled=1,
                    DefaultStartGridPositionsId=grid_ids[t["DefaultStartGridPositionsId"]], EnvironmentId=env,
                    MediaName=media,
                    MPPitProfile=t["MPPitProfile"] if t["MPPitProfile"] in pits else 100)
