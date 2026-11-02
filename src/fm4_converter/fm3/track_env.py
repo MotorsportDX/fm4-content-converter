@@ -22,7 +22,7 @@ import argparse, io, json, os, re, shutil, sqlite3, struct, sys, zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from . import integration, ui_names, track_grid, track_pvs, track_rmb
+from . import integration, ui_names, track_grid, track_pvs, track_rmb, track_package
 from .integration import archive_read
 from ..archives.stfs_reader import STFS
 from ..archives.stfs_zip_io import STFSFile
@@ -397,7 +397,8 @@ def fm3_string_tables(roots):
     return tables
 
 
-def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm4=FM4, string_roots=None):
+def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm4=FM4, string_roots=None,
+          layouts=(170,)):
     from . import converter as c
     files = Path(out) / "files"
     if Path(out).exists():
@@ -465,6 +466,32 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         loose.update({Path("Media/audio/tracks") / media / n: d for n, d in audio.items()})
         report[media] = {**info, "ui_textures": sorted(ui), "settings_donor": donor, "models_v5": models, "track_files": len(track),
                          "ai_files": len(ai), "audio_files": len(audio), "bin_members": members}
+    for layout in layouts:
+        # Layouts on FM4's own geometry (CrownJewel 170): `track_package`'s row and files.
+        from contextlib import closing
+        from . import converter as cv
+        fm3_src, fm4_src = Path(cv.FM3_DEFAULT).resolve(), (fm4 / "DB/gamedb.slt").resolve()
+        f3, f4 = fm3_src.parents[1], fm4_src.parents[1]
+        with closing(cv.connect(fm3_src)) as s3, closing(cv.connect(fm4_src)) as s4:
+            row, _ = track_package.plan_row(s3, s4, layout)
+        media = row["MediaName"]
+        ribbon, _ = track_package.ribbon_files(track_package.find(f3, "Tracks"), track_package.find(f4, "tracks"),
+                                               media, row["RibbonIndex"], row["ReverseIndex"])
+        ai, _ = track_package.ai_files(f3 / "AI/Tracks", f4 / "AI/Tracks", media, row["RibbonIndex"])
+        audio_dir = track_package.find(track_package.find(track_package.find(f4, "audio"), "Tracks"), media)
+        sound, _ = track_package.audio_files(audio_dir, media, row["RibbonIndex"], row["ReverseIndex"])
+        for group in (ribbon, sound):
+            if group:
+                archive, data = track_package.mounted_archive(Path(next(iter(group))).parent, group)
+                archives[archive] = data
+        ai_all.update({Path(k).relative_to("Media/AI/Tracks").as_posix(): pad_mlp(v) for k, v in ai.items()})
+        with b:
+            b.execute(f"insert into Tracks ({','.join(row)}) values ({','.join('?' * len(row))})", list(row.values()))
+        wanted["tracks.str"] += [(ui_names.reference(row["DisplayName"]), f"IDS_DisplayName_{layout}", "tracks.str",
+                                  frozenset()),
+                                 (ui_names.reference(row["ShortDisplayName"]), f"IDS_ShortDisplayName_{layout}",
+                                  "tracks.str", frozenset())]
+        report[f"layout_{layout}"] = {"media": media, "ribbon": row["RibbonIndex"], "geometry_ribbon": row["ReverseIndex"]}
     assert b.execute("pragma integrity_check").fetchone()[0] == "ok"
     b.close()
     archives[Path("Media/AI/Tracks.zip")] = zip_bytes(ai_all)
