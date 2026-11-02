@@ -169,13 +169,26 @@ NONE = 0xFFFF
 SPECIAL_CELL_FLAGS = 0x4FFF0044  # u4 of the special (always visible) cells in FM4's own v27 ribbons
 
 
+SKY_SHADER = "shaders\track\sky_diff_1"
+
+
+def sky_model_index(p):
+    """Index of the special (sky) object `to_v27` appends to l52: FM4 draws object i with
+    model `<s132>.{i:05d}.rmb.bin`, where FM3 kept the sky in `<s132>.sky.rmb.bin`."""
+    return len(p["l52"])
+
+
 def to_v27(p, w3, slot=None):
     """v24 -> v27 in the shape of FM4's own v27 ribbons. Cell vectors become (f, 0, 0, 0)
     (FM4's v<25 path fills with the constant at 0x82000F40 = 0.0). The legacy cell and
     object are appended to l36/l52 as the special cell (u0 = object, u4 =
     SPECIAL_CELL_FLAGS); a84/a100 hold it at `slot` with FFFF before it, a116 = [object].
     FM4's own reading of a v<26 file puts it at slot 1 (`helper_8288EAE8` 8288ED88); FM4's
-    ribbons without l68 cells (AmalfiGP 01) use slot 0, so that is the default for them."""
+    ribbons without l68 cells (AmalfiGP 01) use slot 0, so that is the default for them.
+    The slot is the sky FM4 shows: `GetSkyObjectIndex` (822BAC30) takes a84[SkyboxIndex of
+    TrackSettings], so it must match the TrackSettings shipped with the track.
+    The object is the sky: in FM4's ribbons its ids name the `sky_diff_1` shader of l172
+    (FM3's legacy object has none) and its model is `sky_model_index`."""
     if p["ver"] != 24:
         raise ValueError("expected FPVS v24")
     if slot is None:
@@ -186,7 +199,10 @@ def to_v27(p, w3, slot=None):
     oi, ci = len(p["l52"]), len(p["l36"])
     q["l36"] = [fix(c) for c in p["l36"]] + [{**fix(p["legacy_cell"]), "u0": oi, "u4": SPECIAL_CELL_FLAGS}]
     q["l68"] = [fix(c) for c in p["l68"]]
-    q["l52"] = p["l52"] + [p["legacy_obj"]]
+    sky = dict(p["legacy_obj"])
+    if not sky["ids"] and SKY_SHADER in p["l172"]:
+        sky["ids"] = [p["l172"].index(SKY_SHADER)]
+    q["l52"] = p["l52"] + [sky]
     q["a84"], q["a100"], q["a116"] = [NONE] * slot + [ci], [NONE] * slot + [oi], [oi]
     q.pop("legacy_cell"); q.pop("legacy_obj")
     return q

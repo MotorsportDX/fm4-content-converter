@@ -192,18 +192,26 @@ def without_road_detail(p):
     return q
 
 
+def skybox_index(settings):
+    m = re.search(rb'<SkyboxIndex\s+value="(\d+)"', settings or b"")
+    return int(m.group(1)) if m else None
+
+
 def convert_track_file(name, data, settings):
     """A file of `Media/Tracks/<media>/` as FM4 needs it."""
     low = name.lower()
     if low.endswith(".pvs"):
-        return track_pvs.write(without_road_detail(track_pvs.to_v27(track_pvs.parse(data), PVS_W3)))
+        p = track_pvs.to_v27(track_pvs.parse(data), PVS_W3, skybox_index(settings))
+        return track_pvs.write(without_road_detail(p))
     if low == "tracksettings.xml" and settings is not None:
         return settings
     return data
 
 
-def write_bin(path, members):
-    """Write the track `bin.zip` (stored) with RMB v4 models as v5; (members, models)."""
+def write_bin(path, members, sky_indexes=()):
+    """Write the track `bin.zip` (stored) with RMB v4 models as v5; (members, models).
+    The FM3 sky model (`<x>.sky.rmb.bin`) is also written as `<x>.{i:05d}.rmb.bin` for each
+    sky object index i of the converted ribbons (`track_pvs.sky_model_index`)."""
     count = models = 0
     path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as z:
@@ -213,6 +221,11 @@ def write_bin(path, members):
                 models += 1
             z.writestr(zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0)), data)
             count += 1
+            if name.lower().endswith(".sky.rmb.bin"):
+                for i in sky_indexes:
+                    z.writestr(zipfile.ZipInfo(f"{name[:-len('.sky.rmb.bin')]}.{i:05d}.rmb.bin",
+                                               (1980, 1, 1, 0, 0, 0)), data)
+                    count += 1
     return count, models
 
 
@@ -435,10 +448,13 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
             (info["environment"], media)) for v in r} if join else set()
         for k, v in string_additions(rows, None if join else env_row, media, siblings).items():
             wanted[k] += v
-        track = {n: convert_track_file(n, d, settings) for n, d in source.track_files().items()}
+        originals = source.track_files()
+        track = {n: convert_track_file(n, d, settings) for n, d in originals.items()}
+        skies = sorted({track_pvs.sky_model_index(track_pvs.parse(d)) for n, d in originals.items()
+                        if n.lower().endswith(".pvs")})
         archives[Path(f"Media/tracks/{media}.zip")] = zip_bytes(track)
         bin_path = files / f"Media/tracks/{media}/bin.zip"
-        members, models = write_bin(bin_path, source.bin_members())
+        members, models = write_bin(bin_path, source.bin_members(), skies)
         bins[media] = bin_path
         audio = source.audio_files()
         ribbons = sorted({int(m.group(1)) for n in track for m in [re.match(r"ribbon_(\d+)/", n, re.I)] if m})
