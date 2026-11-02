@@ -38,15 +38,30 @@ Tsukuba dengan set biner FM3 lengkap (`bisect/tsukuba-fm3*`) adalah kendali pipe
 biner track: T3 harus lolos di sini sebelum layout FM3-only lain dikonversi, karena
 layout tersebut memakai model FM3 yang sama formatnya.
 
+## Paket
+
+Satu overlay membawa semua konten FM3-only: satu `gamedb.slt`, satu `stringtables.zip`
+dan satu `zipmanifest.xml`, karena FM4 hanya membaca satu dari masing-masing.
+
+```powershell
+python -m fm4_converter.fm3.batch_package --model-helper <carbin-cpu-v4>\carbin-cpu.exe --rules <rules.json> --pi-model <pi-model.json> --value-scales <rules.json> --content-root <...\4D530910\00000002> --out <paket-mobil>
+python -m fm4_converter.fm3.track_env --base <paket-mobil> --content-root <...\4D530910\00000002> --out <paket-final>
+```
+
+`track_env` mengonversi environment NewYork, Amalfi, TestTrackinfield dan LeMansBugatti
+(LeMans 102 sebagai environment sendiri). Isinya: PVS v27, RMB v5, AI dengan nama dan
+padding yang dibaca FM4, `TrackSettings` FM4 sebagai donor pencahayaan, serta logo, mini
+ribbon dan gambar FM3. Nama environment baru yang sudah dipakai FM4 diberi tanda
+"(FM3)", sama seperti mobil.
+
 ## Status
 
 | Item | M1/T1 | M2/T2 | M3 | M4/T3 | T4 | Catatan |
 |---|---|---|---|---|---|---|
-| 73 mobil terkemas | ✔ | 20 diuji | 20 diuji | 20 diuji | – | 53 belum diuji di game |
-| 8 mobil ditolak | ✘ | – | – | – | – | material tanpa preseden, XML rusak, massa stock |
-| CrownJewel 170 | ✔ | ✔ | – | ✔ (geometri FM4) | ✔ | |
+| 81 mobil FM3-only | ✔ 81/81 | 20 diuji | 20 diuji | 20 diuji | – | 8 yang dulu ditolak kini terkemas (XML sumber diperbaiki, berat stok IE, teknik tak dikenal seperti mobil FM4); 61 belum diuji di game |
+| CrownJewel 170 | ✔ | ✔ | – | ✔ (geometri FM4) | ✔ | paket `track_package` terpisah |
 | Kendali Tsukuba FM3 | – | ✔ | – | ✔ | – | `track_rmb.to_v5` (run `track-tsukuba-rmb5c`) |
-| 33 layout lain | ✘ | – | – | – | – | butuh pipeline biner track |
+| NewYork 22–25, Amalfi 10 layout, TestTrackinfield 18, LeMans 102 | ✔ 33/33 | sebagian | – | sebagian | – | lihat uji per layout di bawah |
 
 ## Batas
 

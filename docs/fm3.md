@@ -601,7 +601,24 @@ Sebanyak 24 mobil berasal dari Disc 2 FM3, dan 11 mendapat kunci nama baru. Ada 
 yang butuh Porsche Expansion dan/atau pack `0003`; daftarnya di `requires` manifest.
 Sebaran kelas: R3 24, R2 21, S 8, R1 6, B 4, C 4, A 2, D 2, E 1, X 1.
 
-Delapan mobil tetap ditolak karena tidak ada preseden FM4:
+Pembaruan 3 November 2026: kedelapan mobil di bawah kini terkemas (paket
+`fm3-only-v2`, **81 dari 81**), dengan aturan berikut:
+
+- **CAD_8_CTSV_08**: tag penutup yang tidak punya pembuka di `shadersettings.xml` sumber
+  dibuang. Hanya tag itu, dan tercatat di laporan aset (`repaired_source_xml`).
+- **Empat mobil IE**: stok berat mereka adalah weight reduction level 1, dan
+  `CurbWeight` FM3 = `InitialMass` baris itu. Seperti semua mobil FM4,
+  `CurbWeight × 100` diset sama dengan massa bodi stok. Input massa fisika tidak
+  berubah, dan asumsinya tercatat (`stock_weight_reduction_sets_catalog_weight`).
+- **F430 GT, Supra #35, GTO '68**: material tanpa teknik efek FM4 (`body2`, `LOD1`,
+  `bump_plastic`, `bump_stitching`, `leather`, `bump_leather`) diterima seperti nama
+  teknik tak dikenal yang dibawa mobil FM4 sendiri (TVR Sagaris, Camaro SS). Audit kini
+  melaporkan semua teknik yang hilang sekaligus. Ketiganya wajib lolos uji game.
+
+Aveo5 LT dan Aveo5 LT IE bernama sama di data FM3 (`DisplayName` "Aveo5 LT"); hanya
+`ModelShort` yang berbeda ("Aveo5 +").
+
+Alasan penolakan sebelumnya:
 
 | Mobil | Alasan |
 |---|---|
