@@ -70,6 +70,7 @@
 !/research/tracks-2026-11-02/live_stacks.py
 !/research/tracks-2026-11-02/pvs.py
 !/research/tracks-2026-11-02/track_cmdbuf.py
+!/research/tracks-2026-11-02/crash_stack.py
 !/src/fm4_converter/__init__.py
 !/src/fm4_converter/archives/__init__.py
 !/src/fm4_converter/archives/forza_zip.py

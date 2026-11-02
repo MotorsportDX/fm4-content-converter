@@ -166,26 +166,29 @@ def write(p):
     return bytes(w.b)
 
 
-SPECIAL_CELL_FLAGS = 0x50000204  # FM4 special ("always visible") cells: AmalfiGP, Tsukuba
 NONE = 0xFFFF
+SPECIAL_CELL_FLAGS = 0x4FFF0044  # u4 of the special (always visible) cells in FM4's own v27 ribbons
 
 
-def to_v27(p, w3):
-    """v24 -> v27. Cell vectors become (f, 0, 0, 0) (FM4's v<25 path fills with the constant
-    at 0x82000F40 = 0.0); the legacy extra cell/object are appended and indexed by the three
-    v26 arrays the way FM4's own v27 tracks hold their special cell (Tsukuba: a84 [65535, c],
-    a100 [65535, o], a116 [o], cell.u0 = o, cell.u4 = 0x50000204)."""
+def to_v27(p, w3, slot=None):
+    """v24 -> v27 in the shape of FM4's own v27 ribbons. Cell vectors become (f, 0, 0, 0)
+    (FM4's v<25 path fills with the constant at 0x82000F40 = 0.0). The legacy cell and
+    object are appended to l36/l52 as the special cell (u0 = object, u4 =
+    SPECIAL_CELL_FLAGS); a84/a100 hold it at `slot` with FFFF before it, a116 = [object].
+    FM4's own reading of a v<26 file puts it at slot 1 (`helper_8288EAE8` 8288ED88); FM4's
+    ribbons without l68 cells (AmalfiGP 01) use slot 0, so that is the default for them."""
     if p["ver"] != 24:
         raise ValueError("expected FPVS v24")
+    if slot is None:
+        slot = 1 if p["l68"] else 0
     q = dict(p)
     q["ver"], q["w3"] = 27, w3
     fix = lambda c: {**c, "v16": (c["v16"][0], 0.0, 0.0, 0.0)}
-    q["l36"] = [fix(c) for c in p["l36"]]
-    q["l68"] = [fix(c) for c in p["l68"]]
     oi, ci = len(p["l52"]), len(p["l36"])
+    q["l36"] = [fix(c) for c in p["l36"]] + [{**fix(p["legacy_cell"]), "u0": oi, "u4": SPECIAL_CELL_FLAGS}]
+    q["l68"] = [fix(c) for c in p["l68"]]
     q["l52"] = p["l52"] + [p["legacy_obj"]]
-    q["l36"] = q["l36"] + [{**fix(p["legacy_cell"]), "u0": oi, "u4": SPECIAL_CELL_FLAGS}]
-    q["a84"], q["a100"], q["a116"] = [NONE, ci], [NONE, oi], [oi]
+    q["a84"], q["a100"], q["a116"] = [NONE] * slot + [ci], [NONE] * slot + [oi], [oi]
     q.pop("legacy_cell"); q.pop("legacy_obj")
     return q
 

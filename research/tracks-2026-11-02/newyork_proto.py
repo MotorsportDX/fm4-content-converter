@@ -16,6 +16,9 @@ from fm4_converter.fm3 import integration, ui_names
 from fm4_converter.fm3.integration import archive_read
 from fm4_converter.fm3 import converter as c
 from grid_conversion import FM3 as F3, FM4 as F4, convert, geo
+import pvs
+from fm4_converter.fm3 import track_rmb
+PVS_W3 = 0x401FB8   # FM4 Tsukuba v27 header word
 
 CONTENT = Path(r"I:\FM4-build-usa\user-data\0000000000000000\4D530910\00000002")
 MEDIA, ENV, IDS = "NewYork", 12, (22, 23, 24, 25)
@@ -26,6 +29,7 @@ UI_RIB = "GAME:\\Media\\UI\\Textures\\UI4\\Logos\\Mini_Track_Ribbons\\RIB_OldCou
 parser = argparse.ArgumentParser()
 parser.add_argument("out")
 parser.add_argument("--ai-donor")
+parser.add_argument("--convert", action="store_true", help="PVS v24 -> v27 and RMB v4 -> v5 (normal FM4 track path)")
 args = parser.parse_args()
 out = Path(args.out)/"files"
 if out.parent.exists():
@@ -144,8 +148,15 @@ if args.ai_donor:
     for name in [n for n in ai if "newyork_01" in n.lower()]:
         ai[name] = donor[name.lower().replace("newyork_01", "*")].read_bytes()
         report.setdefault("ai_donor", []).append(name)
+def track_file(p):
+    data = p.read_bytes()
+    if args.convert and p.suffix.lower() == ".pvs":
+        data = pvs.write(pvs.to_v27(pvs.parse(data), PVS_W3))
+    return data
+
+
 archives = {
-    Path("Media/tracks/NewYork.zip"): zip_of({p.relative_to(track3).as_posix(): p.read_bytes()
+    Path("Media/tracks/NewYork.zip"): zip_of({p.relative_to(track3).as_posix(): track_file(p)
                                              for p in track3.rglob("*") if p.is_file() and p.name.lower() != "bin.zip"}),
     Path("Media/AI/Tracks.zip"): zip_of(ai),
 }
@@ -160,7 +171,17 @@ priorities = {ui_names.OVERRIDE: prio_names, **{p: 80 for p in archives}}
 manifest = integration.extend_zip_manifest((F4/"zipmanifest.xml").read_bytes(),
                                            {ui_names.OVERRIDE: names, **archives}, (), priorities)
 # FM3 bin.zip as-is (LZX members; Python cannot CRC-check them), native dirsize convention (+22)
-binzip = (track3/"bin.zip").read_bytes()
+if args.convert:
+    with zipfile.ZipFile(track3/"bin.zip") as zin:
+        members = {}
+        for info in zin.infolist():
+            data = archive_read(zin, info)
+            if info.filename.lower().endswith(".rmb.bin") and track_rmb.model_version(data) == 4:
+                data = track_rmb.to_v5(data)
+            members[info.filename] = data
+    binzip = zip_of(members)
+else:
+    binzip = (track3/"bin.zip").read_bytes()
 disk, cd_disk, n_disk, count, size, start, comment = struct.unpack_from("<4H2IH", binzip, len(binzip)-18)
 assert binzip[-22:-18] == b"PK\x05\x06" and not comment and start+size == len(binzip)-22
 entry = (f'<Zip version="1" path="game:\\media\\tracks\\newyork\\bin.zip" priority="80" '
