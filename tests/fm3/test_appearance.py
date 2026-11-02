@@ -124,7 +124,7 @@ class LocalAssetTests(unittest.TestCase):
         path = CAR/"che_cobalt_05.carbin"
         target[path] = target[path].replace(b"badge_chrome", b"zadge_chrome", 1)
         self.assertNotEqual(target[path], self.target[path])
-        with self.assertRaisesRegex(a.AppearanceError, "Missing race technique"):
+        with self.assertRaisesRegex(a.AppearanceError, "Missing technique.*race .*zadge_chrome"):
             self.appearance(target)
 
     def test_legacy_attributes_reject_bad_scales_and_gauges(self):
@@ -288,3 +288,15 @@ class EvidenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SourceXmlRepairTests(unittest.TestCase):
+    def test_only_unmatched_closing_tags_are_dropped(self):
+        from fm4_converter.fm3 import appearance_audit as a
+        broken = b"<S>\r\n  <t>\r\n    <B r=\"1\"/>\r\n  </t>\r\n\r\n  </t>\r\n</S>\r\n"
+        fixed, removed = a.drop_unmatched_closing_tags(broken)
+        self.assertEqual(removed, ["</t>"])
+        self.assertEqual(fixed, b"<S>\r\n  <t>\r\n    <B r=\"1\"/>\r\n  </t>\r\n\r\n</S>\r\n")
+        self.assertEqual(a.drop_unmatched_closing_tags(fixed), (fixed, []))
+        with self.assertRaises(a.AppearanceError):
+            a.drop_unmatched_closing_tags(b"<S><a><b></a></b></S>")

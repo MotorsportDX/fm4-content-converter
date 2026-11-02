@@ -252,9 +252,19 @@ def convert_assets(payloads, target_root, media, wheel, model_helper, thumb_path
             raise c.MappingError("Native FM4 car audio tuning is unavailable")
         archive_read(archive,matches[0])
     from .asset_conversion import convert_payloads
-    from .appearance_audit import audit as audit_appearance
+    from .appearance_audit import audit as audit_appearance, drop_unmatched_closing_tags
+    # A stray closing tag in a source XML file is removed, and only that (CAD_8_CTSV_08).
+    repaired_xml = []
+    payloads = dict(payloads)
+    for path in [p for p in payloads if p.name.casefold() in ("shadersettings.xml", "carattribs.xml")]:
+        fixed, removed = drop_unmatched_closing_tags(payloads[path])
+        if removed:
+            repaired_xml.append({"path": path.as_posix(), "removed": removed,
+                                 "source_sha256": sha256(payloads[path]).hexdigest()})
+            payloads[path] = fixed
     source_payloads = payloads
     payloads, asset_validation = convert_payloads(source_payloads,model_helper)
+    asset_validation["repaired_source_xml"] = repaired_xml
     # FM3 cockpit textures need FM4's paint scales or the interior renders white.
     from .appearance_audit import with_cockpit_paint_scales
     payloads, paint = with_cockpit_paint_scales(payloads, media)

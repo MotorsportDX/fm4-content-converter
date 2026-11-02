@@ -113,8 +113,16 @@ def apply(result,source):
     body_pk=source["nodes"]["body"]["pk"]
     if any(source_body[k]!=target_body.get(k) for k in source_body if k!=body_pk):
         raise c.MappingError("Code semantics requires unchanged body geometry/origin")
+    body_weight=row(source,WEIGHT)
+    # FM3 import editions: the converter sets CurbWeight to the stock (level 1 weight
+    # reduction) body mass, as on every FM4 car; all physics mass inputs stay as they are.
+    import_edition=(body_weight.get("IsStock")==1 and body_weight.get("Level",0)>=1
+                    and math.isclose(row(source,"car")["CurbWeight"]*100,body_weight.get("InitialMass",float("nan")),rel_tol=1e-7)
+                    and math.isclose(row(candidate,"car")["CurbWeight"]*100,body_weight["Mass"],rel_tol=1e-7))
     for role,node in source["nodes"].items():
         for col,value in node["row"].items():
+            if import_edition and role=="car" and col=="CurbWeight":
+                continue
             if "mass" in col.lower() or col.startswith("BlockDim") or col=="CurbWeight":
                 if role not in candidate["nodes"] or row(candidate,role).get(col)!=value:
                     raise c.MappingError("Code semantics requires preserved visible mass inputs: "+role+"."+col)

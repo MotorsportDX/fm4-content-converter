@@ -395,6 +395,20 @@ def convert(source_db, target_db, source, id_base=ID_BASE, reserved=None, regist
                           "reason":reason + " Raw value retained in source IR."})
         candidate["nodes"][role] = {"table":table,"pk":primary,"row":out}
 
+    # FM3 "IE" (import edition) cars ship with weight reduction level 1 installed as stock:
+    # the stock body-weight row is that level, and CurbWeight is its InitialMass. FM4's
+    # catalog weight is the stock body mass (CurbWeight * 100 = Mass on every native car).
+    body = candidate["nodes"]["List_UpgradeCarBodyWeight"]["row"]
+    car_out = candidate["nodes"]["car"]["row"]
+    if (body.get("IsStock") == 1 and body.get("Level", 0) >= 1
+            and not math.isclose(car_out["CurbWeight"] * 100, body["Mass"], rel_tol=1e-7, abs_tol=1e-5)
+            and math.isclose(car_out["CurbWeight"] * 100, body.get("InitialMass", float("nan")), rel_tol=1e-7, abs_tol=1e-5)):
+        assumptions.append({"rule":"stock_weight_reduction_sets_catalog_weight", "runtime_verified":False,
+                            "source_curb_weight":car_out["CurbWeight"], "stock_level":body["Level"],
+                            "value":body["Mass"] / 100,
+                            "limitation":"FM3 import edition ships a weight reduction part as stock; FM4 has no such car."})
+        car_out["CurbWeight"] = body["Mass"] / 100
+
     tire_deps = native_tire_dependencies(target_db,candidate)
     unreviewed = [m for m in mapping if m["action"] == "copy_native_value" and
                   (m["target_column"].lower().endswith("id") or m["target_column"].lower() == "ordinal")]

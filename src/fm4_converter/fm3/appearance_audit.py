@@ -53,6 +53,43 @@ def xml(data):
                                b"&amp;", data))
 
 
+def drop_unmatched_closing_tags(data):
+    """(bytes, removed tags) of an XML document whose only fault is closing tags without an
+    opening one (FM3 CAD_8_CTSV_08 shadersettings.xml has a stray `</tail_light>`).
+
+    Well-formed input is returned unchanged; anything else that still fails raises."""
+    try:
+        xml(data)
+        return data, []
+    except ET.ParseError:
+        pass
+    text = data.decode("utf-8")
+    stack, drop = [], []
+    for m in re.finditer(r"<(/?)([A-Za-z_][\w.:-]*)[^>]*?(/?)>", text):
+        closing, name, empty = m.group(1), m.group(2), m.group(3)
+        if empty or m.group(0).startswith(("<?", "<!")):
+            continue
+        if not closing:
+            stack.append(name)
+        elif stack and stack[-1] == name:
+            stack.pop()
+        elif name not in stack:
+            drop.append(m)
+        else:
+            raise AppearanceError(f"Unrepairable XML nesting at </{name}>")
+    for m in reversed(drop):
+        # The whole line when the stray tag stands alone on it.
+        start = text.rfind("\n", 0, m.start()) + 1
+        end = text.find("\n", m.end())
+        end = len(text) if end < 0 else end + 1
+        if text[start:m.start()].strip() or text[m.end():end].strip():
+            start, end = m.start(), m.end()
+        text = text[:start] + text[end:]
+    repaired = text.encode("utf-8")
+    xml(repaired)
+    return repaired, [m.group(0) for m in drop]
+
+
 def technique(part, material, lod, detailed=True):
     """Standard (non-SuperLOD) branch of the retail material-name mapper."""
     part = part.casefold()
@@ -117,6 +154,15 @@ ABSENT_TEXTURE_PRECEDENT = {
 NATIVE_UNKNOWN_TECHNIQUES = {
     "Material__1": "TVR_Sagaris_05 wheel LOD0",
     "cockpit_Tail_light_lod0": "CHE_CamaroSS_10 interior LOD0",
+    # FM3 sources whose material has no FM4 effect technique. FM4's own cars above show a
+    # mesh with an unknown technique name loads and races; these three are each checked
+    # in game before acceptance (docs/fm3-acceptance.md, M3/M4).
+    "body2": "as Material__1; FM3 FER_71_F430GT_08 bumperFa",
+    "LOD1": "as Material__1; FM3 TOY_35_Supra_04 bumperFrameF",
+    "bump_plastic": "as Material__1; FM3 PON_GTO_68 wheel LOD3",
+    "bump_stitching": "as Material__1; FM3 PON_GTO_68 wheel",
+    "leather": "as Material__1; FM3 PON_GTO_68 wheel",
+    "bump_leather": "as Material__1; FM3 PON_GTO_68 wheel",
 }
 
 
@@ -388,6 +434,17 @@ def audit(source, target, target_root, media, wheel, archive_read):
                 bindings[key] = {"path": root+name, "bytes": len(data), "sha256": sha(data)}
             return key
 
+        missing = set()
+        for path, data in sorted(target.items()):
+            if path.suffix.lower() == ".carbin":
+                for section in carbin_audit.parse(data, "FM4")["sections"]:
+                    for mesh in section["meshes"]:
+                        name = technique(section["name"], mesh["name"], mesh["lod"])
+                        if name not in NATIVE_UNKNOWN_TECHNIQUES or any(name in e for e in libraries.values()):
+                            missing.update(f"{mode} {path.name}/{section['name']}/{name}"
+                                           for mode, effects in libraries.items() if name not in effects)
+        if missing:
+            raise AppearanceError("Missing technique(s): " + ", ".join(sorted(missing)))
         for path, data in sorted(target.items()):
             if path.suffix.lower() != ".carbin":
                 continue
