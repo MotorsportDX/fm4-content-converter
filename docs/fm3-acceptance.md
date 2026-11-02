@@ -59,7 +59,7 @@ ribbon dan gambar FM3. Nama environment baru yang sudah dipakai FM4 diberi tanda
 | Item | M1/T1 | M2/T2 | M3 | M4/T3 | T4 | Catatan |
 |---|---|---|---|---|---|---|
 | 81 mobil FM3-only | ✔ 81/81 | 20 diuji | 20 diuji | 20 diuji | – | 8 yang dulu ditolak kini terkemas (XML sumber diperbaiki, berat stok IE, teknik tak dikenal seperti mobil FM4); 61 belum diuji di game |
-| CrownJewel 170 | ✔ | ✔ | – | ✔ (geometri FM4) | ✔ | paket `track_package` terpisah |
+| CrownJewel 170 | ✔ | ✔ | – | ✔ (geometri FM4) | ✔ | juga lulus di paket gabungan v4 (Extreme Circuit Reverse, 3 November 2026) |
 | Kendali Tsukuba FM3 | – | ✔ | – | ✔ | – | `track_rmb.to_v5` (run `track-tsukuba-rmb5c`) |
 | NewYork 22–25, Amalfi 10 layout, TestTrackinfield 18, LeMans 102 | ✔ 33/33 | ✔ 33/33 | – | ✔ 33/33 (132–1022 draw pass utama) | grid ✔, lap belum diukur | paket v3, [REPORT tahap 8](../research/tracks-2026-11-02/REPORT.md) |
 

@@ -775,6 +775,10 @@ berjalan ≥ 45 detik tanpa crash, dan pass utama merekam 132–1022 draw shader
 Frame jeda layout dengan draw paling sedikit (Sidewinder E, I Reverse) menampilkan
 track dan langit, dan urutan AI berubah selama balapan.
 
+Paket v4 (v3 + CrownJewel 170): Extreme Circuit Reverse dan NewYork Old Circuit
+berjalan tanpa crash. Judul lokasi Camino Viejo tidak terbaca OCR, jadi uji memilihnya
+dengan satu tekan Right dari Bernese Alps.
+
 Catatan konvensi: `dirsize` entri `zipmanifest.xml` FM4 = ukuran direktori pusat +
 22. `integration.extend_zip_manifest` menulis tanpa +22, dan mount itu tetap bekerja
 (paket mobil, `stringtables.zip`).
