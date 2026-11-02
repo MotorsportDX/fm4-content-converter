@@ -45,7 +45,7 @@ layout tersebut memakai model FM3 yang sama formatnya.
 | 73 mobil terkemas | ✔ | 20 diuji | 20 diuji | 20 diuji | – | 53 belum diuji di game |
 | 8 mobil ditolak | ✘ | – | – | – | – | material tanpa preseden, XML rusak, massa stock |
 | CrownJewel 170 | ✔ | ✔ | – | ✔ (geometri FM4) | ✔ | |
-| Kendali Tsukuba FM3 | – | ✔ | – | ✘ | – | model RMB v4 tanpa command buffer pass 5 |
+| Kendali Tsukuba FM3 | – | ✔ | – | ✔ | – | `track_rmb.to_v5` (run `track-tsukuba-rmb5c`) |
 | 33 layout lain | ✘ | – | – | – | – | butuh pipeline biner track |
 
 ## Batas

@@ -689,6 +689,33 @@ dengan asumsi entri berurutan plus tiga pool di akhir berkas belum cocok dengan 
 nyata. Data entri tampak berselang-seling dengan microcode shader, jadi batas setiap
 record perlu dipetakan dulu dari serializer `8287EBE8`/`8287E878`/`828723C0`.
 
+### Konverter biner track, tahap 6: RMB v4 → v5, tampilan utama tampil (2 November 2026)
+
+Format `CommandBufferGroup` terurai lengkap di `fm4_converter.fm3.track_rmb`. Setiap
+`beginVer` di `CBinaryVersionedStream` (`8295E3D8`) adalah u32, dan `endVer` tidak membaca
+apa pun. Fixup versi 2 berupa `u32 n` + `n × 8` byte mentah (`82871600`/`8286C450`). Grup
+berakhir tepat di EOF. Hasil uji:
+
+- 1087 model FM3 Tsukuba dan 1088 model FM4 Tsukuba terurai dan ditulis ulang identik.
+- Pada model FM4 (sampel setiap 37 model), pass 5 = pass 4 dengan `RB_SURFACE_INFO`
+  (`0x2000`) tanpa bit MSAA, `PA_SC_AA_CONFIG` (`0x2301`) = 0, dan window/scissor
+  1280×720 tanpa tiling. Prolog/epilog predicated tiling (`SET_BIN_SELECT`,
+  `SET_BIN_MASK`, `SET_CONSTANT` window per tile) dibuang.
+- Pass 4 FM3 berbentuk sama dengan pass 4 FM4 (MSAA 4x, tiga tile).
+
+`to_v5` menaikkan versi model ke 5 (18 slot), lalu menyalin slot 12–14 ke 15–17 dengan
+perubahan yang sama. Paket yang dibuang diganti NOP type-2, sehingga offset fixup tetap
+berlaku.
+
+| Run | Isi | Draw shader track di pass utama | Hasil |
+|---|---|---|---|
+| `track-tsukuba-rmb5` | salinan pass 4 apa adanya | 214 | hanya pita bawah tergambar (MSAA dan offset tile terakhir) |
+| `track-tsukuba-rmb5b` | + single-sample | 213 | sama |
+| `track-tsukuba-rmb5c` | + tanpa tiling | 223 | **track FM3 tampil penuh di tampilan utama** (lintasan, dinding, bangunan, langit), tanpa crash |
+
+Kriteria T3 ([fm3-acceptance.md](../../docs/fm3-acceptance.md)) terpenuhi untuk kendali
+Tsukuba FM3.
+
 Catatan konvensi: `dirsize` entri `zipmanifest.xml` FM4 = ukuran direktori pusat +
 22. `integration.extend_zip_manifest` menulis tanpa +22, dan mount itu tetap bekerja
 (paket mobil, `stringtables.zip`).
