@@ -165,8 +165,8 @@ OVERRIDE = Path("Media/stringtables.zip")
 _PRIORITY = re.compile(r"_pri_(\d+)\.zip$", re.IGNORECASE)
 
 
-def winning_tables(target_root, content_root, archive_read, sha):
-    """Per language, the Data_Car.str the game reads now, with its priority."""
+def winning_tables(target_root, content_root, archive_read, sha, table="Data_Car.str"):
+    """Per language, the string table (Data_Car.str by default) the game reads now, with its priority."""
     import xml.etree.ElementTree as ET
     mounts = {z.attrib["path"].casefold():int(z.attrib["priority"])
               for z in ET.fromstring((target_root/"zipmanifest.xml").read_bytes()).findall("Zip")}
@@ -177,9 +177,9 @@ def winning_tables(target_root, content_root, archive_read, sha):
             raise NameError(f"Unmounted language archive: {path.name}")
         inputs[str(path)] = sha(path)
         with zipfile.ZipFile(path) as z:
-            matches = [m for m in z.namelist() if m.casefold()=="data_car.str"]
+            matches = [m for m in z.namelist() if m.casefold()==table.casefold()]
             if len(matches)!=1:
-                raise NameError("Missing or ambiguous native car string table")
+                raise NameError(f"Missing or ambiguous native {table}")
             tables[path.stem.casefold()] = (priority,path.stem,str(path),archive_read(z,matches[0]))
     packs = sorted(Path(content_root).glob("*/Media/DLCZips/StringTables_pri_*.zip")) if content_root else []
     for path in packs:
@@ -188,15 +188,15 @@ def winning_tables(target_root, content_root, archive_read, sha):
         with zipfile.ZipFile(path) as z:
             for member in z.namelist():
                 language, _, name = member.replace("\\","/").partition("/")
-                if name.casefold()!="data_car.str":
+                if name.casefold()!=table.casefold():
                     continue
                 current = tables.get(language.casefold())
                 if current and current[0]==priority:
-                    raise NameError(f"Two {language} car tables share priority {priority}")
+                    raise NameError(f"Two {language} {table} share priority {priority}")
                 if not current or priority>current[0]:
                     tables[language.casefold()] = (priority,language,f"{path}:{member}",archive_read(z,member))
     if "en" not in tables:
-        raise NameError("No native English car string table")
+        raise NameError(f"No native English {table}")
     return tables, inputs
 
 

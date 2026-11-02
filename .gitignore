@@ -63,6 +63,12 @@
 !/research/cars-fm2-2026-11-02/survey_carbin.py
 !/research/tracks-2026-11-02/REPORT.md
 !/research/tracks-2026-11-02/inventory.py
+!/research/tracks-2026-11-02/grid_conversion.py
+!/research/tracks-2026-11-02/newyork_proto.py
+!/research/tracks-2026-11-02/caff.py
+!/research/tracks-2026-11-02/live_stacks.py
+!/research/tracks-2026-11-02/pvs.py
+!/research/tracks-2026-11-02/track_cmdbuf.py
 !/src/fm4_converter/__init__.py
 !/src/fm4_converter/archives/__init__.py
 !/src/fm4_converter/archives/forza_zip.py
@@ -101,6 +107,7 @@
 !/src/fm4_converter/fm3/texture_audit.py
 !/src/fm4_converter/fm3/trace_fm3.py
 !/src/fm4_converter/fm3/trace_mass.py
+!/src/fm4_converter/fm3/track_package.py
 !/src/fm4_converter/fm3/ui_names.py
 !/src/fm4_converter/fm3/ui_thumbnail.py
 !/src/fm4_converter/fm3/value_scales.py
@@ -126,6 +133,7 @@
 !/tests/fm3/test_suspension_semantics.py
 !/tests/fm3/test_suspension_v2.py
 !/tests/fm3/test_test_disc.py
+!/tests/fm3/test_track_package.py
 !/tests/fm3/test_ui_assets.py
 !/tests/fm3/test_value_scales.py
 !/tests/fm3/test_batch_package.py
