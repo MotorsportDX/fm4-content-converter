@@ -34,7 +34,7 @@ def minimal_pvs():
             "u34_38": (0, 0, 0), "f40": (0.0, 0.0, 0.0), "u52": (0,) * 9}
     obj = {"refs": [1], "ids": [], "mat": (0.0,) * 16, "vec": (-1.0, -1.0, -1.0, 0.0)}
     return {"ver": 24, "w2": 7, "w3": None, "h0": 0, "h2": 25, "l4": [([0], [0], [0], [0])],
-            "l20": [(1, 2, 1.0, 1.0, 0.0, 0.0, 4), (3, 4, 1.0, 1.0, 0.0, 0.0, 0x14)], "l172": ["a"], "l36": [dict(cell)], "l52": [dict(obj)],
+            "l20": [(1, 2, 1.0, 1.0, 0.0, 0.0, 4), (3, 4, 1.0, 1.0, 0.0, 0.0, 0x14)], "l172": ["a", "shaders\track\sky_diff_1"], "l36": [dict(cell)], "l52": [dict(obj)],
             "legacy_cell": dict(cell), "legacy_obj": dict(obj), "l68": [], "s132": "tout",
             "b160": 1, "b196": 0, "l200": [], "l192": [[1]]}
 
@@ -60,6 +60,12 @@ class TrackEnvTests(unittest.TestCase):
         self.assertEqual(out["ver"], 27)
         self.assertEqual(out["a84"], [1])  # no l68 cells: special cell at slot 0, as FM4's AmalfiGP 01
         self.assertEqual([t[6] for t in out["l20"]], [4, 4])  # road detail type cleared
+        sky = out["l52"][out["a116"][0]]
+        self.assertEqual(sky["ids"], [1])  # the sky_diff_1 shader, as FM4's own sky objects
+        self.assertEqual(track_pvs.sky_model_index(minimal_pvs()), 1)
+        settings = b'<TrackSettings><SkyboxIndex value="1"/></TrackSettings>'
+        at1 = track_pvs.parse(track_env.convert_track_file("Ribbon_00/t_00.pvs", data, settings))
+        self.assertEqual(at1["a84"], [0xFFFF, 1])  # the sky at the shipped SkyboxIndex
         self.assertEqual(track_env.convert_track_file("TrackSettings.xml", b"fm3", b"fm4"), b"fm4")
         self.assertEqual(track_env.convert_track_file("Ribbon_00/CollObjs.xml", b"x", b"fm4"), b"x")
 

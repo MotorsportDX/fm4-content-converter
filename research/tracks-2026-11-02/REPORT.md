@@ -751,6 +751,23 @@ iklan), tanpa crash.
 Bisect AI (run `track-ny-bis-a..d`): donor `.geo/.irt/.seg/.pit` lolos dari pembuatan AI,
 donor `.seg` saja mengubah crash, dan donor `.irt` saja tidak. Itu yang mengarah ke `.seg`.
 
+### Tahap 8: converter environment dan paket gabungan (3 November 2026)
+
+`fm4_converter.fm3.track_env` mengemas NewYork, Amalfi, TestTrackinfield dan LeMans 102
+di atas paket mobil (`--base`), menjadi satu overlay. Temuan selama uji game:
+
+| Gejala | Penyebab | Perbaikan |
+|---|---|---|
+| Grid Amalfi gagal dikonversi | layout point-to-point mulai di `Tracks.StartLine` (fraksi panjang garis AI 2D; selisih dengan start FM4 0,3–17 m); jalan yang melintas dekat dirinya; grid FM3 8 mobil; grid dua lajur LeMans | `track_grid`: start fraksional, proyeksi minimum lokal terdekat ke garis start, grid diperpanjang per baris empat, toleransi pasangan 2 m |
+| Layout reverse salah | `ReverseIndex` = ribbon geometri, bukan tanda reverse | reverse = ada berkas AI `<media>_NN_R` (cocok 116/116 layout FM4) |
+| NewYork crash di road detail (`8290F4E8`) pada setiap layout dengan paket penuh | tekstur road detail FM3 | tipe tekstur road detail `0x14` → `0x04` di `l20`; jalan tetap bertekstur |
+| Amalfi tidak tampil di menu lokasi | (1) `ContentId` 96 paket DLC FM3, `IsInstalled` 0; (2) menu lokasi FM4 hanya memuat 30 environment | `ContentId` 0, `IsInstalled` 1; layout Amalfi dan LeMans 102 bergabung dengan environment FM4 AmalfiGP dan LeMans (lokasi yang sama), nama layout yang bentrok diberi " (FM3)" |
+| LeMans Bugatti trap saat memuat audio | FMOD dibuka sebagai `Audio\Tracks\LeMansBugatti\lemans.fev` | nama berkas audio asli dipertahankan |
+| Langit abu-abu | langit = objek istimewa `a84[SkyboxIndex]`: model `<track>out.{i:05d}.rmb.bin`, `ids` = shader `sky_diff_1` di `l172`. FM3 menyimpan langit di `.sky.rmb.bin`, dan objek legacy tanpa shader | model langit disalin ke indeks objek, shader diisi, slot = `SkyboxIndex` `TrackSettings` |
+
+Uji: Sidewinder Layout A, Bugatti Circuit, NewYork Old Circuit dan Amalfi Stage A berjalan
+tanpa crash, dengan 365–1019 draw shader track di pass utama dan langit tampil.
+
 Catatan konvensi: `dirsize` entri `zipmanifest.xml` FM4 = ukuran direktori pusat +
 22. `integration.extend_zip_manifest` menulis tanpa +22, dan mount itu tetap bekerja
 (paket mobil, `stringtables.zip`).
