@@ -29,6 +29,7 @@ UI_RIB = "GAME:\\Media\\UI\\Textures\\UI4\\Logos\\Mini_Track_Ribbons\\RIB_OldCou
 parser = argparse.ArgumentParser()
 parser.add_argument("out")
 parser.add_argument("--ai-donor")
+parser.add_argument("--settings-donor", help="FM4 track whose TrackSettings.xml (lighting tuned for FM4) replaces FM3's")
 parser.add_argument("--ai-donor-parts", default="", help="comma list: only donor files whose path contains one of these")
 parser.add_argument("--convert", action="store_true", help="PVS v24 -> v27 and RMB v4 -> v5 (normal FM4 track path)")
 args = parser.parse_args()
@@ -161,6 +162,8 @@ if args.ai_donor:
         report.setdefault("ai_donor", []).append(name)
 def track_file(p):
     data = p.read_bytes()
+    if args.settings_donor and p.name.lower() == "tracksettings.xml":
+        data = find(F4/"tracks"/args.settings_donor, "TrackSettings.xml").read_bytes()
     if args.convert and p.suffix.lower() == ".pvs":
         data = pvs.write(pvs.to_v27(pvs.parse(data), PVS_W3))
     return data

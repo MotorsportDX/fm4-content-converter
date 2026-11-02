@@ -741,6 +741,13 @@ register guest r0..r31 dari konteks recompile di `rdi`, dan memori guest):
 3. Hipotesis `hash.manifest` diuji dan **gugur**: `.seg` FM4 Tsukuba yang satu bitnya
    diubah tetap termuat (`track-tsukuba-seg-tamper2`).
 
+**Pencahayaan.** FM4 menyetel ulang `TrackSettings` setiap track (cahaya, ambient,
+specular, SH, tone map). Pada pasangan Tsukuba/AmalfiGP/Catalunya/Suzuka, 47–75 nilai
+bersama berbeda tanpa rumus tunggal, misalnya `LightColor` 1,7 → 0,85 dan
+`GlobalSpecularLevel` 1 → 5. Run `track-ny-conv-9` (`--settings-donor Tsukuba`, yaitu
+`TrackSettings.xml` FM4 utuh): NewYork terang dan wajar (gedung, kerumunan, pembatas, papan
+iklan), tanpa crash.
+
 Bisect AI (run `track-ny-bis-a..d`): donor `.geo/.irt/.seg/.pit` lolos dari pembuatan AI,
 donor `.seg` saja mengubah crash, dan donor `.irt` saja tidak. Itu yang mengarah ke `.seg`.
 
