@@ -143,14 +143,24 @@ def fm4_tone(cutout):
     return Image.fromarray(rgba.astype(np.uint8))
 
 
-def fit_view(cutout, size):
-    # Preserve aspect ratio, leave gutters and put the floor close to the bottom.
+# Car bounding box in FM4's own 503 atlases, as fractions of the view: median
+# area, 90th-percentile width and height caps, median bottom margin
+# (outputs/fm-car-converter/exterior-paint-v1/view_layout.py). The small view is
+# FM4's side profile, long and low; the reused FM3 front-quarter image is
+# shorter and taller, so it gets FM4's car area rather than its width.
+LARGE_LAYOUT = (0.557, 0.931, 0.792, 0.014)
+SMALL_LAYOUT = (0.202, 0.656, 0.406, 0.087)
+
+
+def fit_view(cutout, size, layout):
+    area, width, height, bottom = layout
     foreground = cutout.crop(cutout.getbbox())
-    scale = min(size[0]*0.85/foreground.width, size[1]*0.85/foreground.height)
+    scale = min((area*size[0]*size[1]/(foreground.width*foreground.height))**0.5,
+                size[0]*width/foreground.width, size[1]*height/foreground.height)
     dimensions = (max(1,round(foreground.width*scale)),max(1,round(foreground.height*scale)))
     foreground = foreground.resize(dimensions,Image.Resampling.LANCZOS)
     view = Image.new("RGBA",size)
-    view.paste(foreground,((size[0]-foreground.width)//2,size[1]-foreground.height-6))
+    view.paste(foreground,((size[0]-foreground.width)//2,size[1]-foreground.height-round(size[1]*bottom)))
     return view
 
 
@@ -183,8 +193,8 @@ def convert(data, template):
         raise ThumbnailError("Unreviewed FM3 thumbnail format")
     cutout, report = remove_white_matte(decode(data))
     cutout = fm4_tone(cutout)
-    large = fit_view(cutout,(608,288))
-    small = fit_view(cutout,(288,160))
+    large = fit_view(cutout,(608,288),LARGE_LAYOUT)
+    small = fit_view(cutout,(288,160),SMALL_LAYOUT)
     atlas = Image.new("RGBA",(768,288))
     atlas.paste(large,(0,0))
     atlas.paste(small.transpose(Image.Transpose.ROTATE_90),(608,0))

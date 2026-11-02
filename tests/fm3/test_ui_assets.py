@@ -155,13 +155,17 @@ class LocalUiTests(unittest.TestCase):
         self.assertTrue((raw[raw[:,:,3]==0,:3]==0).all())
         decoded = thumbs.decode(encoded,True)
         views = [decoded.crop((0,0,608,288)),decoded.crop((608,0,768,288)).transpose(Image.Transpose.ROTATE_270)]
-        for view in views:
+        for view,(area,width,height,bottom) in zip(views,(thumbs.LARGE_LAYOUT,thumbs.SMALL_LAYOUT)):
             self.assertEqual(view.getpixel((0,0)),(0,0,0,0))
             x0,y0,x1,y1 = view.getbbox()
-            self.assertGreater(x1-x0,view.width*0.7)
-            self.assertLess(y1,view.height)
-            # Roof is above the centre; tyres/ground extend near the bottom.
-            self.assertGreater(y1,view.height*0.9)
+            # FM4's own car size: its median area unless a width/height cap binds.
+            self.assertLessEqual(x1-x0,round(view.width*width)+1)
+            self.assertLessEqual(y1-y0,round(view.height*height)+1)
+            share = (x1-x0)*(y1-y0)/(view.width*view.height)
+            self.assertTrue(abs(share-area)<0.02 or abs((x1-x0)-view.width*width)<=2
+                            or abs((y1-y0)-view.height*height)<=2)
+            self.assertAlmostEqual(view.height-y1,view.height*bottom,delta=2)
+            self.assertAlmostEqual((x0+x1)/2,view.width/2,delta=1)
         self.assertGreater(report["transparent_background_pixels"],50000)
         self.assertEqual(report["enclosed_ground_matte_islands_removed"],2)
 

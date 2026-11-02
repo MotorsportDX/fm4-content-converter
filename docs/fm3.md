@@ -756,6 +756,16 @@ lebih kusam daripada thumbnail asli FM4. Di game (disc `fm3-only-v2`, run `v2-av
 mobil FM4 di sebelahnya, baik di gambar besar maupun di strip (frame
 `exterior-paint-v1/carselect_before_after.png`).
 
+Mobil di strip (tampilan kecil 288×160) sebelumnya juga terlalu besar: lebarnya 85% dan
+tingginya 59% dari kotak, sedangkan median FM4 hanya 60% × 33%. FM4 memakai foto samping
+yang panjang dan rendah. `fit_view` kini mengikuti ukuran mobil di 503 atlas FM4 sendiri
+(`exterior-paint-v1/view_layout.py`): luas kotak mobil disamakan dengan median FM4 (besar
+0,557, kecil 0,202), lebar dan tinggi dibatasi pada persentil-90 (besar 0,931/0,792,
+kecil 0,656/0,406), dan jarak bawah memakai median (0,014/0,087). Foto depan-samping FM3
+yang lebih tinggi bisa terkena batas tinggi, sehingga hatchback seperti Aveo5 tampil
+sedikit lebih kecil. Sudah dicek di game pada disc `fm3-only-v3` (run `v3-aveo` dan
+`v3-granturismo`, frame `exterior-paint-v1/carselect_v3.png`).
+
 Eksperimen yang sama juga menunjukkan interior Z06 versi konversi lebih terang daripada
 Z06 bawaan (setir abu muda vs hitam). Nilai PaintScale median terlalu terang untuk mobil
 ini, padahal median memang berarti separuh port Turn 10 lebih gelap. Ini belum dikoreksi.
