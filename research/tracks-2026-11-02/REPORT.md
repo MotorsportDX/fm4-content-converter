@@ -768,6 +768,13 @@ di atas paket mobil (`--base`), menjadi satu overlay. Temuan selama uji game:
 Uji: Sidewinder Layout A, Bugatti Circuit, NewYork Old Circuit dan Amalfi Stage A berjalan
 tanpa crash, dengan 365–1019 draw shader track di pass utama dan langit tampil.
 
+Uji lengkap paket v3 (`fm3-content-v3`, 3 November 2026): **33/33 layout** (NewYork 4,
+Bugatti 1, Amalfi 10, Sidewinder 18) dipilih lewat menu Quick Race (teks layout dicek
+OCR, kecuali layout pertama daftar yang tidak perlu dipilih), balapan AI 12 mobil
+berjalan ≥ 45 detik tanpa crash, dan pass utama merekam 132–1022 draw shader track.
+Frame jeda layout dengan draw paling sedikit (Sidewinder E, I Reverse) menampilkan
+track dan langit, dan urutan AI berubah selama balapan.
+
 Catatan konvensi: `dirsize` entri `zipmanifest.xml` FM4 = ukuran direktori pusat +
 22. `integration.extend_zip_manifest` menulis tanpa +22, dan mount itu tetap bekerja
 (paket mobil, `stringtables.zip`).
