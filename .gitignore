@@ -111,6 +111,9 @@
 !/src/fm4_converter/fm3/trace_mass.py
 !/src/fm4_converter/fm3/track_package.py
 !/src/fm4_converter/fm3/track_rmb.py
+!/src/fm4_converter/fm3/track_pvs.py
+!/src/fm4_converter/fm3/track_grid.py
+!/src/fm4_converter/fm3/track_env.py
 !/src/fm4_converter/fm3/ui_names.py
 !/src/fm4_converter/fm3/ui_thumbnail.py
 !/src/fm4_converter/fm3/value_scales.py
@@ -138,6 +141,7 @@
 !/tests/fm3/test_test_disc.py
 !/tests/fm3/test_track_package.py
 !/tests/fm3/test_track_rmb.py
+!/tests/fm3/test_track_env.py
 !/tests/fm3/test_ui_assets.py
 !/tests/fm3/test_value_scales.py
 !/tests/fm3/test_batch_package.py

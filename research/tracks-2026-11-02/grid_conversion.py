@@ -11,69 +11,12 @@ Dijalankan langsung, skrip membandingkan hasil hitung dengan baris FM4 untuk
 semua layout yang ada di kedua game. Hanya membaca (SQLite mode=ro).
 """
 from pathlib import Path
-import math, re, sqlite3, struct
+import sqlite3
+
+from fm4_converter.fm3.track_grid import convert, find_ai, geo, slot  # noqa: F401
 
 FM3 = Path(r'D:\Data\FM3\USA\Forza Motorsport 3 (USA) (Disc 1) (Play Disc)\Media')
 FM4 = Path(r'D:\Data\forza-motorsport-4\Forza Motorsport 4 (Japan, Asia) (Disc 1) (Play Disc)\Media')
-
-
-def geo(path):
-    """Array float sebuah berkas AI MLPData (big-endian)."""
-    d = Path(path).read_bytes()
-    fields = {}
-    for m in re.finditer(rb'(\w+):(\w+):(\d+):\d+:\s+(\d+)\n', d[:d.find(b'MLPDataEnd')]):
-        if m.group(2) == b'float':
-            fields[m.group(1).decode()] = struct.unpack_from(f'>{int(m.group(3))}f', d, int(m.group(4)))
-    return fields
-
-
-def find_ai(roots, media, ribbon, reverse):
-    name = f"{media}_{ribbon:02d}{'_r' if reverse else ''}.geo".lower()
-    for root in roots:
-        for p in Path(root).iterdir():
-            if p.name.lower() == name:
-                return p
-
-
-def slot(centreline, x, z, hx, hz):
-    """(jarak ke garis tengah, MetersBack, MetersRight, Yaw derajat) satu slot."""
-    X, Z = centreline['fWaypointX'], centreline['fWaypointY']
-    n = len(X)
-    cum = [0.0]
-    for i in range(1, n):
-        cum.append(cum[-1] + math.hypot(X[i]-X[i-1], Z[i]-Z[i-1]))
-    total = cum[-1] + math.hypot(X[0]-X[-1], Z[0]-Z[-1])
-    best = None
-    for i in range(n):
-        j = (i+1) % n
-        dx, dz = X[j]-X[i], Z[j]-Z[i]
-        L2 = dx*dx + dz*dz or 1e-9
-        t = max(0.0, min(1.0, ((x-X[i])*dx + (z-Z[i])*dz)/L2))
-        px, pz = X[i]+t*dx, Z[i]+t*dz
-        dist = math.hypot(x-px, z-pz)
-        if best is None or dist < best[0]:
-            L = math.sqrt(L2)
-            best = (dist, cum[i]+t*L, ((x-px)*dz - (z-pz)*dx)/L, math.atan2(dx, dz))
-    dist, s, right, tangent = best
-    back = total - s if s > total/2 else -s
-    yaw = (math.degrees(math.atan2(hx, hz) - tangent) + 180) % 360 - 180
-    return dist, back, right, yaw
-
-
-def convert(grid_id, fm3_row, centreline, max_offset=8.0):
-    """Baris StartGridPositions FM4 (16 slot) dari satu baris FM3."""
-    rows = []
-    for k in range(12):
-        x, y, z, hx, hy, hz = fm3_row[1+6*k:7+6*k]
-        dist, back, right, yaw = slot(centreline, x, z, hx, hz)
-        if dist > max_offset:
-            raise ValueError(f'Slot {k} is {dist:.1f} m from the AI centreline')
-        rows.append((grid_id, k, back, right, yaw))
-    shift = rows[11][2] - rows[7][2]
-    rows += [(grid_id, k, rows[k-4][2]+shift, rows[k-4][3], 0.0) for k in range(12, 16)]
-    if any(b[2] <= a[2] for a, b in zip(rows, rows[1:])):
-        raise ValueError('Grid is not ordered back from the start line')
-    return rows
 
 
 def main():
