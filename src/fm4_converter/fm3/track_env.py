@@ -255,14 +255,16 @@ def add_database(fm3_db, fm4_db, media, ai):
     return {"environment": env, "tracks": ids, "grids": grids}
 
 
-def string_additions(media_rows, env_row, env_id):
+def string_additions(media_rows, env_row, media):
     """{table: [(fm3 key, FM4 key name)]} of the names one environment needs."""
     wanted = {"tracks.str": [], "environments.str": []}
     for t in media_rows:
         wanted["tracks.str"] += [(ui_names.reference(t["DisplayName"]), f"IDS_DisplayName_{t['id']}"),
                                  (ui_names.reference(t["ShortDisplayName"]), f"IDS_ShortDisplayName_{t['id']}")]
     for field in ("Location", "DisplayName", "ShortDisplayName"):
-        wanted["environments.str"].append((ui_names.reference(env_row[field]), f"IDS_{field}_{env_id}"))
+        # Labels only: FM4 finds the text by key. Labels by id can exist already
+        # (FM4's tables name environments its database no longer has, e.g. 62).
+        wanted["environments.str"].append((ui_names.reference(env_row[field]), f"IDS_{field}_FM3_{media}"))
     return wanted
 
 
@@ -303,7 +305,7 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         ai_all.update(ai)
         rows = [dict(r) for r in a.execute("select * from Tracks where MediaName=? order by id", (media,))]
         env_row = dict(a.execute("select * from Environments where MediaName=?", (media,)).fetchone())
-        for k, v in string_additions(rows, env_row, info["environment"]).items():
+        for k, v in string_additions(rows, env_row, media).items():
             wanted[k] += v
         track = {n: convert_track_file(n, d, settings) for n, d in source.track_files().items()}
         archives[Path(f"Media/tracks/{media}.zip")] = zip_bytes(track)
