@@ -329,6 +329,11 @@ def convert(source_db, target_db, source, id_base=ID_BASE, reserved=None, regist
             elif name.lower() in REGISTRY_COLUMNS:
                 value = resolve_registry(REGISTRY_COLUMNS[name.lower()], old[name])
                 action, confidence = "native_fm4_registry", "semantic_identity"
+            elif table == "Data_Car" and name == "HasRaceLivery" and "HasLivery" in old:
+                # FM3 race cars carry their stock livery in the car model; without this flag FM4 shows plain paint
+                value = int(old["HasLivery"])
+                origin = "HasLivery"
+                action, confidence = "fm3_stock_livery_flag", "runtime_verified"
             elif table == "Data_Car" and name in {"IsCarExperienceUnlocked","HasCarExperience","HasRaceLivery","IsDrivable"}:
                 value = int(name == "IsDrivable")
                 action, confidence = "prototype_capability_flag", "explicit_policy"

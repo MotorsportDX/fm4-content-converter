@@ -119,6 +119,13 @@ class ConverterTests(unittest.TestCase):
             self.assertIsNone(existing)
         self.assertNotEqual(result["candidate"]["nodes"]["body"]["row"]["Id"],247000)
 
+    def test_race_livery_flag_follows_fm3_has_livery(self):
+        for flag in (0, 1):
+            graph = copy.deepcopy(self.graph)
+            graph["nodes"]["car"]["row"]["HasLivery"] = flag
+            result = m.convert(self.source,self.target,graph)
+            self.assertEqual(result["candidate"]["nodes"]["car"]["row"]["HasRaceLivery"],flag)
+
     def test_unknown_target_field_fails_closed(self):
         with closing(self.clone(self.target)) as changed:
             changed.execute("ALTER TABLE Data_Car ADD COLUMN UnknownNewPhysicsParameter REAL")
