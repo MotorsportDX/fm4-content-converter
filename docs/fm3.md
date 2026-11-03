@@ -615,6 +615,13 @@ Pembaruan 3 November 2026: kedelapan mobil di bawah kini terkemas (paket
   teknik tak dikenal yang dibawa mobil FM4 sendiri (TVR Sagaris, Camaro SS). Audit kini
   melaporkan semua teknik yang hilang sekaligus. Ketiganya wajib lolos uji game.
 
+**Livery balap stok.** FM4 menggambar livery stok sebuah mobil hanya bila
+`Data_Car.HasRaceLivery` = 1 (mobil balap FM4 seperti 333SP dan GT-R #12 2010). Converter
+dulu selalu menulis 0, sehingga mobil balap FM3 tampil polos di garasi dan saat balapan;
+hanya gambar Car Select, yang diambil dari FM3, menampilkan livery. Sejak paket
+`fm3-only-v3` nilainya diambil dari `HasLivery` FM3: 64 mobil balap = 1, 17 mobil jalan = 0.
+Livery FM3 sendiri ada di model `.carbin` dan tidak perlu berkas tambahan.
+
 Aveo5 LT dan Aveo5 LT IE bernama sama di data FM3 (`DisplayName` "Aveo5 LT"); hanya
 `ModelShort` yang berbeda ("Aveo5 +").
 
