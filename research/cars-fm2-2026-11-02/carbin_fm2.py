@@ -216,7 +216,10 @@ def parse(data):
     glass = read_vertices(r, glass_count, glass_size) if glass_count > 0 else []
     r.skip(12)
     body_count, body_size = r.i32(), r.u32()
-    r.skip(4)
+    # Velg FM2 (type 1) hanya punya buffer pertama; buffer kedua kosong dan file berakhir
+    # tanpa penanda 0x000DECAF yang mendahului vertex buffer kedua pada mobil.
+    if body_count > 0 or r.pos < len(data):
+        r.skip(4)
     body = read_vertices(r, body_count, body_size) if body_count > 0 else []
     end = r.pos
     # Pass 2: section dengan indeks. Indeks tiap section lokal, ditumpuk berurutan di buffer bersama.
