@@ -28,6 +28,7 @@ from pathlib import Path
 import argparse, json, shutil, sqlite3, subprocess, sys, traceback, zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import carbin_fm2
 import physics_fm2
 import prototype_fm4_model as pm
 import survey_carbin as sv
@@ -53,7 +54,8 @@ def fm2_only():
 
 
 def donor_pool(fm4):
-    """Mobil disc FM4 yang bisa menjadi donor: header _lod0/_cockpit, empat kaliper dan rotor."""
+    """Mobil disc FM4 yang bisa menjadi donor: header _lod0/_cockpit, empat kaliper dan rotor; `steer`
+    = x origin section steering_wheel di _cockpit (negatif = setir kiri)."""
     discs = {q.stem.casefold(): q for q in pm.FM4.glob('*.zip')}
 
     def usable(media):
@@ -68,12 +70,26 @@ def donor_pool(fm4):
                 return False
             # Header close-up donor disalin ke model; AUD_2_R15TDI_09 punya float tak hingga di sana.
             try:
-                for kind in ('lod0', 'cockpit'):
-                    carbin_audit.parse(forza_zip.read(z, f'{media.lower()}_{kind}.carbin'), 'FM4')
+                heads = {k: carbin_audit.parse(forza_zip.read(z, f'{media.lower()}_{k}.carbin'), 'FM4')
+                         for k in ('lod0', 'cockpit')}
             except carbin_audit.FormatError:
                 return False
-        return True
-    return [d for d in physics_fm2.fm4_index(fm4) if usable(d['media'])]
+        wheel = [s['bounds'][0] for s in heads['cockpit']['sections'] if s['name'] == 'steering_wheel']
+        return wheel[0] if len(wheel) == 1 else False
+    pool = []
+    for d in physics_fm2.fm4_index(fm4):
+        steer = usable(d['media'])
+        if steer is not False:
+            pool.append({**d, 'steer': steer})
+    return pool
+
+
+def fm2_steer(car, fm2_zip):
+    """x origin section steering_wheel model FM2 (konvensi sumbu sama dengan FM4), atau None."""
+    with zipfile.ZipFile(fm2_zip) as z:
+        model = carbin_fm2.parse(z.read(next(n for n in z.namelist() if n.lower() == car.lower() + '.carbin')))
+    wheel = [s.origin[0] for s in model.sections if s.name == 'steering_wheel']
+    return wheel[0] if len(wheel) == 1 else None
 
 
 def models_for(car, donor, root):
@@ -145,7 +161,13 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
                         car_id in reserved.get('Data_Car', ()):
                     raise c.MappingError('The FM2 car identity already exists in FM4 or an installed DLC')
                 source = physics_fm2.extract(fm2_db, car_id, work)
-                donor = physics_fm2.donor(pool, source, car_id)['media']
+                # Kamera kokpit dan posisi driver ikut donor: donor bersetir di sisi lain menaruh kamera
+                # di kursi penumpang (Evo IX dengan donor Eclipse, REPORT 14.5). Donor sesisi setir saja.
+                steer = fm2_steer(car, fm2_zips[car.lower()])
+                if steer is None:
+                    raise c.MappingError('FM2 model has no single steering_wheel section')
+                donor = physics_fm2.donor([d for d in pool if (d['steer'] > 0) == (steer > 0)], source, car_id)['media']
+                log['steering'] = 'right' if steer > 0 else 'left'
                 log['donor'] = donor
                 models = models_for(car, donor, Path(models_root))
                 prototype = json.loads((models / 'report.json').read_text(encoding='utf-8'))

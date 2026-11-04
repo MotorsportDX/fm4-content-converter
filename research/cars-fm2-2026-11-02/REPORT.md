@@ -73,6 +73,8 @@ Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
   satu tabel nama, satu atlas thumbnail, dan override audio untuk 41 mobil tanpa tuning audio
   FM4. Yang tidak masuk: empat mobil DLC FM2 (datanya tidak ada di disc) dan satu quad turbo.
   Lancer Evo IX GT dan Tommy Kaira R34 dari paket ini balapan sampai finis tanpa crash.
+  Kamera kokpit dan posisi driver ternyata ikut donor. Karena itu donor kini harus punya sisi
+  setir yang sama; sebelumnya 15 mobil memakai donor dengan sisi setir berbeda (bagian 14.5).
 
 ## 1. Rute sumber per mobil
 
@@ -1222,8 +1224,8 @@ satu mobil (bagian 8–11), dengan fisika FM2 dari `study.json`.
 
 ### 14.1 Pilihan per mobil
 
-- **Donor** dipilih dengan `physics_fm2.donor`: merek dan penggerak sama, lalu massa dan tenaga
-  terdekat. Kandidatnya 309 mobil disc FM4 yang punya `_lod0` dan `_cockpit`, empat kaliper dan
+- **Donor** dipilih dengan `physics_fm2.donor` di antara donor dengan sisi setir yang sama
+  (bagian 14.5): merek dan penggerak sama, lalu massa dan tenaga terdekat. Kandidatnya 309 mobil disc FM4 yang punya `_lod0` dan `_cockpit`, empat kaliper dan
   rotor, serta header close-up yang bisa dibaca (`AUD_2_R15TDI_09` berisi float tak hingga).
   Untuk mobil yang mereknya tidak ada di disc (Porsche, Proto Motors), donor jatuh ke merek lain,
   misalnya Porsche 996 GT3 Cup ke `FER_250GT_60`. Model dibuat ulang per pasangan mobil–donor,
@@ -1298,9 +1300,45 @@ Nama "(FM2)" tampil di Car Select. Warning runtime sama dengan run sebelumnya.
 - Hanya 2 dari 50 mobil yang dibalap.
 - Override audio hanya terbukti tidak membuat crash. Log tidak menunjukkan file CMT mana yang
   dibaca, dan suara tidak diperiksa.
-- Tampilan kokpit dengan material yang dipetakan, serta posisi driver tanpa `carattribs.xml`,
-  belum dilihat. Run memakai kamera chase.
-- Mobil dengan merek atau donor lintas merek (Porsche, Spirra) belum dicoba di game.
+- Mobil dengan merek atau donor lintas merek selain Porsche (misalnya Spirra) belum dicoba di
+  game.
+
+### 14.5 Tampilan kokpit
+
+Empat mobil dari `package-v1` dibalap dengan AI. Setelah start, kamera diganti tiga kali dengan
+`back`: kokpit, kap, bumper, lalu chase. Frame ditangkap setiap ~2 detik.
+
+| Mobil | Material yang dipetakan | Kokpit |
+|---|---|---|
+| AWE SilverBullet S4 | `black`, `matte_colors`, `tail_light` | Benar: dasbor gelap, setir Audi, spion memantul, tangan di setir. Kap hitam-biru di kamera kap adalah livery atlas FM2 |
+| #22 3R-Racing 911 GT3 Cup (merek Porsche dari DLC, donor Ferrari) | `weatherstrip`, `matte_colors` | Benar: setir Porsche, roll cage |
+| Tommy Kaira R34 (tanpa `carattribs.xml`) | `black`, `matte_colors` | Kamera di belakang setir dan tangan di setir. Dasbor putih dari atlas FM2. Sudut pandang agak rendah, atap menutupi sepertiga atas layar |
+| Lancer Evolution IX GT | `tail_light` | **Salah:** setir di kanan layar, kamera dan tangan driver di kursi kiri, tangan tidak memegang apa pun |
+
+**Penyebab Evo IX.** Kamera kokpit dan posisi driver ikut donor, bukan model FM2.
+- Setir Evo IX FM2 ada di x = +0,35, sedangkan donor `MIT_EclipseGSX_95` di x = −0,37.
+- Tiga mobil lain memakai donor yang sesisi setir: R34 +0,35 dengan GT-R Spec V +0,37, S4 −0,41
+  dengan R8 −0,36, GT3 Cup dengan Ferrari, keduanya negatif.
+- `JAG_XK_07` (+0,47) juga sesisi dengan `JAG_XKRS_09` (+0,37).
+- Konvensi sumbu x model FM2 dan FM4 sama.
+
+**Perbaikan.** `donor_pool` mencatat x origin `steering_wheel` dari `_cockpit` donor, dan
+`fm2_steer` membaca hal yang sama dari model FM2. Donor dipilih hanya dari mobil yang sesisi
+setir.
+- Di `package-v1`, 15 dari 50 mobil sisi setirnya berbeda dengan donor. Contohnya empat Lancer
+  Evo dengan Eclipse, Fairlady Z dengan 370Z, Focus SVT dengan Focus RS, dan dua 911 GT3-RSR
+  dengan Fairlady 432Z.
+- Di `package-v2` semuanya sesisi. Lancer Evo kini memakai `MIT_LancerEvoXGSR_08`. Bila tidak ada
+  donor semerek yang sesisi, donor jatuh ke merek lain: S2000 Mugen → `JAG_33_XKR_10`, Spirra →
+  `SHE_Cobra427_65`.
+- `package-v2` tetap berisi 50 mobil, dan donor berubah hanya pada 15 mobil itu.
+- Evo IX dengan `package-v2`: kamera di belakang setir, tangan di setir, spion samping di kanan.
+
+**Batas.**
+- Dari 50 mobil, 4 yang kokpitnya dilihat.
+- Material `tail_light` (5–6 vertex) dan `misc` tidak terlihat jelas di frame.
+- Sudut pandang Tommy Kaira yang rendah belum diselidiki: bisa karena tidak ada `carattribs.xml`,
+  bisa karena posisi kursi donor.
 
 ## Batas riset
 
