@@ -76,24 +76,61 @@ class DonorTests(unittest.TestCase):
         self.assertEqual([d['media'] for d in package.same_side(pool, 0.35)], ['RHD'])
         self.assertEqual([d['media'] for d in package.same_side(pool, -0.41)], ['LHD'])
 
-    POOL = [{'media': 'JAG_XKRS_09', 'id': 1, 'drive': 1, 'make': 19, 'mass': 1700, 'power': 380, 'steer': 0.37},
-            {'media': 'JAG_33_XKR_10', 'id': 2, 'drive': 1, 'make': 19, 'mass': 1600, 'power': 300, 'steer': 0.4},
-            {'media': 'JAG_XJ220_93', 'id': 3, 'drive': 1, 'make': 19, 'mass': 1500, 'power': 400, 'steer': -0.4}]
+    @staticmethod
+    def donor(media, id, wheel, mass=1600, power=300, make=19, drive=1, race=False):
+        return {'media': media, 'id': id, 'drive': drive, 'make': make, 'mass': mass, 'power': power,
+                'wheel': wheel, 'steer': wheel[0], 'race': race}
+
+    POOL = [donor('JAG_XKRS_09', 1, (0.37, 0.65, -0.25), mass=1700, power=380),
+            donor('JAG_33_XKR_10', 2, (0.4, 0.65, -0.25)),
+            donor('JAG_XJ220_93', 3, (-0.4, 0.65, -0.25), mass=1500, power=400)]
     SOURCE = {'nodes': {'List_UpgradeCarBodyWeight': {'Mass': 1600}, 'engine': {'EngineGraphingMaxPower': 300},
                         'drivetrain': {'DrivetypeID': 1}, 'car': {'MakeID': 19}}}
+    WHEEL = (0.47, 0.65, -0.3)
+
+    def choose(self, pool, wheel=WHEEL, race=False, manual=None):
+        donor, how = package.choose_donor(pool, self.SOURCE, 490, wheel, race, manual)
+        return donor['media'], how
 
     def test_automatic_donor_keeps_the_steering_side(self):
-        self.assertEqual(package.choose_donor(self.POOL, self.SOURCE, 490, 0.47), ('JAG_33_XKR_10', 'automatic'))
+        self.assertEqual(self.choose(self.POOL), ('JAG_33_XKR_10', 'automatic'))
+
+    def test_automatic_donor_has_its_steering_wheel_near_the_fm2_one(self):
+        # The nearest in mass and power has its wheel 0.33 m in front of the FM2 one (432R and Silvia).
+        pool = [self.donor('NEAR_POWER', 1, (0.37, 0.65, -0.63)), self.donor('NEAR_WHEEL', 2, (0.37, 0.65, -0.35),
+                                                                            mass=1700, power=380)]
+        self.assertEqual(self.choose(pool), ('NEAR_WHEEL', 'automatic'))
+        # dy beyond WHEEL_DY also counts (the Supra AB Flug's hands were hidden at +0.08).
+        pool[0]['wheel'] = (0.37, 0.57, -0.35)
+        self.assertEqual(self.choose(pool), ('NEAR_WHEEL', 'automatic'))
+
+    def test_without_a_donor_in_the_window_the_nearest_wheel_wins(self):
+        pool = [self.donor('FAR', 1, (0.37, 0.65, -1.0)), self.donor('LESS_FAR', 2, (0.37, 0.65, 0.2),
+                                                                     mass=1700, power=380)]
+        self.assertEqual(self.choose(pool), ('LESS_FAR', 'automatic'))
+
+    def test_race_donors_only_for_race_cars(self):
+        pool = [self.donor('STOCK_CAR', 1, (0.37, 0.65, -0.3), race=True),
+                self.donor('ROAD_CAR', 2, (0.37, 0.65, -0.3), mass=1700, power=380)]
+        self.assertEqual(self.choose(pool), ('ROAD_CAR', 'automatic'))
+        self.assertEqual(self.choose(pool, race=True), ('STOCK_CAR', 'automatic'))
+
+    def test_wheel_offset_and_window(self):
+        donor = self.donor('D', 1, (0.36, 0.65, -0.24))
+        dz, dy = package.wheel_offset((0.37, 0.58, 0.09), donor)
+        self.assertAlmostEqual(dz, 0.33)
+        self.assertAlmostEqual(dy, -0.07)
+        self.assertAlmostEqual(package.outside((0.37, 0.58, 0.09), donor), 0.23)
+        self.assertEqual(package.outside((0.37, 0.65, -0.24), donor), 0)
 
     def test_manual_donor_from_the_pool(self):
-        self.assertEqual(package.choose_donor(self.POOL, self.SOURCE, 490, 0.47, 'jag_xkrs_09'),
-                         ('JAG_XKRS_09', 'manual'))
+        self.assertEqual(self.choose(self.POOL, manual='jag_xkrs_09'), ('JAG_XKRS_09', 'manual'))
 
     def test_manual_donor_outside_the_pool_or_on_the_other_side_is_refused(self):
         with self.assertRaisesRegex(package.c.MappingError, 'not a usable donor'):
-            package.choose_donor(self.POOL, self.SOURCE, 490, 0.47, 'AUD_2_R15TDI_09')
+            self.choose(self.POOL, manual='AUD_2_R15TDI_09')
         with self.assertRaisesRegex(package.c.MappingError, 'other side'):
-            package.choose_donor(self.POOL, self.SOURCE, 490, 0.47, 'JAG_XJ220_93')
+            self.choose(self.POOL, manual='JAG_XJ220_93')
 
     def test_donor_arguments(self):
         self.assertEqual(package.parse_donors(['JAG_XK_07=JAG_XKRS_09']), {'jag_xk_07': 'JAG_XKRS_09'})

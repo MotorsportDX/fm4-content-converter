@@ -58,12 +58,17 @@ disc dengan `fm4_converter.fm3.test_disc` ([panduan FM3](fm3.md#uji-e2e-motorspo
 | Paket | `package` | Graf database stock donor dengan kunci baru, `Data_Car.Id` FM2, tekstur dan thumbnail FM2, nama "(FM2)", serta override audio. Bagian 8, 14 |
 
 **Donor.** Mobil disc FM4 dengan `_lod0`, `_cockpit`, empat kaliper dan rotor, serta
-header close-up yang terbaca. Kamera kokpit dan posisi driver ikut donor, jadi donor
-harus punya sisi setir yang sama dengan model FM2 (bagian 14.5). Pilihan otomatis
-mendahulukan merek dan penggerak yang sama, lalu massa dan tenaga terdekat. `--donor`
-memakai pool dan aturan sisi setir yang sama. Donor di luar pool atau dengan setir di
-sisi lain ditolak. Pilihan dicatat di `manifest.json` sebagai `donor_choice`
-(`automatic` atau `manual`).
+header close-up yang terbaca. Kamera kokpit dan posisi driver ikut donor, sedangkan
+geometri kokpit dari FM2 (bagian 14.5, 15.3). Pilihan otomatis (bagian 16):
+1. sisi setir dan jenis penggerak sama;
+2. donor balap hanya untuk mobil balap;
+3. setir FM2 berada −0,25…+0,10 m (depan–belakang) dan maksimal 0,07 m (tinggi) dari
+   setir donor, atau donor terdekat bila tidak ada;
+4. merek sama, lalu massa dan tenaga terdekat.
+
+`--donor` memakai pool dan aturan sisi setir yang sama, tanpa batas jendela. Donor di
+luar pool atau dengan setir di sisi lain ditolak. `manifest.json` mencatat
+`donor_choice` (`automatic` atau `manual`) dan `wheel_offset` (`dz`, `dy`, `in_window`).
 
 **Yang tetap milik donor:** grup fisika yang tidak dipilih studi, baris `List_Wheels`
 kecuali `MediaName`, `CarPartPositions`, `CameraOverrides`, `CarExceptions`,
@@ -72,24 +77,26 @@ CMT audio bila FM4 tidak punya, dan `MakeID` bila FM4 tidak punya merek FM2.
 
 ## Hasil saat ini
 
-`package-v3` berisi 50 dari 55 mobil. Yang tidak masuk: empat mobil DLC FM2 (aset dan
+`package-v4` berisi 50 dari 55 mobil. Yang tidak masuk: empat mobil DLC FM2 (aset dan
 baris database tidak ada di disc) dan `CHR_ME412_05` (quad turbo, bagian 11.2).
 
 Uji game di Motorsport DX (Quick Race Bernese Alps, AI menyetir):
 
 - Balapan sampai finis: `JAG_XK_07`, `MAZ_RX7_ReAmemiya_95`, Lancer Evo IX GT, dan
   Tommy Kaira R34 (bagian 8, 10, 11, 14.4).
-- Kamera kokpit, kap, bumper, dan chase `package-v3` pada 18 mobil (bagian 15.2–15.3): kaca,
-  spion, dan material kokpit benar. Kamera salah pada S2000 Mugen, Fairlady Z 432R, #58 Viper
-  GTS-R, Spirra, dan Camaro SS.
+- Kamera kokpit, kap, bumper, dan chase pada 18 mobil `package-v3` (bagian 15.2–15.3) dan 8
+  mobil `package-v4` (bagian 16.2). Kaca, spion, dan material kokpit benar. Di v4, kamera benar
+  pada S2000 Mugen, 432R, Spirra, Camaro, R34, dan Tuscan; Viper sebagian besar benar; Supra
+  AB Flug masih terlalu dekat.
 - Fisika FM2 pada tiga mobil FM4 native: durasi balapan AI −1,5% sampai +0,8% dari
   fisika asli (bagian 12).
 
 ## Batas
 
-- Kamera kokpit dan posisi driver ikut donor. Bila setir FM2 jauh dari setir donor, kamera berada
-  di dalam atau di depan setir, atau di belakang kursi (bagian 15.3). Periksa selisihnya sebelum
-  memilih donor dengan `--donor`. Donor stock car membuat kamera mobil jalan raya terlalu rendah.
+- Kamera kokpit dan posisi driver ikut donor. Jendela posisi setir disimpulkan dari uji game,
+  bukan dari posisi kamera donor (bagian 16). Donor manual di luar jendela dapat menaruh kamera
+  di dalam atau di depan setir, atau di belakang kursi; periksa `wheel_offset` di manifest.
+- Warna cat bawaan, suara mesin, dan merek mobil tanpa padanan FM4 ikut donor.
 - Kartu "CAR" sebelum balapan menampilkan foto garasi donor.
 - Kecocokan kelas PI validation 25/37. Kelas belum tentu sama dengan mobil sebanding
   di FM4 (bagian 13).

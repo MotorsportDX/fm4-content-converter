@@ -14,9 +14,10 @@ zipmanifest, as `fm3.batch_package`. Cars are planned one after another against 
 package database, so new keys never collide; installed DLC keys stay reserved.
 
 - Donor: `physics.donor` (same make and drive type, nearest mass and power) among FM4 disc cars with
-  _lod0, _cockpit, four calipers and rotors and the FM2 model's steering side. The cockpit camera
-  and driver position follow the donor (REPORT 14.5). `--donor CAR=DONOR` picks one car's donor
-  from the same pool, with the same steering side.
+  _lod0, _cockpit, four calipers and rotors, the FM2 model's steering side and drive type, a race
+  car only for race cars, and a steering wheel near the FM2 one (`choose_donor`). The cockpit camera
+  and driver position follow the donor (REPORT 14.5, 15.3). `--donor CAR=DONOR` picks one car's
+  donor from the same pool, with the same steering side.
 - `MakeID`: FM2's when FM4 or an installed DLC has a make with the same ID and manufacturer code
   (the DLC goes to `requires`); otherwise the donor's, recorded.
 - Wheels FM4 already ships are used as they are; a wheel several FM2 cars share is shipped once.
@@ -241,8 +242,9 @@ def string_archive(target_root, content_root, keys):
 
 
 def donor_pool(fm4):
-    """FM4 disc cars that can be donors: _lod0/_cockpit headers, four calipers and rotors; `steer` =
-    x origin of the steering_wheel section in _cockpit (negative = left-hand drive)."""
+    """FM4 disc cars that can be donors: _lod0/_cockpit headers, four calipers and rotors; `wheel` =
+    origin of the steering_wheel section in _cockpit, `steer` = its x (negative = left-hand drive),
+    `race` = a race car (CarTypeID RACE)."""
     discs = sources.zips(sources.FM4_CARS)
 
     def usable(media):
@@ -261,21 +263,22 @@ def donor_pool(fm4):
                          for k in ('lod0', 'cockpit')}
             except carbin_audit.FormatError:
                 return False
-        wheel = [s['bounds'][0] for s in heads['cockpit']['sections'] if s['name'] == 'steering_wheel']
+        wheel = [tuple(s['bounds'][:3]) for s in heads['cockpit']['sections'] if s['name'] == 'steering_wheel']
         return wheel[0] if len(wheel) == 1 else False
     pool = []
     for d in physics.fm4_index(fm4):
-        steer = usable(d['media'])
-        if steer is not False:
-            pool.append({**d, 'steer': steer})
+        wheel = usable(d['media'])
+        if wheel is not False:
+            race = fm4.execute('SELECT CarTypeID FROM Data_Car WHERE Id=?', (d['id'],)).fetchone()[0] == RACE
+            pool.append({**d, 'wheel': wheel, 'steer': wheel[0], 'race': race})
     return pool
 
 
-def fm2_steer(car, fm2_zip):
-    """x origin of the FM2 model's steering_wheel section (same axis convention as FM4), or None."""
+def fm2_wheel(car, fm2_zip):
+    """Origin of the FM2 model's steering_wheel section (same axis convention as FM4), or None."""
     with zipfile.ZipFile(fm2_zip) as z:
         model = carbin.parse(z.read(next(n for n in z.namelist() if n.lower() == car.lower() + '.carbin')))
-    wheel = [s.origin[0] for s in model.sections if s.name == 'steering_wheel']
+    wheel = [tuple(s.origin[:3]) for s in model.sections if s.name == 'steering_wheel']
     return wheel[0] if len(wheel) == 1 else None
 
 
@@ -284,12 +287,41 @@ def same_side(pool, steer):
     return [d for d in pool if (d['steer'] > 0) == (steer > 0)]
 
 
-def choose_donor(pool, source, car_id, steer, manual=None):
-    """(donor MediaName, 'automatic' or 'manual'). A manual donor must be in the pool and keep the
-    steering side, as an automatic one."""
-    side = same_side(pool, steer)
+# CarTypeID in FM2 and FM4: 1 production, 2 tuner, 3 race.
+RACE = 3
+# The cockpit camera follows the donor, the cockpit geometry the FM2 model. dz/dy = FM2 steering wheel
+# origin minus the donor's in metres; +z points to the rear, so dz > 0 puts the FM2 wheel nearer the
+# seat. In game dz -0.31..+0.17 looked right; +0.18..+0.35 put the camera inside or in front of the
+# wheel, -0.59 behind the seat, and dy +0.08 hid the hands (REPORT 15.3). The window keeps a margin.
+WHEEL_DZ = (-0.25, 0.10)
+WHEEL_DY = 0.07
+
+
+def wheel_offset(wheel, donor):
+    """(dz, dy) of the FM2 steering wheel origin against the donor's."""
+    return wheel[2] - donor['wheel'][2], wheel[1] - donor['wheel'][1]
+
+
+def outside(wheel, donor):
+    """How far (metres) the FM2 wheel lies outside the WHEEL_DZ/WHEEL_DY window of the donor; 0 inside."""
+    dz, dy = wheel_offset(wheel, donor)
+    return max(WHEEL_DZ[0] - dz, dz - WHEEL_DZ[1], 0) + max(abs(dy) - WHEEL_DY, 0)
+
+
+def choose_donor(pool, source, car_id, wheel, race, manual=None):
+    """(donor pool entry, 'automatic' or 'manual').
+
+    Automatic: donors with the steering side and drive type of the FM2 car, race donors for race cars
+    and non-race donors otherwise (when there is one), then those whose steering wheel lies in the
+    WHEEL_DZ/WHEEL_DY window (or the nearest one when none does), then `physics.donor`: same make,
+    nearest mass and power. Manual: in the pool with the same steering side; the window is not
+    enforced, and the offset is reported by the caller."""
+    side = same_side(pool, wheel[0])
     if manual is None:
-        return physics.donor(side, source, car_id)['media'], 'automatic'
+        drive = [d for d in side if d['drive'] == source['nodes']['drivetrain']['DrivetypeID']] or side
+        kind = [d for d in drive if d['race'] == race] or drive
+        seated = [d for d in kind if not outside(wheel, d)] or [min(kind, key=lambda d: (outside(wheel, d), d['id']))]
+        return physics.donor(seated, source, car_id), 'automatic'
     found = [d for d in pool if d['media'].casefold() == manual.casefold()]
     if not found:
         raise c.MappingError(f'{manual} is not a usable donor: an FM4 disc car with _lod0, _cockpit, '
@@ -297,7 +329,7 @@ def choose_donor(pool, source, car_id, steer, manual=None):
     if found[0] not in side:
         raise c.MappingError(f'{manual} has the steering wheel on the other side; the cockpit camera '
                              'would sit on the passenger seat')
-    return found[0]['media'], 'manual'
+    return found[0], 'manual'
 
 
 def parse_donors(pairs):
@@ -391,12 +423,17 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
                 source = physics.extract(fm2_db, car_id, work)
                 # The cockpit camera and driver position follow the donor: a donor with the wheel on the
                 # other side puts the camera on the passenger seat (Evo IX with an Eclipse donor, REPORT 14.5).
-                steer = fm2_steer(car, fm2_zips[car.lower()])
-                if steer is None:
+                steering = fm2_wheel(car, fm2_zips[car.lower()])
+                if steering is None:
                     raise c.MappingError('FM2 model has no single steering_wheel section')
-                donor, log['donor_choice'] = choose_donor(pool, source, car_id, steer, donors.get(car.casefold()))
-                log['steering'] = 'right' if steer > 0 else 'left'
+                chosen, log['donor_choice'] = choose_donor(pool, source, car_id, steering,
+                                                           fm2_car['CarTypeID'] == RACE, donors.get(car.casefold()))
+                donor = chosen['media']
+                dz, dy = wheel_offset(steering, chosen)
+                log['steering'] = 'right' if steering[0] > 0 else 'left'
                 log['donor'] = donor
+                log['wheel_offset'] = {'dz': round(dz, 3), 'dy': round(dy, 3),
+                                       'in_window': not outside(steering, chosen)}
                 models = models_for(car, donor, Path(models_root), helper)
                 prototype = json.loads((models / 'report.json').read_text(encoding='utf-8'))
                 requires = set()

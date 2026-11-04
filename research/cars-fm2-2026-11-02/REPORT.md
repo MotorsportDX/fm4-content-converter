@@ -83,6 +83,10 @@ Dekode model (bagian 5) memakai [`fm2/carbin.py`](../../src/fm4_converter/fm2/ca
   semua mobil, tetapi kamera salah pada 5 mobil. Kamera kokpit ikut donor, jadi kamera meleset bila
   setir FM2 jauh dari posisi setir donor (S2000 Mugen, 432R, Viper GTS-R, Spirra) atau bila donornya
   stock car (Camaro SS). Kartu "CAR" sebelum balapan juga menampilkan foto donor.
+- **Donor kini dipilih menurut posisi setir** (bagian 16). Di `package-v4` setir semua 50 mobil
+  berada dalam 25 cm (depan–belakang) dan 7 cm (tinggi) dari setir donor, dan mobil jalan raya tidak
+  lagi mendapat donor balap. Empat dari lima kokpit yang salah kini benar, Viper sebagian besar
+  benar, dan sudut pandang rendah Tommy Kaira R34 hilang. Supra AB Flug masih terlalu dekat.
 
 ## 1. Rute sumber per mobil
 
@@ -194,9 +198,9 @@ kalibrasi fisika (bagian 10), `CMHeight` dan part aspirasi tanpa donor (bagian 1
 kendali pada mobil FM4 native (bagian 12), PI (bagian 13), paket 50 mobil (bagian 14),
 serta pemindahan kode ke package dengan opsi donor manual (bagian 15).
 
-1. **Posisi kamera kokpit.** Pilih donor yang posisi setirnya dekat dengan setir FM2 (bagian 15.3),
-   atau temukan dan pindahkan posisi kamera di data FM4. Sepuluh mobil berisiko, lima sudah
-   terbukti salah. Hindari juga donor stock car untuk mobil jalan raya.
+1. **Sisa posisi kamera kokpit.** Donor sudah dipilih menurut posisi setir (bagian 16). Sisanya:
+   Supra AB Flug masih terlalu dekat, selisih sumbu x belum masuk aturan (Viper), dan 20 mobil
+   yang donornya berubah belum dilihat di game. Posisi kamera di data FM4 belum ditemukan.
 2. **Foto donor di kartu "CAR" sebelum balapan.** Sumber gambarnya belum diketahui (bagian 15.3).
 3. **Kelas PI.** Kecocokan kelas validation baru 25/37, dan dua dari tiga mobil bagian 12
    masih satu kelas terlalu rendah (bagian 13).
@@ -207,8 +211,7 @@ serta pemindahan kode ke package dengan opsi donor manual (bagian 15).
 6. **Section dan bagian yang tidak ada di FM2**: section `wheel`, `undercarriagea` dan
    `exhaust*` tambahan FM3 (bagian 5.3), kaliper/rotor sendiri, gauge cluster, jarum, dan
    `a_pillar` (bagian 9.4); kini donor atau tidak ada.
-7. **Cakupan uji game:** sudut pandang rendah Tommy Kaira R34 (bagian 14.5, kemungkinan `dy`
-   −0,12 di bagian 15.3), suara dari
+7. **Cakupan uji game:** suara dari
    override CMT, serta mobil yang belum dibalap.
 8. Sisa format: 12 nilai S16 terakhir vertex FM2, header 0x100 byte, record 140 byte,
    dan arti pembagian dua buffer vertex (bagian 5.4 dan 7.3).
@@ -1503,6 +1506,67 @@ PI 0,538968, dan aturan PI `pi_hinge` sama dengan `package-v3`, karena fisika te
 Donor `MAZ_Miata_94` ditolak karena setirnya di sisi lain. Lima tes baru di
 `tests/fm2/test_package.py` menguji pilihan otomatis, donor manual, kedua penolakan, dan parsing
 argumen.
+
+## 16. Donor dipilih menurut posisi setir
+
+Lanjutan 5 November 2026. Bagian 15.3 menunjukkan bahwa kamera kokpit salah bila setir FM2 jauh
+dari setir donor, atau bila donornya mobil balap. `package.choose_donor` kini memilih donor otomatis
+dalam empat langkah:
+1. Sisi setir dan jenis penggerak sama dengan mobil FM2.
+2. Donor balap (`CarTypeID` 3) hanya untuk mobil balap, dan donor non-balap untuk mobil lain. Tipe 2
+   adalah tuner, jadi tetap termasuk mobil jalan raya. Langkah ini dilewati bila tidak ada kandidat.
+3. Origin setir FM2 dikurangi origin setir donor harus berada di jendela `WHEEL_DZ` = −0,25…+0,10 m
+   dan `|dy|` ≤ `WHEEL_DY` = 0,07 m. Jendela ini lebih sempit dari rentang yang terbukti benar di
+   bagian 15.3 (−0,31…+0,17). Bila tidak ada kandidat, dipilih donor yang paling dekat ke jendela.
+4. `physics.donor` seperti sebelumnya: merek sama, lalu massa dan tenaga terdekat.
+
+`manifest.json` mencatat `wheel_offset` (`dz`, `dy`, `in_window`) per mobil. Donor manual
+(`--donor`) tidak dibatasi jendela, tetapi selisihnya tetap dicatat.
+
+### 16.1 `package-v4`
+
+| | |
+|---|---:|
+| Mobil dipaketkan (gagal: 4 DLC FM2 dan quad turbo, sama dengan v3) | 50 |
+| Donor berubah dari v3 | 28 |
+| Mobil dengan setir di luar jendela | 0 (v3: 26) |
+| Kelas berubah | 0 |
+| Merek tanpa padanan FM4 berubah | 1 (Spirra: Shelby → Ferrari) |
+| CMT audio berubah karena donor baru | 23 |
+| Kehilangan donor semerek karena tidak ada yang masuk jendela | 10 |
+
+Contoh donor baru: 432R → `NIS_Fairlady432Z_69`, Camaro SS → `CHE_CorvetteGS_10`, S2000 Mugen →
+`CHE_Corvette_60`, Spirra → `FER_GTO_84`, Tommy Kaira R34 → `NIS_SkylineGTRVSpec_95`, #58 Viper
+GTS-R → `AUD_2_A4_11`, dan kedua Audi R8 → `AUD_14_R10_10`.
+
+Fisika tetap dari studi FM2, jadi kelas tidak berubah. Yang ikut donor tetap sama seperti di bagian
+14.1: suara mesin `Data_Engine`, CMT bila FM4 tidak punya, kaliper dan rotor, header close-up, dan
+`Combo_Colors`. Karena itu warna cat bawaan juga ikut berubah: 432R menjadi kuning dan Camaro merah.
+
+### 16.2 Uji game
+
+Langkah sama dengan bagian 15.3, disc uji `fm2-batch-v4`, run `I:\FM4-build-usa\e2e\fm2-v4cam-<mobil>`.
+Semua run tanpa crash.
+
+| Mobil | v3 | Donor v4 | dz / dy v4 | Kokpit v4 |
+|---|---|---|---|---|
+| Mugen S2000 | Salah | `CHE_Corvette_60` | +0,04 / −0,02 | Benar: setir, tangan, dan panel digital S2000 tampil |
+| Fairlady Z 432R | Salah | `NIS_Fairlady432Z_69` | −0,09 / −0,03 | Benar: setir kayu, gauge bulat, tangan di setir |
+| #58 Viper GTS-R | Salah | `AUD_2_A4_11` | +0,05 / +0,01 | Sebagian besar benar: jalan terlihat, gauge dan tangan tampil. Setir 7 cm di kiri kamera (`dx` −0,07), spion tengah berisi bercak kabur |
+| Spirra | Salah | `FER_GTO_84` | +0,01 / −0,01 | Benar: setir, tangan, konsol tengah, spion |
+| Camaro SS | Salah | `CHE_CorvetteGS_10` | −0,14 / −0,00 | Benar: tinggi duduk normal, kaca depan penuh |
+| AB Flug S900 Supra | Sebagian | `JAG_XKRS_09` | +0,09 / −0,01 | Masih sebagian: setir terlalu dekat, satu tangan terlihat |
+| Tommy Kaira R34 | Rendah (bagian 14.5) | `NIS_SkylineGTRVSpec_95` | +0,06 / +0,01 | Benar: sudut pandang normal, gauge terlihat |
+| Tuscan R | Benar | `HON_S2000_03` | −0,07 / −0,04 | Tetap benar (uji regresi donor yang berubah) |
+
+- Empat dari lima mobil yang salah di v3 kini benar, dan Viper sebagian besar benar.
+- Sudut pandang rendah R34 terbukti berasal dari `dy` −0,12 dengan donor lama.
+- Supra AB Flug tetap terlalu dekat walau `dz` +0,09 dan `dy` −0,01 masuk jendela. Evo IX benar di
+  `dz` +0,06, jadi menyempitkan jendela tidak sesuai bukti. Penyebabnya kemungkinan khas model ini.
+- Selisih sumbu x (`dx`) belum masuk aturan. Viper menunjukkan bahwa 7 cm sudah terlihat.
+
+**Batas.** Delapan mobil diuji, satu run per mobil. 20 mobil lain yang donornya berubah belum dilihat
+di game. Jendela berasal dari 19 mobil di bagian 15.3, bukan dari posisi kamera donor.
 
 ## Batas riset
 
