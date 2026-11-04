@@ -84,6 +84,7 @@
 !/src/fm4_converter/archives/stfs_zip_io.py
 !/src/fm4_converter/fm2/__init__.py
 !/src/fm4_converter/fm2/carbin.py
+!/src/fm4_converter/fm2/dlc.py
 !/src/fm4_converter/fm2/models.py
 !/src/fm4_converter/fm2/package.py
 !/src/fm4_converter/fm2/physics.py
@@ -136,6 +137,7 @@
 !/tests/fm2/__init__.py
 !/tests/fm2/samples.py
 !/tests/fm2/test_carbin.py
+!/tests/fm2/test_dlc.py
 !/tests/fm2/test_package.py
 !/tests/fm2/test_physics.py
 !/tests/fm3/__init__.py

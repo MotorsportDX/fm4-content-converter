@@ -16,8 +16,8 @@ disc sumber.
 - Python dan dependensi `requirements.txt`, seperti [setup repository](../README.md#setup-python).
 - Helper CPU `carbin-cpu.exe` yang sudah direview, dari
   [petunjuk build helper](../tools/carbin_cpu/README.md).
-- Disc FM2 USA, FM3 USA Disc 1, dan FM4 Disc 1 lokal. Lokasi default ada di
-  [`fm2/sources.py`](../src/fm4_converter/fm2/sources.py).
+- Disc FM2 USA beserta Bonus Disc (DLC), FM3 USA Disc 1, dan FM4 Disc 1 lokal. Lokasi default ada
+  di [`fm2/sources.py`](../src/fm4_converter/fm2/sources.py).
 - Folder paket DLC FM4 terpasang (`--content-root`), agar kunci database, merek, dan
   velg DLC tidak bertabrakan.
 - Inventory rute per mobil dari riset (`outputs/car-fm2-research-2026-11-02/inventory.json`).
@@ -27,10 +27,13 @@ disc sumber.
 Semua perintah dijalankan dari root repository dengan interpreter `.venv`.
 
 ```powershell
-# 1. Studi kalibrasi fisika FM2 -> FM4 (study.json)
+# 1. DLC FM2 dari Bonus Disc sebagai folder Media (outputs/car-fm2-dlc)
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.dlc
+
+# 2. Studi kalibrasi fisika FM2 -> FM4 (study.json, hanya database disc)
 .\.venv\Scripts\python.exe -m fm4_converter.fm2.physics
 
-# 2. Paket overlay: semua mobil fm2_only, atau sebagian dengan --cars
+# 3. Paket overlay: semua mobil fm2_only, atau sebagian dengan --cars
 .\.venv\Scripts\python.exe -m fm4_converter.fm2.package --out <paket-baru>
 .\.venv\Scripts\python.exe -m fm4_converter.fm2.package --out <paket-baru> --cars JAG_XK_07
 
@@ -77,8 +80,10 @@ CMT audio bila FM4 tidak punya, dan `MakeID` bila FM4 tidak punya merek FM2.
 
 ## Hasil saat ini
 
-`package-v4` berisi 50 dari 55 mobil. Yang tidak masuk: empat mobil DLC FM2 (aset dan
-baris database tidak ada di disc) dan `CHR_ME412_05` (quad turbo, bagian 11.2).
+`package-v5` berisi 55 dari 55 mobil FM2-only (bagian 17). Empat mobil DLC FM2 dibaca dari
+Bonus Disc (`fm2.dlc`), dan quad turbo `CHR_ME412_05` dipasang sebagai twin turbo seperti Veyron
+di FM4. Daftar 55 mobil sudah diverifikasi terhadap 45 mobil FM2 yang ID-nya ada di FM4 dengan
+nama lain (bagian 17.4).
 
 Uji game di Motorsport DX (Quick Race Bernese Alps, AI menyetir):
 

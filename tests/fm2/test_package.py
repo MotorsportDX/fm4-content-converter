@@ -53,6 +53,11 @@ class KeyTests(unittest.TestCase):
         self.assertTrue({65533, 65532} <= taken)
 
 
+class ThumbnailTests(unittest.TestCase):
+    def test_thumbnail_path_is_written_as_fm4_does(self):
+        self.assertEqual(package.THUMBNAIL_PATH.format(490), 'game:\\Media\\UI\\Textures\\Thumbnails\\Thumbnail_490.xds')
+
+
 class MakeTests(unittest.TestCase):
     def setUp(self):
         self.fm2 = database('CREATE TABLE List_CarMake (ID INTEGER, ManufacturerCode TEXT)')

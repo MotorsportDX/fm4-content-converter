@@ -14,7 +14,7 @@ masih direncanakan.
 | Sumber | Status | Cakupan saat ini |
 |---|---|---|
 | Forza Motorsport 3 | Prototipe | Konversi database mobil stock, model dan tekstur, metadata UI, serta audit offline |
-| Forza Motorsport 2 | Prototipe | Mobil FM2-only: model, fisika terkalibrasi, dan satu paket overlay (50 dari 55 mobil) |
+| Forza Motorsport 2 | Prototipe | Mobil FM2-only: model, fisika terkalibrasi, dan satu paket overlay (55 dari 55 mobil, termasuk DLC FM2) |
 | Game lain | Direncanakan | Format dan cakupan akan ditentukan untuk setiap adapter sumber |
 
 Jalur fisika FM3 telah dievaluasi pada panel 30 mobil. Impor aset dikembangkan

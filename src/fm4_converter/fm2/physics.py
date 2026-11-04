@@ -117,7 +117,7 @@ def auto_steer(fm4, car):
 
 @lru_cache(maxsize=1)
 def fm2_zips():
-    return sources.zips(sources.FM2_CARS)
+    return sources.fm2_zips('cars')
 
 
 def model_bounds(media):
@@ -703,6 +703,9 @@ ASPIRATION_PARTS = {1: (), 2: (TURBO[0], 'List_UpgradeEngineIntercooler'),
                     3: (TURBO[1], 'List_UpgradeEngineIntercooler'),
                     5: ('List_UpgradeEngineDSC', 'List_UpgradeEngineIntercooler'),
                     6: ('List_UpgradeEngineCSC', 'List_UpgradeEngineIntercooler')}
+# FM2 AspirationTypeId without an FM4 stock layout -> the FM4 one. FM4 stores the real quad-turbo
+# Bugatti Veyron and EB110 SS as twin turbo (3); FM2's only quad turbo is CHR_ME412_05.
+STOCK_ASPIRATION = {4: 3}
 TRIPLETS = {'List_SpringDamperPhysics': ('SpringRate', 'DampenBumpRate', 'DampenReboundRate', 'RideHeight'),
             'List_AntiSwayPhysics': ('SwaybarStiffness',)}
 
@@ -760,6 +763,13 @@ def apply(nodes, source, study, fm4):
     log = {'changed': [], 'kept_donor': [], 'abstained': [], 'unknown_enum': [], 'removed_roles': [],
            'added_roles': [], 'installed': []}
     aspiration = source['nodes']['car']['AspirationTypeId']
+    if aspiration in STOCK_ASPIRATION:
+        mapped = STOCK_ASPIRATION[aspiration]
+        log['aspiration_mapped'] = {'fm2': aspiration, 'fm4': mapped}
+        nodes_in = source['nodes']
+        source = {**source, 'nodes': {**nodes_in, 'car': {**nodes_in['car'], 'AspirationTypeId': mapped},
+                                      'engine': {**nodes_in['engine'], 'AspirationID_Stock': mapped}}}
+        aspiration = mapped
     if aspiration not in ASPIRATION_PARTS:
         raise c.MappingError(f'FM4 has no stock part layout for AspirationTypeId {aspiration}')
     wanted = ASPIRATION_PARTS[aspiration]

@@ -32,7 +32,7 @@ Failed cars are recorded with their reason; the other cars are still packaged. N
                                       [--donor JAG_XK_07=JAG_XKRS_09 ...]
 """
 from contextlib import closing
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import argparse, hashlib, io, json, shutil, sqlite3, traceback, zipfile
 
 from . import carbin, models as fm4_models, physics, sources
@@ -49,6 +49,8 @@ OUT = PROJECT_ROOT / 'outputs/car-fm2-batch-2026-11-04'
 INVENTORY = PROJECT_ROOT / 'outputs/car-fm2-research-2026-11-02/inventory.json'
 STUDY = physics.OUT / 'study.json'
 CARS, WHEELS, THUMBNAILS = Path('Media/Cars'), Path('Media/Wheels'), batch_package.THUMBNAILS
+# Data_Car.Thumbnail as FM4 writes it, e.g. game:\Media\UI\Textures\Thumbnails\Thumbnail_1473.xds.
+THUMBNAIL_PATH = 'game:\\' + str(PureWindowsPath(THUMBNAILS)) + '\\Thumbnail_{}.xds'
 BODY_TEXTURES = ('nodamage', 'damage', 'lights', 'damagelights')
 # FM4 Data_Car.str keys use the upper word 0xCD49 (e.g. _&3444170456).
 STRING_PAGE = 0xCD49
@@ -149,7 +151,7 @@ def assets(car, donor, models, fm2_zip, donor_zip, wheel):
     wheel_root = WHEELS / wheel
     payloads[wheel_root / f'{wheel.lower()}.carbin'] = (models / 'wheel' / f'{wheel.lower()}.carbin').read_bytes()
     origin[(wheel_root / f'{wheel.lower()}.carbin').as_posix()] = 'fm2.models (FM2 wheel)'
-    with zipfile.ZipFile(sources.disc_zip(sources.FM2_WHEELS, wheel)) as z:
+    with zipfile.ZipFile(sources.fm2_zip('wheels', wheel)) as z:
         rims = {i.filename: z.read(i) for i in z.infolist() if not i.is_dir()}
     for name in [n for n in rims if n.lower().endswith('.xds')]:
         data = convert_texture(rims[name], name)
@@ -188,8 +190,10 @@ def clone_stock(work, donor, media, car_id, year, reserved):
         parent = graph['nodes'][edge['to']]
         nodes[edge['from']]['row'][edge['column']] = allocation[parent['table'], parent['row'][parent['pk']]]
     car = nodes['car']['row']
+    # Car Select finds the thumbnail by Id, the pre-race car card by this path (it showed the donor).
     car.update(MediaName=media, Year=year, ModelId=car_id, ContentId=0, IsInstalled=1, IsPurchased=1,
-               IsArcade=1, IsUnicorn=0, IsDrivable=1, HasCarExperience=0, IsCarExperienceUnlocked=0)
+               IsArcade=1, IsUnicorn=0, IsDrivable=1, HasCarExperience=0, IsCarExperienceUnlocked=0,
+               Thumbnail=THUMBNAIL_PATH.format(car_id))
     rows = [{'table': n['table'], 'row': n['row']} for n in nodes.values()]
     donor_id = graph['nodes']['car']['row']['Id']
     for table, column in PRESENTATION.items():
@@ -390,12 +394,16 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
     reports.mkdir()
     database = files / 'Media/DB/gamedb.slt'
     shutil.copyfile(target, database)
-    fm2_zips = sources.zips(sources.FM2_CARS)
-    fm2_media = sources.FM2_MEDIA
-    inputs = {str(p): c.sha(p) for p in (target, sources.FM2_DB, study, fm2_media / 'StringTables/EN.zip',
-                                          fm2_media / 'UI/Textures.zip', target_root / 'audio/Cars/CarModelTuning.zip')}
-    with zipfile.ZipFile(fm2_media / 'StringTables/EN.zip') as z:
-        fm2_text = ui_names.StringTable(z.read('Data_Car.str')).texts
+    # The FM2 disc, and the FM2 DLC (`fm2.dlc`) when built: its Data_Car.str adds the DLC names.
+    fm2_zips, fm2_database = sources.fm2_zips('cars'), sources.fm2_db()
+    media = [m for m in (sources.FM2_DLC, sources.FM2_MEDIA) if (m / 'UI/Textures.zip').exists()]
+    inputs = {str(p): c.sha(p) for p in (target, fm2_database, study, *(m / 'StringTables/EN.zip' for m in media),
+                                          *(m / 'UI/Textures.zip' for m in media),
+                                          target_root / 'audio/Cars/CarModelTuning.zip')}
+    fm2_text = {}
+    for m in reversed(media):
+        with zipfile.ZipFile(m / 'StringTables/EN.zip') as z:
+            fm2_text.update(ui_names.StringTable(z.read('Data_Car.str')).texts)
     with zipfile.ZipFile(target_root / 'audio/Cars/CarModelTuning.zip') as z:
         tuning = {i.filename.casefold(): archive_read(z, i) for i in z.infolist()}
     with zipfile.ZipFile(target_root / 'UI/Textures.zip') as z:
@@ -405,7 +413,7 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
 
     payloads, origins, keys, thumbs, audio, shipped_wheels = {}, {}, {}, {}, {}, {}
     packaged, failed = [], []
-    with closing(c.connect(sources.FM2_DB)) as fm2_db, closing(sqlite3.connect(database)) as work:
+    with closing(c.connect(fm2_database)) as fm2_db, closing(sqlite3.connect(database)) as work:
         work.row_factory = sqlite3.Row
         pool = donor_pool(work)
         tables, _ = ui_names.winning_tables(target_root, content_root, archive_read, c.sha)
@@ -494,8 +502,14 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
                                                     target_root, car, wheel, archive_read)
                 for model in ('', '_lod0', '_cockpit'):
                     carbin_audit.parse(car_payloads[CARS / car / f'{car.lower()}{model}.carbin'], 'FM4')
-                with zipfile.ZipFile(fm2_media / 'UI/Textures.zip') as z:
-                    thumb, thumb_report = thumbnail(z.read(f'Thumbnails/Thumbnail_{car_id}.xds'), controls[0])
+                name = f'Thumbnails/Thumbnail_{car_id}.xds'
+                for m in media:
+                    with zipfile.ZipFile(m / 'UI/Textures.zip') as z:
+                        if name in z.namelist():
+                            thumb, thumb_report = thumbnail(z.read(name), controls[0])
+                            break
+                else:
+                    raise c.MappingError(f'No FM2 {name}')
 
                 if (car + '_CMT.xml').casefold() in tuning:
                     log['audio'] = 'native_fm4'

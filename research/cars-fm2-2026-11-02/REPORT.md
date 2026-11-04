@@ -87,6 +87,10 @@ Dekode model (bagian 5) memakai [`fm2/carbin.py`](../../src/fm4_converter/fm2/ca
   berada dalam 25 cm (depan–belakang) dan 7 cm (tinggi) dari setir donor, dan mobil jalan raya tidak
   lagi mendapat donor balap. Empat dari lima kokpit yang salah kini benar, Viper sebagian besar
   benar, dan sudut pandang rendah Tommy Kaira R34 hilang. Supra AB Flug masih terlalu dekat.
+- **Semua 55 mobil FM2-only kini dipaketkan** (bagian 17). Empat mobil DLC FM2 dibaca dari paket
+  STFS Bonus Disc, quad turbo ME Four-Twelve menjadi twin turbo seperti Veyron di FM4, dan kartu
+  "CAR" kini menampilkan thumbnail mobil sendiri. 45 mobil yang ID-nya ada di FM4 dengan nama lain
+  terbukti mobil yang sama, jadi daftar 55 mobil final.
 
 ## 1. Rute sumber per mobil
 
@@ -196,24 +200,20 @@ loader FM4 untuk file yang tidak ada (bagian 6), model utama, `_lod0`, serta `_c
 (bagian 7), uji game `JAG_XK_07` (bagian 8), kokpit, spion, dan velg FM2 (bagian 9),
 kalibrasi fisika (bagian 10), `CMHeight` dan part aspirasi tanpa donor (bagian 11), uji
 kendali pada mobil FM4 native (bagian 12), PI (bagian 13), paket 50 mobil (bagian 14),
-serta pemindahan kode ke package dengan opsi donor manual (bagian 15).
+pemindahan kode ke package dengan opsi donor manual (bagian 15), donor menurut posisi setir
+(bagian 16), serta 55 dari 55 mobil termasuk DLC FM2 dan daftar final (bagian 17).
 
 1. **Sisa posisi kamera kokpit.** Donor sudah dipilih menurut posisi setir (bagian 16). Sisanya:
    Supra AB Flug masih terlalu dekat, selisih sumbu x belum masuk aturan (Viper), dan 20 mobil
    yang donornya berubah belum dilihat di game. Posisi kamera di data FM4 belum ditemukan.
-2. **Foto donor di kartu "CAR" sebelum balapan.** Sumber gambarnya belum diketahui (bagian 15.3).
-3. **Kelas PI.** Kecocokan kelas validation baru 25/37, dan dua dari tiga mobil bagian 12
+2. **Kelas PI.** Kecocokan kelas validation baru 25/37, dan dua dari tiga mobil bagian 12
    masih satu kelas terlalu rendah (bagian 13).
-4. **Verifikasi 45 mobil `fm4_same_id_renamed`** dan kandidat `near_matches`
-   sebelum menetapkan daftar final FM2-only.
-5. **Lima mobil yang belum masuk paket:** buka paket STFS Bonus Disc untuk aset empat
-   mobil DLC FM2, dan tangani quad turbo `CHR_ME412_05` (bagian 11.2).
-6. **Section dan bagian yang tidak ada di FM2**: section `wheel`, `undercarriagea` dan
+3. **Section dan bagian yang tidak ada di FM2**: section `wheel`, `undercarriagea` dan
    `exhaust*` tambahan FM3 (bagian 5.3), kaliper/rotor sendiri, gauge cluster, jarum, dan
    `a_pillar` (bagian 9.4); kini donor atau tidak ada.
-7. **Cakupan uji game:** suara dari
+4. **Cakupan uji game:** suara dari
    override CMT, serta mobil yang belum dibalap.
-8. Sisa format: 12 nilai S16 terakhir vertex FM2, header 0x100 byte, record 140 byte,
+5. Sisa format: 12 nilai S16 terakhir vertex FM2, header 0x100 byte, record 140 byte,
    dan arti pembagian dua buffer vertex (bagian 5.4 dan 7.3).
 
 ## 5. Dekode `.carbin` FM2
@@ -1567,6 +1567,86 @@ Semua run tanpa crash.
 
 **Batas.** Delapan mobil diuji, satu run per mobil. 20 mobil lain yang donornya berubah belum dilihat
 di game. Jendela berasal dari 19 mobil di bagian 15.3, bukan dari posisi kamera donor.
+
+## 17. Semua 55 mobil FM2-only
+
+Lanjutan 5 November 2026. `package-v5` berisi **55 dari 55** mobil FM2-only, tanpa mobil gagal.
+
+### 17.1 Foto donor di kartu "CAR"
+
+`clone_stock` menyalin `Data_Car.Thumbnail` milik donor, misalnya Camaro SS menunjuk
+`Thumbnail_1170.xds` (Corvette Grand Sport). Car Select mencari thumbnail lewat Id mobil, tetapi
+kartu "CAR" sebelum balapan membaca kolom ini (bagian 15.3). Kolom kini diisi
+`game:\Media\UI\Textures\Thumbnails\Thumbnail_<Id FM2>.xds`, dengan format byte yang sama
+seperti FM4. Jalur FM3 tidak terkena, karena 81 mobil `fm3-content-v5` sudah menunjuk ke
+thumbnail sendiri. Di database paket, kolom teks lain yang masih menyebut donor hanya
+`Data_Engine.MediaName`, dan itu memang suara mesin donor (bagian 14.1).
+
+### 17.2 Quad turbo `CHR_ME412_05`
+
+FM4 tidak punya susunan part stock untuk quad turbo (`AspirationTypeId` 4). Bugatti Veyron dan EB110
+SS, yang di dunia nyata quad turbo, disimpan FM4 sebagai twin turbo (3). ME Four-Twelve adalah
+satu-satunya quad turbo FM2. `physics.STOCK_ASPIRATION` memetakan 4 → 3 sebelum `apply`, lalu
+turbo FM2 dipasang di tabel twin dengan skala twin (bagian 11.2), beserta intercooler. Hasilnya
+kelas R3, PI 0,700 (`pi_hinge`), donor `MER_190E_90`. Pemetaan ini dicatat di
+`physics.json` sebagai `aspiration_mapped`.
+
+### 17.3 Mobil DLC FM2 dari Bonus Disc
+
+Bonus Disc FM2 menyimpan semua DLC sebagai paket STFS. Setiap paket mobil berisi
+`DLC<n>_pri_<p>.zip` (mobil, velg, thumbnail, patch database) dan `DLC<n>Overrides1_pri_<p>.zip`
+(`Data_Car.str` kumulatif). [`fm2/dlc.py`](../../src/fm4_converter/fm2/dlc.py) menulis semuanya ke
+`outputs/car-fm2-dlc/Media` dengan susunan folder disc FM2. `sources.fm2_db()` dan `fm2_zips()`
+lalu membaca folder itu bersama disc.
+
+- **Patch database** diterapkan dalam urutan nomor, seperti game: 6 `<n>_merge.slt` dan 7
+  `<n>_execute.sql`. `39999_execute.sql` menghapus SplitPoints yang kemudian diganti
+  `40000_merge.slt`.
+- Tabel FM2 tidak punya primary key, dan setiap paket mengulang baris bersama (misalnya
+  `AeroPhysicsID` 1). Karena itu `merge` hanya menambah baris yang belum ada persis sama.
+  Percobaan pertama dengan `INSERT OR REPLACE` menggandakan baris aero, dan `extract` menolaknya
+  ("expected exactly one row, got 5").
+- Setelah merge, kolom pertama yang unik di disc diperiksa (`key_conflicts`), dan tidak ada
+  konflik.
+- 39 mobil DLC, 13 patch, thumbnail, dan tabel string English dari override berprioritas tertinggi.
+- Studi fisika tetap memakai database disc. `study.json` dibangun ulang dan hasilnya identik.
+
+| Mobil | Donor | Kelas | PI | dz / dy |
+|---|---|---|---:|---|
+| 350Z Grand Touring Coupe | `NIS_370Z_10` | B | 0,365 | −0,08 / −0,04 |
+| Altima 3.5 SE | `NIS_Versa_09` | C | 0,298 | −0,13 / +0,03 |
+| Challenger Concept | `DOD_ChallengerSRT8_09` | B | 0,405 | −0,06 / −0,06 |
+| MC12 Corsa | `FER_F50_95` | R2 | 0,753 | −0,10 / −0,06 |
+
+Dengan string override DLC, nama satu mobil disc ikut berubah: "Mine's CP9A Lancer EVO VI" menjadi
+"MINE'S CP9A Lancer Evolution VI", sama seperti di FM2 dengan DLC terpasang.
+
+### 17.4 Daftar final FM2-only
+
+- **45 mobil `fm4_same_id_renamed`** (bagian 1) dibandingkan dengan padanannya: tahun, mesin,
+  penggerak, wheelbase, track, serta dimensi model dari `.carbin` FM2 dan FM4 (disc, Disc 2, dan DLC
+  terpasang).
+  - Untuk semua pasangan yang modelnya terbaca, lebar dan panjang sama sampai sentimeter.
+  - Selisih tinggi hanya berasal dari section `wheel` dan `undercarriagea` yang tidak ada di FM2.
+  - 355 GTS dan 355 Berlinetta punya section yang sama. 207 RC Cup hanya menambah part balap
+    (cage, varian bumper) pada bodi 207 Super2000.
+  - Perbedaan `CarTypeID` 1/2 hanyalah kategori antar-game.
+  - Kesimpulannya, semuanya mobil yang sama di FM4 dan tidak perlu dikonversi.
+- **`near_matches`** (315 entri) hanya berarti merek sama dan tahun ±1. Pasangan yang benar-benar
+  mirip adalah varian yang berbeda: FocusSport lawan Focus SVT, Evo VIII GSR lawan MR, Evo IX GT
+  lawan MR, 432R lawan 432Z, Tuscan R lawan S, serta mobil tuner lawan versi standarnya. FM2 tidak
+  memuat padanan FM4-nya.
+- Daftar final: **55 mobil**, semuanya di `package-v5`.
+
+### 17.5 `package-v5`
+
+| | |
+|---|---:|
+| Mobil | 55 (gagal 0) |
+| Kelas | C 6, B 22, A 8, S 10, R3 6, R2 1, R1 2 |
+| Isi | 103 file, 705 MB |
+| Dependensi | Disc 2 FM4 (`0001`, `0002`) dan paket DLC Porsche |
+| 50 mobil v4 | arsip mobil identik byte demi byte; `Data_Car` hanya berubah di `Thumbnail` |
 
 ## Batas riset
 

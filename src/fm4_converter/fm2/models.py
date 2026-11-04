@@ -219,11 +219,11 @@ def audit_wheel_lod0(before, after):
 
 def build_wheel(car, out, helper=HELPER):
     """The FM2 stock wheel of `car` as an FM4 wheel in out/wheel/<wheel>.carbin; the wheel report."""
-    with sqlite3.connect(f'file:{sources.FM2_DB}?mode=ro', uri=True) as db:
+    with sqlite3.connect(f'file:{sources.fm2_db()}?mode=ro', uri=True) as db:
         wheel, = db.execute('SELECT w.MediaName FROM Data_Car c JOIN List_Wheels w ON w.ID = c.StockWheelID '
                             'WHERE lower(c.MediaName) = ?', (car,)).fetchone()
     name = wheel.lower()
-    with zipfile.ZipFile(sources.disc_zip(sources.FM2_WHEELS, name)) as z:
+    with zipfile.ZipFile(sources.fm2_zip('wheels', name)) as z:
         fm2 = z.read(next(i.filename for i in z.infolist() if i.filename.lower() == name + '.carbin'))
     folder = out / 'wheel'
     folder.mkdir()
@@ -243,7 +243,7 @@ def build(car_media, donor_media, out, helper=HELPER):
     into the new folder `out`; returns the report, also saved as out/report.json."""
     car, donor, out = car_media.lower(), donor_media.lower(), Path(out)
     out.mkdir(parents=True, exist_ok=False)
-    with zipfile.ZipFile(sources.disc_zip(sources.FM2_CARS, car)) as z:
+    with zipfile.ZipFile(sources.fm2_zip('cars', car)) as z:
         fm2 = z.read(next(i.filename for i in z.infolist() if i.filename.lower() == car + '.carbin'))
     with zipfile.ZipFile(sources.disc_zip(sources.FM4_CARS, donor)) as z:
         heads = {k: forza_zip.read(z, f'{donor}_{k}.carbin') for k in ('lod0', 'cockpit')}

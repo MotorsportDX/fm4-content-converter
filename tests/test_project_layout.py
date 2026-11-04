@@ -14,7 +14,7 @@ class ProjectLayoutTests(unittest.TestCase):
     def test_cli_modules_run_outside_repository(self):
         with tempfile.TemporaryDirectory() as directory:
             for module in ("fm3.converter", "fm3.offline_package", "fm3.build_carbin_cpu", "fm2.transcode",
-                           "fm2.models", "fm2.physics", "fm2.package"):
+                           "fm2.models", "fm2.physics", "fm2.package", "fm2.dlc"):
                 with self.subTest(module=module):
                     process = subprocess.run(
                         [sys.executable, "-m", "fm4_converter." + module, "--help"],
