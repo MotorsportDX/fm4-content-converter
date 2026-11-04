@@ -54,6 +54,10 @@ Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
   material spion FM4 dengan UV 0–1, dan pantulannya hidup. Velg FM2 dikonversi dengan LOD0 dari
   LOD1; 407/407 velg FM2 lolos audit. Kecerahan interior sesuai kalibrasi 74 mobil FM2∩FM4, dan
   plafon hitam memang berasal dari atlas FM2.
+- **Fisika FM2 dikalibrasi ke FM4** (bagian 10). Pada 184 pasangan FM2∩FM4, nilai FM2 (dengan 46
+  aturan skala dan konvensi FM4) lebih dekat ke FM4 asli daripada donor pada 34 dari 46 grup
+  fisika, termasuk kurva torsi, massa, transmisi, dan pegas. `JAG_XK_07` dengan fisika FM2
+  (kelas B, mesin NA, 1.595 kg) balapan sampai finis tanpa crash.
 
 ## 1. Rute sumber per mobil
 
@@ -160,11 +164,11 @@ kalibrasi tetap per sumber, sesuai [arsitektur](../../docs/architecture.md).
 
 Urutan berdasarkan risiko. Sudah dikerjakan: dekode `.carbin` FM2 (bagian 5), perilaku
 loader FM4 untuk file yang tidak ada (bagian 6), prototipe model utama, `_lod0`, serta
-`_cockpit` (bagian 7), uji game `JAG_XK_07` (bagian 8), serta kokpit, spion, dan velg FM2
-(bagian 9).
+`_cockpit` (bagian 7), uji game `JAG_XK_07` (bagian 8), kokpit, spion, dan velg FM2
+(bagian 9), serta kalibrasi fisika FM2 → FM4 (bagian 10).
 
-1. **Kalibrasi fisika FM2 → FM4** dengan pasangan FM2∩FM4, mengikuti metode
-   benchmark 30 mobil FM3.
+1. **Sisa fisika:** `CMHeight` dari bounding box model, pemasangan turbo/supercharger FM2 tanpa
+   part donor yang sama, serta uji kendali dengan mobil lain.
 2. **Verifikasi 45 mobil `fm4_same_id_renamed`** dan kandidat `near_matches`
    sebelum menetapkan daftar final FM2-only.
 3. **Section dan bagian yang tidak ada di FM2**: section `wheel`, `undercarriagea` dan
@@ -694,6 +698,179 @@ garasi Car Select, velg 10 palang XK '07 FM2 dirender di LOD0 bersama ban dan ka
 - Kaliper, rotor, dan massa velg masih milik donor. Section `undercarriagea` dan `exhaust*`
   tambahan FM3 (bagian 5.3) belum ditangani.
 
+## 10. Kalibrasi fisika FM2 → FM4
+
+Lanjutan 3 November 2026. [`physics_fm2.py`](physics_fm2.py) membaca konfigurasi stock FM2,
+membandingkannya dengan mobil yang sama di FM4, dan menulis hasilnya ke paket uji lewat
+`package_fm2_test.py --physics`. Hasil di `outputs/car-fm2-research-2026-11-02/physics/study.json`:
+
+```powershell
+.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/physics_fm2.py
+```
+
+### 10.1 Extractor dan pasangan
+
+`extract` mengikuti `IsStock=1` lewat `Ordinal` dan `EngineID`, lalu menyusun hasilnya dalam
+role, tabel, dan nama kolom FM4 seperti `converter.extract_stock`. Hampir semua tabel part FM2
+punya padanan FM4 dengan kolom bernama sama; perbedaannya:
+
+- `List_UpgradeWeight` → `List_UpgradeCarBodyWeight`, `List_UpgradeEngineCamValves` →
+  `List_UpgradeEngineCamshaft`, `List_UpgradeEngineBlock` → `List_UpgradeEngineDisplacement`,
+  transmisi/kopling/diferensial/driveline → `List_UpgradeDrivetrain*`, `List_UpgradeEngineTurbo`
+  → turbo single atau twin.
+- Satu baris FM2 dipecah per gandar: anti-roll, lebar ban, dan ukuran rim.
+- Geometri model (`Model*`, `BottomCenterWheelbasePos*`) pindah dari `Data_Car` ke
+  `Data_CarBody`. Drive type pindah dari `Data_Engine` ke `Data_Drivetrain`. Ukuran ban stock
+  pindah ke kolom `Data_Car` bernama baru.
+- Skala kurva zero-throttle masuk ke `ZeroThrottleTorqueScale`, seperti jalur FM3.
+
+Kolom FM4 tanpa sumber FM2 tetap milik donor. Contohnya: grip chassis, part oil
+cooling/piston/valves (semuanya 1,0 di donor), `MaxStretchDeltaFromRideHeight`, `CVTShiftTime`,
+dan bounding box bodi. `AutoSteerOverrideID` juga tetap donor, karena ambang STM FM2 (1,5/2,5 pada
+310 mobil) tidak ada di `AutoSteerOverrides` FM4 (hanya 1,5/3,0).
+
+**Pasangan.** Id, `MediaName`, tahun, dan merek harus sama di FM2 dan disc FM4. Hasilnya 184
+pasangan: 147 training dan 37 validation, dibagi per mesin FM2 seperti jalur FM3. Sebanyak 18
+Id dikeluarkan karena nama atau tahunnya berbeda.
+
+### 10.2 Aturan skala (metode `value_scales`)
+
+`value_scales.study` kini menerima observasi dari sumber lain (`rows`, `salt`); jalur FM3 tidak
+berubah. Dari 453 kolom yang dibandingkan:
+
+- **278 tidak sistematis:** identity sudah cocok pada ≥ 80% training.
+- **46 aturan diterima**, terutama konvensi FM4 yang seragam di hampir semua mobil:
+  - rate kemudi 105;
+  - TCS 33 dan 0,5;
+  - lima parameter ABS;
+  - bumpstop 200 dan 2, clamp damper 10;
+  - `TireAeroHack*`.
+
+  Ada juga skala linear: `SteerMaxAngle`, `CMHeight`, `GameFrictionScaleBraking`, rate damper
+  maksimum, dan PI serta rating.
+- **86 ditolak validation**, dan 43 lainnya tidak punya kandidat sah atau barisnya kurang.
+
+Rate pegas, damper, dan anti-roll, tinggi suspensi, massa, rasio gigi, serta kurva torsi tidak
+punya skala global. FM4 menyetel ulang nilai ini per mobil:
+
+- `DefSpringRate` FM2 tidak sama dengan FM4 pada satu pasangan pun (median rasio 0,87; p10–p90
+  0,59–1,50), dan juga tidak sama dengan FM3 (0 dari 368 gandar).
+- Kurva torsi: 157 pasangan punya jumlah sampel dan RPM maksimum yang sama, tetapi hanya 4 yang
+  sampelnya identik.
+
+Ada pula konvensi yang tergantung jenis penggerak. Di FM4, LSD tengah bernilai 0 pada 335 dari
+335 mobil RWD, sedangkan di FM2 96% mobil RWD menyimpan nilai. `drive_conventions` mencatat
+kolom diferensial yang bernilai tunggal pada ≥ 99% mobil FM4 sejenis penggerak.
+
+### 10.3 FM2 atau donor
+
+Untuk mobil FM2-only, pilihannya bukan identity melawan aturan, melainkan nilai FM2 melawan
+donor. Maka setiap pasangan juga diberi donor, dengan aturan yang sama seperti paket uji: mobil
+FM4 drivable lain dengan merek dan penggerak yang sama, serta massa dan tenaga terdekat. Contoh
+donor yang sering terpilih: `SUB_LegacyB4GT_10` dan `CHE_CamaroZ28_79`.
+
+Kolom yang bekerja bersama diputuskan sebagai satu grup:
+
+- pegas kedua gandar beserta tinggi stock;
+- anti-roll kedua gandar;
+- transmisi beserta `NumGears`;
+- kurva torsi beserta camshaft, displacement, dan `GameTorqueScale`;
+- massa beserta CM dan `CurbWeight`;
+- ban dan rim;
+- geometri bodi, aero bodi beserta `GameDragScale`, dan part aero;
+- LSD, dan skala boost.
+
+Kolom lain diputuskan sendiri-sendiri.
+
+**Skor.** Skor grup adalah rata-rata, per kolom, dari galat FM2 / (galat FM2 + galat donor).
+Galat kolom kontinu adalah MAE dibagi rata-rata |FM4|; galat kategori adalah 1 − kecocokan.
+Kurva torsi dibandingkan sebagai torsi efektif (sampel × `TorqueScale` × `GameTorqueScale`) pada
+grid RPM FM4, dibagi torsi puncak. FM2 dipakai hanya bila skornya ≤ 0,5 pada training **dan**
+validation.
+
+| Grup | Skor FM2 training / validation | Sumber |
+|---|---|---|
+| Kurva torsi dan mesin (12 kolom) | 0,21 / 0,17 | FM2 |
+| Massa dan CM (10) | 0,22 / 0,18 | FM2 |
+| Transmisi (14) | 0,18 / 0,22 | FM2 |
+| Pegas dan damper (39) | 0,28 / 0,27 | FM2 |
+| Ban dan rim (12) | 0,11 / 0,20 | FM2 |
+| Geometri bodi (8) | 0,16 / 0,13 | FM2 |
+| LSD (7) | 0,44 / 0,36 | FM2 |
+| Anti-roll (6), aero bodi (7) | 0,47 / 0,46 | FM2 |
+| Part aero depan/belakang (10) | 0,51 / 0,50 | donor |
+| Turbo (9), supercharger DSC (7) | 0,52 / 0,64; 0,43 / 1,00 | donor |
+
+Galat kurva torsi efektif rata-rata 0,14 (FM2) melawan 0,38 (donor) pada training, dan 0,17
+melawan 0,46 pada validation. FM2 lebih dekat pada 116 dari 147 dan 31 dari 37 pasangan. Dari 46
+grup fisika, 34 memakai FM2. Sisanya donor, antara lain:
+
+- inersia mesin, flywheel, dan driveline;
+- waktu kopling;
+- massa mesin dan velg;
+- satu titik ABS.
+
+### 10.4 `JAG_XK_07` dengan fisika FM2
+
+`physics_fm2.apply` menimpa graf stock donor yang sudah dikloning:
+
+- Grup FM2 memakai nilai FM2, atau aturan yang diterima bila ada.
+- Triplet stock yang di FM2 tidak bisa disetel (Min = Def = Max) tetap begitu, seperti 384 dari
+  503 suspensi stock FM4.
+- Sampel torsi tak aktif diisi 0, dan slot gigi tak terpakai diisi −1, keduanya konvensi FM4.
+- Kelas dihitung ulang dari PI dengan `performance_index.apply`.
+- Part aspirasi donor yang tidak dimiliki mobil FM2 dibuang. Untuk XK07, DSC dan intercooler
+  XKR-S dibuang; DSC itu memberi skala boost 1,442.
+- Enum yang tidak dikenal FM4 ditolak, begitu pula triplet yang tidak berurutan.
+
+`package-v6` mengubah 126 nilai; contohnya:
+
+| Nilai | Donor XKR-S | FM2 → FM4 |
+|---|---:|---:|
+| Massa | 1.760 kg | 1.595 kg |
+| PI mentah / kelas | 0,4439 / A | 0,3869 / B |
+| Aspirasi | DSC 0,884 bar | NA |
+| Kurva torsi | 81 sampel, maks 8.000 rpm | 86 sampel, maks 8.500 rpm |
+| Redline | 6.500 rpm | 7.000 rpm |
+| Final drive / waktu ganti gigi | 3,31 / 0,20 s | 3,46 / 0,146 s |
+| Pegas depan / belakang | 51,0 / 45,2 | 49,0 / 43,4 |
+| Tinggi stock depan | 0,137 m | 0,162 m |
+| Rem depan | 15 in, 6 piston | 13 in, 4 piston |
+| Rim depan / belakang | 20 / 20 in | 21 / 21 in |
+
+### 10.5 Uji game
+
+Semua run memakai Quick Race Bernese Alps sampai finis dengan AI mengemudikan mobil pemain,
+`FM4_FIXED_SEED=1` dan `FM4_FIXED_FRAME_TIME=1`. Durasi diukur dari event layar.
+
+| Run | Fisika | Kelas | Durasi balapan | Posisi |
+|---|---|---|---:|---|
+| `fm2-xk07-v4-fin` | donor | A | 258,7 s | 1st |
+| `fm2-xk07-v5-fin` | FM2 (`package-v5`) | B | 262,4 s | 1st |
+| `fm2-xk07-v5-fin2` | FM2 (`package-v5`) | B | 262,4 s | 1st |
+| `fm2-xk07-v6-fin` | FM2 (`package-v6`) | B | 262,1 s | 1st |
+
+- Tidak ada crash, dan kunci error runtime sama dengan run sebelumnya.
+- Dua run v5 hanya berselisih 0,02 s, jadi hasilnya dapat diulang.
+- Mobil dengan fisika FM2 3,7 s lebih lambat daripada versi donor, sesuai mesin NA ±300 hp
+  melawan XKR-S supercharged.
+- Kelas yang berbeda bisa mengubah lawan AI di grid, jadi angka ini bukan ukuran kemiripan
+  handling.
+- `package-v5` dibuat sebelum konvensi penggerak dan keputusan per kolom. Selisihnya dengan v6
+  adalah LSD tengah RWD (v5: 464, v6: 0), titik ABS belakang, waktu kopling, serta inersia mesin,
+  flywheel, dan driveline.
+
+### 10.6 Batas
+
+- Studi membandingkan nilai database, bukan handling. Skor ≤ 0,5 berarti nilai FM2 lebih dekat
+  ke angka FM4 asli daripada donor, bukan bahwa mobil terasa seperti di FM4.
+- Validation 37 pasangan dipakai untuk memilih sumber per grup; tidak ada test set ketiga. Donor
+  pada studi dipilih otomatis, sedangkan donor paket dipilih manual.
+- `CMHeight` memakai aturan linear (MAE 0,069). Jalur FM3 punya estimasi dari ride height dan
+  bounding box (`code_semantics`); padanannya untuk FM2 belum dikerjakan.
+- Turbo dan supercharger FM2 belum bisa dipasang bila donor tidak punya part yang sama
+  (`apply` menolak). Massa velg, aero part, dan grip chassis tetap milik donor.
+
 ## Batas riset
 
 Katalog FM3/FM4/DLC berasal dari evidence riset 20 Oktober yang dibangun dari
@@ -702,4 +879,5 @@ membuktikan geometri, fisika, atau livery yang identik. Decoder `.carbin` FM2 ha
 diverifikasi terhadap FM3 untuk LOD1; LOD2–5 dibaca dengan aturan yang sama tetapi
 tidak dibandingkan. Penulis model FM4 (bagian 7) baru prototipe, diaudit secara statis
 untuk satu mobil lengkap dan model utama semua mobil FM2. Uji game baru dilakukan untuk
-satu mobil dalam satu Quick Race (bagian 8).
+satu mobil di satu lintasan (bagian 8–10). Kalibrasi fisika (bagian 10) dinilai pada nilai
+database pasangan FM2∩FM4, bukan pada perilaku berkendara.

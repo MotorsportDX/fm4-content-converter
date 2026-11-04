@@ -9,9 +9,10 @@ Isi paket (bentuknya sama dengan paket FM3 `batch_package.py`, satu mobil saja):
 - `Media/Wheels/<velg>.zip`: velg stock FM2 dari prototype_fm4_model.py (LOD 0-5) dan tekstur
   velg FM2; `wheel_lod0.xds` = `wheel.xds`, karena LOD 0 velg memakai UV LOD 1.
 - Database: graf stock mobil donor FM4 disalin dengan kunci baru, `Data_Car.Id` = Id FM2,
-  `MediaName`/`Year` FM2, `List_Wheels.MediaName` = velg FM2. Fisika, kelas, PI, sisa baris velg,
-  posisi part dan kamera milik donor;
-  kalibrasi fisika FM2 belum dikerjakan (REPORT bagian 4).
+  `MediaName`/`Year` FM2, `List_Wheels.MediaName` = velg FM2. Sisa baris velg, posisi part dan
+  kamera milik donor. Tanpa `--physics` fisika, kelas dan PI juga milik donor; dengan
+  `--physics <study.json>` (keluaran physics_fm2.py) grup fisika yang lolos studi FM2 -> FM4
+  memakai nilai FM2, PI FM2 dipetakan ke skala FM4, dan kelas mengikuti PI (REPORT bagian 10).
 - Nama FM2 bahasa Inggris + " (FM2)" di `stringtables.zip` berprioritas tertinggi.
 - Thumbnail FM2 (DXT5 256x128, sudah punya alpha) dalam atlas UI FM4 768x288.
 
@@ -28,6 +29,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import physics_fm2
 import survey_carbin as sv
 from fm4_converter.fm3 import appearance_audit, batch_package, carbin_audit, integration, ui_names, ui_thumbnail
 from fm4_converter.fm3 import converter as c
@@ -197,7 +199,7 @@ def string_archive(target_root, content_root, keys):
     return stream.getvalue(), priority, dict(inputs=inputs, languages=reports, priority=priority)
 
 
-def build(car, donor, out, target=c.FM4_DEFAULT, content_root=CONTENT, models=None):
+def build(car, donor, out, target=c.FM4_DEFAULT, content_root=CONTENT, models=None, physics=None):
     target, out = Path(target).resolve(), Path(out).resolve()
     target_root, disc = target.parents[1], target.parents[2]
     if out.exists():
@@ -245,6 +247,15 @@ def build(car, donor, out, target=c.FM4_DEFAULT, content_root=CONTENT, models=No
         if batch_package.native_wheel(target_root, dlc_wheels, fm2_wheel) is not None or                 (disc / WHEELS / (fm2_wheel + '.zip')).exists():
             raise c.MappingError('FM4 already ships a wheel folder with the FM2 wheel name')
         nodes['wheel']['row']['MediaName'] = fm2_wheel
+        physics_log = None
+        if physics is not None:
+            inputs[str(physics)] = c.sha(physics)
+            with closing(c.connect(FM2_MEDIA / 'DB/gamedb.slt')) as fm2_ro:
+                source = physics_fm2.extract(fm2_ro, car_id, work)
+            physics_log = physics_fm2.apply(nodes, source, json.loads(Path(physics).read_text(encoding='utf-8')),
+                                            work)
+            removed = {id(nodes.pop(role)['row']) for role in physics_log['removed_roles']}
+            rows = [r for r in rows if id(r['row']) not in removed]
         tables, _ = ui_names.winning_tables(target_root, content_root, archive_read, c.sha)
         taken = {k for _, _, _, data in tables.values() for k in ui_names.StringTable(data).texts}
         keys = names(car_id, label, taken)
@@ -300,6 +311,8 @@ def build(car, donor, out, target=c.FM4_DEFAULT, content_root=CONTENT, models=No
                                            allocation={r: [n['table'], n['row'][n['pk']]] for r, n in nodes.items()},
                                            presentation_rows=[r for r in rows if r['table'] in PRESENTATION],
                                            names=keys, car=car_row))
+    if physics_log is not None:
+        c.dump(reports / 'physics.json', physics_log)
     c.dump(reports / 'assets.json', dict(origin=origin, sha256={k.as_posix(): sha(v) for k, v in payloads.items()},
                                          fm2_files_not_shipped=skipped, cockpit_paint_scales=paint))
     c.dump(reports / 'appearance_validation.json', appearance)
@@ -312,7 +325,11 @@ def build(car, donor, out, target=c.FM4_DEFAULT, content_root=CONTENT, models=No
                       requires=[])],
         'packaged': 1, 'failed': 0, 'requires': [], 'inputs': inputs, 'sources_unchanged': True,
         'overlays_checked': len(overlays), 'content_root': str(content_root),
-        'donor_values': ['physics', 'class', 'performance_index', 'List_Wheels row except MediaName', 'CarPartPositions',
+        'physics': None if physics is None else dict(study=str(physics), changed=len(physics_log['changed']),
+                                                      removed_roles=physics_log['removed_roles']),
+        'donor_values': (['physics', 'class', 'performance_index'] if physics is None else
+                         ['physics groups not chosen by the FM2 study']) +
+                        ['List_Wheels row except MediaName', 'CarPartPositions',
                          'CameraOverrides', 'CarExceptions', 'Combo_Colors', 'calipers', 'rotors',
                          '_lod0/_cockpit headers'],
         'merged_database_sha256': c.sha(database), 'zip_manifest_sha256': c.sha(files / 'Media/zipmanifest.xml'),
@@ -332,8 +349,9 @@ def main():
     p.add_argument('--fm4', type=Path, default=c.FM4_DEFAULT)
     p.add_argument('--content-root', type=Path, default=CONTENT)
     p.add_argument('--models', type=Path, help='keluaran prototype_fm4_model.py (default outputs/car-fm2-prototype-2026-11-03/<car>)')
+    p.add_argument('--physics', type=Path, help='study.json physics_fm2.py; tanpa ini fisika milik donor')
     a = p.parse_args()
-    manifest, appearance = build(a.car, a.donor, a.out, a.fm4, a.content_root, a.models)
+    manifest, appearance = build(a.car, a.donor, a.out, a.fm4, a.content_root, a.models, a.physics)
     print(json.dumps(dict(car=manifest['cars'][0], techniques=appearance['techniques'],
                           unknown_techniques=appearance['techniques_without_effect_native_precedent'],
                           absent_textures=appearance['absent_textures_with_native_precedent'],

@@ -204,16 +204,18 @@ def score(rule, xs, ys, continuous):
     out = {"n":len(ys),"match":matches,"match_rate":matches/len(ys) if ys else 0.0}
     if continuous:
         errors = [abs(p-y) for p,y in zip(pred,ys)]
-        out["mae"] = sum(errors)/len(errors)
+        out["mae"] = sum(errors)/len(errors) if errors else 0.0
     return out
 
 
-def study(source_db, target_db, rules=None):
-    rows = observations(source_db,target_db,rules)
+def study(source_db, target_db, rules=None, rows=None, salt="fm3-fm4-values-cv-v1"):
+    """`rows` lets another source (FM2) supply its own same-car observations."""
+    if rows is None:
+        rows = observations(source_db,target_db,rules)
     columns = defaultdict(list)
     for r in rows:
         columns[(r["table"],r["column"])].append(r)
-    fold = lambda engine: int(hashlib.sha256(("fm3-fm4-values-cv-v1:"+str(engine)).encode())
+    fold = lambda engine: int(hashlib.sha256((salt+":"+str(engine)).encode())
                               .hexdigest()[:8],16)%POLICY["folds"]
     report = []
     for (table,column),items in sorted(columns.items()):
