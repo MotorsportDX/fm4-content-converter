@@ -102,7 +102,20 @@ def assets(car, donor, models, fm2_zip, donor_zip, wheel):
         if texture == 'nodamage':
             # Mesh kokpit `interior` FM2 (kini cockpit_plastic) memakai UV atlas bodi.
             put('interior_lod0.xds', data, 'FM2 Nodamage.xds (cockpit meshes use the body atlas UVs)')
-    put('carattribs.xml', fm2[find(fm2, 'CarAttribs.xml')], 'FM2 CarAttribs.xml')
+    # CarAttribs.xml: tiga mobil FM2 tidak membawanya, dan versi (CarAttributes, Driver) FM2 lama (3, 3)
+    # dan (3, 4) tidak punya preseden FM4. Keduanya dikirim tanpa file ini, seperti mobil FM4 native
+    # tanpa carattribs.xml (`appearance_audit.driver_attributes`).
+    attribs = [k for k in fm2 if k.casefold() == 'carattribs.xml']
+    if attribs:
+        attributes = appearance_audit.xml(fm2[attribs[0]])
+        driver = attributes.find('Driver')
+        version = (attributes.get('Version'), driver.get('Version') if driver is not None else None)
+        if version in appearance_audit.NATIVE_LAYOUTS:
+            put('carattribs.xml', fm2[attribs[0]], 'FM2 CarAttribs.xml')
+        else:
+            origin['carattribs.xml not shipped'] = f'FM2 CarAttributes/Driver version {version} has no FM4 precedent'
+    else:
+        origin['carattribs.xml not shipped'] = 'FM2 archive has no CarAttribs.xml'
     put('physics/maxdata.xml', fm2[find(fm2, 'Physics/MAXData.xml')], 'FM2 Physics/MAXData.xml')
     with zipfile.ZipFile(donor_zip) as z:
         for info in z.infolist():
@@ -111,6 +124,10 @@ def assets(car, donor, models, fm2_zip, donor_zip, wheel):
                 put(car.lower() + name[len(donor):], archive_read(z, info), f'donor {info.filename}')
     if sum('_caliper' in k or '_rotor' in k for k in origin) != 8:
         raise c.MappingError('Donor must have four calipers and four rotors')
+    skipped = sorted(k for k in fm2 if not any(k.casefold() == f.casefold() for f in
+                     [t + '.xds' for t in BODY_TEXTURES] + ['CarAttribs.xml', 'Physics/MAXData.xml', car.lower() + '.carbin']))
+    if wheel is None:   # velg sudah dikirim FM4 atau mobil lain di paket yang sama
+        return payloads, origin, skipped
     # Velg stock FM2: model dari prototype_fm4_model.py, tekstur FM2; LOD 0 velg memakai UV LOD 1.
     wheel_root = WHEELS / wheel
     payloads[wheel_root / f'{wheel.lower()}.carbin'] = (models / 'wheel' / f'{wheel.lower()}.carbin').read_bytes()
@@ -124,8 +141,6 @@ def assets(car, donor, models, fm2_zip, donor_zip, wheel):
         if name.lower() == 'wheel.xds':
             payloads[wheel_root / 'wheel_lod0.xds'] = data
             origin[(wheel_root / 'wheel_lod0.xds').as_posix()] = 'FM2 wheel wheel.xds (LOD 0 uses the LOD 1 UVs)'
-    skipped = sorted(k for k in fm2 if not any(k.casefold() == f.casefold() for f in
-                     [t + '.xds' for t in BODY_TEXTURES] + ['CarAttribs.xml', 'Physics/MAXData.xml', car.lower() + '.carbin']))
     return payloads, origin, skipped
 
 

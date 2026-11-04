@@ -41,8 +41,18 @@ COCKPIT = ('seatL', 'seatR', 'steering_wheel', 'cagerace', 'glassLF', 'glassRF',
 # `cockpit_plastic`, yang membaca Interior_LOD0.xds; paket uji mengisinya dengan atlas bodi yang sama.
 # Kaca spion FM2 bermaterial `chrome`; FM4 menggambar pantulan hanya untuk mirrorLeft/Right/Middle.
 # Ketiga mesh cocok posisi, ukuran, dan arah normalnya dengan mesh spion JAG_XKRS_09 (REPORT 9.2).
+# Material eksterior FM2 di section kokpit (REPORT 14.2) tidak punya teknik cockpit_<material> di FM4.
+# Semua teknik kokpit FM4 kecuali kaca membaca atlas interior (di sini atlas bodi): matte_colors, misc
+# dan weatherstrip FM2 memang membaca atlas bodi; UV mesh `black` (teknik FM4 tanpa tekstur) menunjuk
+# texel hampir hitam pada mobil yang diukur. tail_light membaca atlas lampu, yang tidak terbaca teknik
+# kokpit mana pun (5-6 vertex per mobil).
 COCKPIT_MATERIALS = {'interior': 'plastic', 'mirrorL/chrome': 'mirrorLeft', 'mirrorR/chrome': 'mirrorRight',
-                     'interior/chrome': 'mirrorMiddle'}
+                     'interior/chrome': 'mirrorMiddle', 'black': 'plastic', 'matte_colors': 'plastic',
+                     'misc': 'plastic', 'weatherstrip': 'rubber', 'black_glass': 'glass', 'window': 'glass',
+                     'tail_light': 'reflector'}
+# Spion tengah dengan UV konstan tidak bisa dipetakan ke UV 0-1 mirrorMiddle; mesh itu tetap
+# cockpit_chrome dan blok cermin dinolkan seperti mobil tanpa spion tengah.
+NO_MIDDLE_MIRROR = 'Mirror mesh mirrorMiddle has constant UVs'
 MIRROR_MATERIALS = ('mirrorLeft', 'mirrorRight', 'mirrorMiddle')
 NO_MIRROR = bytes(76) + struct.pack('>I', 1)   # blok cermin model tanpa mirrorMiddle (lihat carbin_audit)
 
@@ -238,12 +248,24 @@ def main():
                             mirror_block=carbin_audit.audit_mirror_block(main_data)))
     (out / 'cockpit_sections.txt').write_text('\n'.join(COCKPIT) + '\n')
     model = carbin_audit.parse(main_data, 'FM4')
-    (out / 'cockpit_materials.txt').write_text(''.join(f'{a} {b}\n' for a, b in COCKPIT_MATERIALS.items()))
+    # Helper menolak rename yang tidak mengenai mesh; hanya pasangan yang ada di section kokpit dipakai.
+    present = {(s['name'], m['name']) for s in model['sections'] if s['name'] in COCKPIT for m in s['meshes']}
+    materials = {k: v for k, v in COCKPIT_MATERIALS.items()
+                 if (tuple(k.split('/')) in present if '/' in k else any(m == k for _, m in present))}
+    (out / 'cockpit_materials.txt').write_text(''.join(f'{a} {b}\n' for a, b in materials.items()))
     for kind, mode in (('lod0', 'exclude'), ('cockpit', 'include')):
         raw = out / f'{car}_{kind}.helper.carbin'
-        renames = COCKPIT_MATERIALS if kind == 'cockpit' else {}
-        closeup = helper('closeup', out / f'{car}.carbin', out / f'donor_{kind}.carbin', raw, out / 'cockpit_sections.txt',
-                         mode, *([out / 'cockpit_materials.txt'] if renames else []))
+        renames = materials if kind == 'cockpit' else {}
+        args = ('closeup', out / f'{car}.carbin', out / f'donor_{kind}.carbin', raw, out / 'cockpit_sections.txt', mode)
+        try:
+            closeup = helper(*args, *([out / 'cockpit_materials.txt'] if renames else []))
+        except RuntimeError as error:
+            if not renames or NO_MIDDLE_MIRROR not in str(error):
+                raise
+            del materials['interior/chrome']
+            (out / 'cockpit_materials.txt').write_text(''.join(f'{a} {b}\n' for a, b in materials.items()))
+            closeup = helper(*args, out / 'cockpit_materials.txt')
+            report['middle_mirror_dropped'] = str(error)
         data = fix_mirror(raw.read_bytes())
         (out / f'{car}_{kind}.carbin').write_bytes(data)
         donor_head = carbin_audit.parse(heads[kind], 'FM4')['header']

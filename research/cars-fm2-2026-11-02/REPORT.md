@@ -69,6 +69,10 @@ Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
 - **PI dipetakan dengan model hinge plus hasil simulasi FM2** (bagian 13). MAE validation turun
   dari 0,0274 ke 0,0223. Kecocokan kelas validation tetap 25/37, dan pada CV naik dari 71% ke 78%.
   Dari tiga mobil bagian 12, hanya S60 R yang kelasnya kini benar.
+- **Paket gabungan berisi 50 dari 55 mobil FM2-only** (bagian 14). Isinya satu database,
+  satu tabel nama, satu atlas thumbnail, dan override audio untuk 41 mobil tanpa tuning audio
+  FM4. Yang tidak masuk: empat mobil DLC FM2 (datanya tidak ada di disc) dan satu quad turbo.
+  Lancer Evo IX GT dan Tommy Kaira R34 dari paket ini balapan sampai finis tanpa crash.
 
 ## 1. Rute sumber per mobil
 
@@ -1204,6 +1208,99 @@ cukup untuk memindahkan kelas mobil semacam ini.
 tetap tidak pasti. Penyebab sisa galat tidak diketahui; perbaikan berikutnya kemungkinan perlu
 menjalankan simulasi FM4 sendiri (misalnya dari performa di game), bukan data FM2 yang
 tersimpan.
+
+## 14. Paket gabungan mobil FM2-only
+
+[`package_fm2_batch.py`](package_fm2_batch.py) memaketkan semua mobil rute `fm2_only` ke satu
+overlay, seperti `fm3.batch_package`. Mobil direncanakan berurutan terhadap database paket yang
+terus bertambah, dan kunci DLC terpasang dicadangkan. Per mobil isinya sama dengan paket uji
+satu mobil (bagian 8–11), dengan fisika FM2 dari `study.json`.
+
+```powershell
+.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/package_fm2_batch.py --out <paket-baru>
+```
+
+### 14.1 Pilihan per mobil
+
+- **Donor** dipilih dengan `physics_fm2.donor`: merek dan penggerak sama, lalu massa dan tenaga
+  terdekat. Kandidatnya 309 mobil disc FM4 yang punya `_lod0` dan `_cockpit`, empat kaliper dan
+  rotor, serta header close-up yang bisa dibaca (`AUD_2_R15TDI_09` berisi float tak hingga).
+  Untuk mobil yang mereknya tidak ada di disc (Porsche, Proto Motors), donor jatuh ke merek lain,
+  misalnya Porsche 996 GT3 Cup ke `FER_250GT_60`. Model dibuat ulang per pasangan mobil–donor,
+  sekitar 3 detik per mobil.
+- **Merek** memakai `MakeID` FM2 bila FM4 atau DLC terpasang punya ID dengan kode pabrikan yang
+  sama: 49 mobil, dan Porsche lewat DLC (`requires`). Proto Motors tidak ada di FM4, jadi Spirra
+  tetap memakai merek donor.
+- **Velg:** 38 velg FM2 dikonversi, 6 mobil memakai velg yang sudah dikirim mobil lain di paket,
+  dan 6 memakai velg FM4 atau DLC dengan nama yang sama.
+- **Audio:** hanya 9 dari 50 mobil yang punya `<car>_CMT.xml` di `CarModelTuning.zip` FM4. Untuk
+  41 lainnya, CMT donor disalin dengan nama mobil ke `Media/audio/Cars.zip`, dengan entri
+  `CarModelTuning/<car>_CMT.xml` dan prioritas 96 (di atas `carmodeltuning.zip`, 95). Polanya
+  sama dengan `Media/stringtables.zip`. CMT berisi posisi sumber suara dan volume per mobil;
+  suara mesin tetap dari `Data_Engine` donor.
+- **Baris yatim:** FM4 menyimpan `TireMod_FrictionScale` Ordinal 288 tanpa mobil. Id itu adalah
+  Camaro SS FM2, dan `extract_stock` mengikat baris itu ke mobil dengan Id tersebut. Baris itu
+  dimasukkan ke graf sebagai baris yang sudah ada (0,95/0,95), dan di-`UPDATE` bila fisika FM2
+  mengubahnya.
+
+### 14.2 Perbaikan model yang dibutuhkan mobil lain
+
+XK07 dan RX-7 Amemiya tidak memerlukan perbaikan ini. Mobil FM2 lain memerlukannya:
+
+- **Material eksterior di section kokpit:** `black`, `black_glass`, `matte_colors`, `misc`,
+  `weatherstrip`, `tail_light`, dan `window`. FM4 memetakan mesh kokpit LOD 0 ke
+  `cockpit_<material>`, dan teknik itu tidak ada untuk material-material ini. Akibatnya 17 mobil
+  gagal di audit teknik.
+  - Semua teknik kokpit FM4, kecuali kaca, membaca atlas interior (di paket ini atlas bodi).
+  - `matte_colors`, `misc`, dan `weatherstrip` FM2 juga membaca atlas bodi, jadi dipetakan ke
+    `cockpit_plastic` dan `cockpit_rubber`.
+  - `black` di FM4 tidak bertekstur. UV mesh `black` menunjuk texel hampir hitam di atlas bodi
+    (rata-rata RGB 0–34 pada 7 mobil yang diukur), jadi `cockpit_plastic` tetap tampil gelap.
+  - Kaca dipetakan ke `cockpit_glass`.
+  - `tail_light` membaca atlas lampu, dan tidak ada teknik kokpit yang bisa membacanya. Material
+    ini dipetakan ke `cockpit_reflector` dengan warna atlas bodi. Hanya 5–6 vertex per mobil yang
+    terkena.
+  - Helper menolak rename yang tidak mengenai mesh, jadi peta disaring per mobil.
+- **Spion tengah dengan UV konstan** (Spirra, Supra AB Flug): mesh tetap `cockpit_chrome` dan blok
+  cermin dinolkan, seperti mobil tanpa spion tengah.
+- **`CarAttribs.xml`:** tiga arsip FM2 tidak membawanya. Dua lainnya memakai versi
+  CarAttributes/Driver (3, 3) dan (3, 4), yang tidak punya preseden FM4 (hanya (4, 5) dan (4, 6)
+  yang ada). Kelima mobil dikirim tanpa file ini, seperti mobil FM4 native tanpa `carattribs.xml`.
+  Posisi driver memakai bawaan game.
+
+### 14.3 Hasil
+
+| | Jumlah |
+|---|---:|
+| Mobil `fm2_only` di inventory | 55 |
+| Dipaketkan | **50** |
+| Gagal: mobil DLC FM2 (tidak ada ZIP dan baris DB di disc) | 4 |
+| Gagal: `CHR_ME412_05` quad turbo (bagian 11.2) | 1 |
+
+- **Kelas:** C 5, B 20, A 8, S 10, R3 5, R1 2.
+- **PI:** model hinge pada 49 mobil, dan aturan linear pada `JAG_XK_07` (2007 di luar domain).
+- **Part aspirasi:** 15 mobil mendapat part aspirasi baru.
+- **Isi paket:** 93 file, 638 MB.
+- **Dependensi:** tiga paket DLC terpasang (merek Porsche dan velg DLC).
+
+### 14.4 Uji game
+
+Disc uji: `fm3.test_disc` dengan `package-v1`, Quick Race Bernese Alps, AI menyetir, seed tetap.
+
+| Mobil | Donor | Audio | Hasil | Durasi |
+|---|---|---|---|---:|
+| Lancer Evolution IX GT (FM2), kelas B | `MIT_EclipseGSX_95` | CMT donor lewat override | 1st, tanpa crash | 268,2 s |
+| Tommy Kaira Skyline GT-R R34 (FM2), kelas A | `NIS_GTRSpecV_10` | CMT donor lewat override, tanpa `carattribs.xml` | 1st, tanpa crash | 251,7 s |
+
+Nama "(FM2)" tampil di Car Select. Warning runtime sama dengan run sebelumnya.
+
+**Batas.**
+- Hanya 2 dari 50 mobil yang dibalap.
+- Override audio hanya terbukti tidak membuat crash. Log tidak menunjukkan file CMT mana yang
+  dibaca, dan suara tidak diperiksa.
+- Tampilan kokpit dengan material yang dipetakan, serta posisi driver tanpa `carattribs.xml`,
+  belum dilihat. Run memakai kamera chase.
+- Mobil dengan merek atau donor lintas merek (Porsche, Spirra) belum dicoba di game.
 
 ## Batas riset
 
