@@ -62,6 +62,10 @@ Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
   (bagian 11). MAE validation `CMHeight` turun dari 0,069 ke 0,029. `apply` lolos pada 50 dari
   51 mobil FM2-only (hanya quad turbo yang ditolak); 12 di antaranya mendapat turbo atau SC baru. `MAZ_RX7_ReAmemiya_95`
   (donor RX-8 NA, turbo terpasang, kelas S) balapan sampai finis tanpa crash.
+- **Fisika FM2 dibandingkan dengan FM4 asli di game** (bagian 12). Pada tiga mobil validation
+  (Skyline R34, S60 R, Eclipse GSX), fisika FM2 ditanam di mobil native dengan aset dan kelas
+  tetap. Durasi balapan AI berbeda −1,5% sampai +0,8% dari FM4 asli. PI hasil pemetaan FM2
+  ternyata satu kelas terlalu rendah pada ketiganya.
 
 ## 1. Rute sumber per mobil
 
@@ -1077,6 +1081,67 @@ Hasil uji kering setelah perubahan ini: **50 dari 51** mobil FM2-only disc utama
 Satu-satunya yang tersisa adalah `CHR_ME412_05`. Paket `JAG_XK_07` dan `MAZ_RX7_ReAmemiya_95`
 tidak berubah, karena kedua aturan ini hanya aktif pada graf yang sebelumnya ditolak.
 
+## 12. Fisika FM2 pada mobil FM4 native
+
+Lanjutan 4 November 2026. Uji di bagian 10–11 hanya membuktikan mobil berjalan, karena tidak ada
+acuan "benar". [`physics_swap_test.py`](physics_swap_test.py) membuat acuan itu dengan mobil
+yang ada di FM2 dan FM4.
+
+Graf stock mobil native ditimpa di tempat oleh `apply` dengan nilai FM2 mobil yang sama. Mobil
+itu sendiri menjadi donor, jadi grup yang di studi tetap donor bernilai FM4 asli. Yang tetap
+native:
+
+- model, audio, dan nama;
+- `PerformanceIndex` dan `ClassID`, agar lawan di grid sama.
+
+Baris graf yang juga dipakai mobil drivable lain tidak boleh berubah; bila berubah, paket
+ditolak. Hanya `gamedb.slt` yang ditimpa. Run FM4 asli memakai disc dengan salinan persis
+database asli (`native-db`), sehingga kedua run hanya berbeda pada fisika.
+
+```powershell
+.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/physics_swap_test.py NIS_SkylineGTRVSpecII_02 --out outputs/car-fm2-prototype-2026-11-03/swap-NIS_SkylineGTRVSpecII_02
+```
+
+Tiga mobil turbo dari split **validation** dipilih, yaitu mobil yang nilai FM4-nya tidak dipakai
+untuk fitting aturan. Ketiganya tidak memakai baris graf bersama yang berubah.
+
+| Mobil | Kelas | Nilai berubah | Perubahan utama FM4 → FM2 |
+|---|---|---:|---|
+| `NIS_SkylineGTRVSpecII_02` | A | 104 | `GameTorqueScale` 0,775 → 0,85; boost 0,90 → 0,775 bar; anti-roll depan 9,2 → 6,3; `CMHeight` 0,481 → 0,511 |
+| `VOL_S60R_04` | B | 97 | `GameTorqueScale` 0,775 → 0,85; pegas depan 34,2 → 52,0; compound ban 4 → 3; `PowerMaxScale` 75 → 176 |
+| `MIT_EclipseGSX_95` | C | 83 | `GameTorqueScale` 0,76 → 0,85; pegas depan 36,7 → 51,8; compound ban 5 → 3; `CMHeight` 0,453 → 0,479 |
+
+Pengaturan run sama dengan bagian 10.5. Durasi dihitung dari event layar.
+
+| Mobil | FM4 asli | Fisika FM2 | Selisih | Posisi |
+|---|---:|---:|---:|---|
+| Skyline GT-R V-Spec II | 264,2 s | 260,2 s | −4,0 s (−1,5%) | 1st / 1st |
+| S60 R | 274,5 s | 273,2 s | −1,3 s (−0,5%) | 1st / 1st |
+| Eclipse GSX | 283,2 s | 285,4 s | +2,2 s (+0,8%) | 1st / 1st |
+
+- Tidak ada crash. Kunci error runtime sama dengan run sebelumnya.
+- Selisih ketiga mobil berada di ±1,5%. Run ulang dengan seed tetap berbeda ≤ 0,3 s (bagian
+  10.5, docs/fm3.md), jadi selisih ini nyata. Arahnya tidak seragam: dua mobil sedikit lebih
+  cepat, satu sedikit lebih lambat.
+- Run yang tidak sah, dibuang:
+  - `s60r-fm2b` memilih mobil yang salah, S60 R-Design 2011, karena label OCR "S60 R" cocok
+    dengan kedua mobil.
+  - `s60r-native3/fm2c` berhenti di merek yang salah.
+  - `eclipse-*`/`-2` gagal memilih mobil. "shipbuilding" juga cocok dengan deskripsi Hyundai,
+    dan Eclipse GSX tampil hanya sebagai "Eclipse".
+  - Label akhirnya: "Kwaishinsha" / "V-Spec II", "Swedish SKF" / "2004 Volvo", dan
+    "Mitsubishi Group" / "1995 Mitsubishi".
+- PI hasil pemetaan FM2 lebih rendah dari PI native pada ketiga mobil: 0,399 lawan 0,420,
+  0,347 lawan 0,362, dan 0,261 lawan 0,289. Masing-masing jatuh satu kelas lebih rendah.
+  Mobil FM2-only memakai PI ini (bagian 10.4), jadi kelasnya kemungkinan terlalu rendah satu
+  tingkat. Ini perlu kalibrasi PI tersendiri.
+
+**Batas.** Tiga mobil, satu lintasan, AI driver, dan satu run per versi. Waktu balapan adalah
+ringkasan kasar handling: pegas 40–50% lebih kaku dan torsi efektif +10% bisa saling
+mengimbangi tanpa terlihat di durasi. Mobil dengan selisih terbesar (Skyline) adalah satu-satunya
+dengan perubahan boost dan anti-roll yang besar. Belum diuji per komponen, misalnya hanya pegas
+FM2 atau hanya `GameTorqueScale` FM2.
+
 ## Batas riset
 
 Katalog FM3/FM4/DLC berasal dari evidence riset 20 Oktober yang dibangun dari
@@ -1085,5 +1150,6 @@ membuktikan geometri, fisika, atau livery yang identik. Decoder `.carbin` FM2 ha
 diverifikasi terhadap FM3 untuk LOD1; LOD2–5 dibaca dengan aturan yang sama tetapi
 tidak dibandingkan. Penulis model FM4 (bagian 7) baru prototipe, diaudit secara statis
 untuk satu mobil lengkap dan model utama semua mobil FM2. Uji game baru dilakukan untuk
-dua mobil di satu lintasan (bagian 8–11). Kalibrasi fisika (bagian 10) dinilai pada nilai
-database pasangan FM2∩FM4, bukan pada perilaku berkendara.
+dua mobil FM2-only di satu lintasan (bagian 8–11). Kalibrasi fisika (bagian 10) dinilai pada
+nilai database pasangan FM2∩FM4. Perilaku berkendara baru dibandingkan lewat durasi balapan AI
+pada tiga mobil validation (bagian 12).
