@@ -89,10 +89,10 @@ Uji game di Motorsport DX (Quick Race Bernese Alps, AI menyetir):
 
 - Balapan sampai finis: `JAG_XK_07`, `MAZ_RX7_ReAmemiya_95`, Lancer Evo IX GT, dan
   Tommy Kaira R34 (bagian 8, 10, 11, 14.4).
-- Kamera kokpit, kap, bumper, dan chase pada 18 mobil `package-v3` (bagian 15.2–15.3) dan 8
-  mobil `package-v4` (bagian 16.2). Kaca, spion, dan material kokpit benar. Di v4, kamera benar
-  pada S2000 Mugen, 432R, Spirra, Camaro, R34, dan Tuscan; Viper sebagian besar benar; Supra
-  AB Flug masih terlalu dekat.
+- Kamera kokpit, kap, bumper, dan chase pada **semua 55 mobil** dengan donor finalnya (bagian
+  17.6), tanpa crash. Kokpit benar pada 50 mobil. #58 Viper GTS-R dan #77 Viper ACR sebagian
+  besar benar. AB Flug Supra dan kedua VeilSide Supra menampilkan setir terlalu dekat.
+- Kartu "CAR" sebelum balapan menampilkan thumbnail FM2 mobil sendiri.
 - Fisika FM2 pada tiga mobil FM4 native: durasi balapan AI −1,5% sampai +0,8% dari
   fisika asli (bagian 12).
 
@@ -101,8 +101,9 @@ Uji game di Motorsport DX (Quick Race Bernese Alps, AI menyetir):
 - Kamera kokpit dan posisi driver ikut donor. Jendela posisi setir disimpulkan dari uji game,
   bukan dari posisi kamera donor (bagian 16). Donor manual di luar jendela dapat menaruh kamera
   di dalam atau di depan setir, atau di belakang kursi; periksa `wheel_offset` di manifest.
+- Tiga Supra mk4 dan dua Viper balap tidak dapat diperbaiki lewat pilihan donor; posisi kamera
+  kokpit di data FM4 belum ditemukan (bagian 17.6).
 - Warna cat bawaan, suara mesin, dan merek mobil tanpa padanan FM4 ikut donor.
-- Kartu "CAR" sebelum balapan menampilkan foto garasi donor.
 - Kecocokan kelas PI validation 25/37. Kelas belum tentu sama dengan mobil sebanding
   di FM4 (bagian 13).
 - FM2 tidak menyimpan `_lod0`, kokpit, gauge, jarum, `a_pillar`, kaliper, dan rotor.

@@ -91,6 +91,9 @@ Dekode model (bagian 5) memakai [`fm2/carbin.py`](../../src/fm4_converter/fm2/ca
   STFS Bonus Disc, quad turbo ME Four-Twelve menjadi twin turbo seperti Veyron di FM4, dan kartu
   "CAR" kini menampilkan thumbnail mobil sendiri. 45 mobil yang ID-nya ada di FM4 dengan nama lain
   terbukti mobil yang sama, jadi daftar 55 mobil final.
+- **Semua 55 mobil dilihat di game dengan donor finalnya** (bagian 17.6). Tidak ada crash. Kokpit
+  benar pada 50 mobil. Dua Viper balap sebagian besar benar, dan tiga Supra mk4 masih menampilkan
+  setir terlalu dekat.
 
 ## 1. Rute sumber per mobil
 
@@ -203,9 +206,9 @@ kendali pada mobil FM4 native (bagian 12), PI (bagian 13), paket 50 mobil (bagia
 pemindahan kode ke package dengan opsi donor manual (bagian 15), donor menurut posisi setir
 (bagian 16), serta 55 dari 55 mobil termasuk DLC FM2 dan daftar final (bagian 17).
 
-1. **Sisa posisi kamera kokpit.** Donor sudah dipilih menurut posisi setir (bagian 16). Sisanya:
-   Supra AB Flug masih terlalu dekat, selisih sumbu x belum masuk aturan (Viper), dan 20 mobil
-   yang donornya berubah belum dilihat di game. Posisi kamera di data FM4 belum ditemukan.
+1. **Sisa posisi kamera kokpit.** Tiga Supra mk4 dan dua Viper balap (bagian 17.6) tidak bisa
+   diperbaiki lewat pilihan donor. Untuk itu perlu ditemukan di mana FM4 menyimpan posisi kamera
+   kokpit (bagian 6.4).
 2. **Kelas PI.** Kecocokan kelas validation baru 25/37, dan dua dari tiga mobil bagian 12
    masih satu kelas terlalu rendah (bagian 13).
 3. **Section dan bagian yang tidak ada di FM2**: section `wheel`, `undercarriagea` dan
@@ -1647,6 +1650,38 @@ Dengan string override DLC, nama satu mobil disc ikut berubah: "Mine's CP9A Lanc
 | Isi | 103 file, 705 MB |
 | Dependensi | Disc 2 FM4 (`0001`, `0002`) dan paket DLC Porsche |
 | 50 mobil v4 | arsip mobil identik byte demi byte; `Data_Car` hanya berubah di `Thumbnail` |
+
+### 17.6 Semua 55 mobil di game
+
+Setiap mobil kini dilihat di Motorsport DX dengan donor finalnya: kamera kokpit, kap, bumper, dan
+chase saat Quick Race Bernese Alps dengan AI menyetir.
+- 27 mobil di disc `fm2-batch-v4`: 8 di bagian 16.2 dan 19 dari 20 mobil yang donornya berubah.
+- 18 mobil di disc `fm2-batch-v5`: 5 mobil baru, GT-R Nür (gagal di langkah OCR pada v4), dan 12
+  mobil yang donornya tidak berubah sejak v3 tetapi belum pernah dilihat, termasuk RE-Amemiya
+  (bagian 11 memakai donor RX-8). Run: `I:\FM4-build-usa\e2e\fm2-v5cam-<mobil>`.
+- 10 mobil sudah dilihat sebelumnya dengan donor yang sama: 7 di bagian 15.3, serta Evo IX, S4, dan
+  XK07 di bagian 9 dan 15.2.
+
+Semua run tanpa crash. Empat run berhenti di langkah menu setelah balapan mulai, tetapi frame
+kokpitnya tetap terekam.
+
+| Hasil | Mobil |
+|---|---|
+| **Benar** (50) | setir, tangan, dan instrumen terlihat dari kursi yang benar; kaca bening, spion memantul |
+| **Sebagian besar benar** (2) | #58 Viper GTS-R dan #77 Viper ACR: jalan dan instrumen terlihat, setir gelap dan kabur di kiri bawah |
+| **Sebagian** (3) | AB Flug S900 Supra, VeilSide Supra Fortune 03, dan VeilSide Supra Fortune 99: setir terlalu dekat ke kamera |
+
+- **Kartu "CAR" sebelum balapan** kini menampilkan thumbnail FM2 mobil sendiri, misalnya
+  Challenger Concept dan Evo VI TME.
+- **Quad turbo ME Four-Twelve** sebagai twin turbo berjalan tanpa crash. Kokpitnya benar.
+- **Masalah Supra tidak dijelaskan oleh posisi setir.** Ketiga Supra mk4 FM2 memakai model yang
+  sama: setir 45–47 cm dengan tepi belakang di z −0,04 sampai −0,01, sedangkan mobil yang benar ada
+  di −0,13 sampai −0,48. Selisih origin, tepi belakang, sumbu x, maupun jarak kursi–setir terhadap
+  donor tidak memisahkan Supra dari mobil yang benar. Contohnya VeilSide 99 (tepi belakang −0,11)
+  dan Soarer (−0,11): yang pertama salah, yang kedua benar. Supra '92 (Do-Luck) tidak terkena.
+  Penyebabnya kemungkinan data kamera kokpit yang belum ditemukan (bagian 6.4).
+- **Dua Viper balap** juga tidak terpisah oleh ukuran-ukuran itu. Hennessey Viper (jalan raya)
+  benar.
 
 ## Batas riset
 
