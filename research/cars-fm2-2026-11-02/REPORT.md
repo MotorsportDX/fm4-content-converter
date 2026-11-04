@@ -77,7 +77,12 @@ Dekode model (bagian 5) memakai [`fm2/carbin.py`](../../src/fm4_converter/fm2/ca
   setir yang sama; sebelumnya 15 mobil memakai donor dengan sisi setir berbeda (bagian 14.5).
 - **Kode FM2 kini berada di `src/fm4_converter/fm2/`, lengkap dengan 28 unit test** (bagian 15).
   Hasilnya dibuktikan identik dengan kode riset. Pemindahan ini juga menemukan bahwa rename
-  material kokpit terlalu luas, dan aturannya sudah diperbaiki di `package-v3`.
+  material kokpit terlalu luas, dan aturannya sudah diperbaiki di `package-v3`. Paket dengan donor
+  pilihan sendiri kini tersedia lewat `--donor` (bagian 15.4).
+- **Kokpit `package-v3` diuji pada 16 mobil lagi, satu per merek** (bagian 15.3). Material benar di
+  semua mobil, tetapi kamera salah pada 5 mobil. Kamera kokpit ikut donor, jadi kamera meleset bila
+  setir FM2 jauh dari posisi setir donor (S2000 Mugen, 432R, Viper GTS-R, Spirra) atau bila donornya
+  stock car (Camaro SS). Kartu "CAR" sebelum balapan juga menampilkan foto donor.
 
 ## 1. Rute sumber per mobil
 
@@ -183,19 +188,29 @@ kalibrasi tetap per sumber, sesuai [arsitektur](../../docs/architecture.md).
 ## 4. Langkah berikutnya
 
 Urutan berdasarkan risiko. Sudah dikerjakan: dekode `.carbin` FM2 (bagian 5), perilaku
-loader FM4 untuk file yang tidak ada (bagian 6), prototipe model utama, `_lod0`, serta
-`_cockpit` (bagian 7), uji game `JAG_XK_07` (bagian 8), kokpit, spion, dan velg FM2
-(bagian 9), serta kalibrasi fisika FM2 → FM4 (bagian 10).
+loader FM4 untuk file yang tidak ada (bagian 6), model utama, `_lod0`, serta `_cockpit`
+(bagian 7), uji game `JAG_XK_07` (bagian 8), kokpit, spion, dan velg FM2 (bagian 9),
+kalibrasi fisika (bagian 10), `CMHeight` dan part aspirasi tanpa donor (bagian 11), uji
+kendali pada mobil FM4 native (bagian 12), PI (bagian 13), paket 50 mobil (bagian 14),
+serta pemindahan kode ke package dengan opsi donor manual (bagian 15).
 
-1. **Sisa fisika:** `CMHeight` dari bounding box model, pemasangan turbo/supercharger FM2 tanpa
-   part donor yang sama, serta uji kendali dengan mobil lain.
-2. **Verifikasi 45 mobil `fm4_same_id_renamed`** dan kandidat `near_matches`
+1. **Posisi kamera kokpit.** Pilih donor yang posisi setirnya dekat dengan setir FM2 (bagian 15.3),
+   atau temukan dan pindahkan posisi kamera di data FM4. Sepuluh mobil berisiko, lima sudah
+   terbukti salah. Hindari juga donor stock car untuk mobil jalan raya.
+2. **Foto donor di kartu "CAR" sebelum balapan.** Sumber gambarnya belum diketahui (bagian 15.3).
+3. **Kelas PI.** Kecocokan kelas validation baru 25/37, dan dua dari tiga mobil bagian 12
+   masih satu kelas terlalu rendah (bagian 13).
+4. **Verifikasi 45 mobil `fm4_same_id_renamed`** dan kandidat `near_matches`
    sebelum menetapkan daftar final FM2-only.
-3. **Section dan bagian yang tidak ada di FM2**: section `wheel`, `undercarriagea` dan
+5. **Lima mobil yang belum masuk paket:** buka paket STFS Bonus Disc untuk aset empat
+   mobil DLC FM2, dan tangani quad turbo `CHR_ME412_05` (bagian 11.2).
+6. **Section dan bagian yang tidak ada di FM2**: section `wheel`, `undercarriagea` dan
    `exhaust*` tambahan FM3 (bagian 5.3), kaliper/rotor sendiri, gauge cluster, jarum, dan
    `a_pillar` (bagian 9.4); kini donor atau tidak ada.
-4. Buka paket STFS Bonus Disc untuk aset 4 mobil FM2-only dari paket bonus.
-5. Sisa format: 12 nilai S16 terakhir vertex FM2, header 0x100 byte, record 140 byte,
+7. **Cakupan uji game:** sudut pandang rendah Tommy Kaira R34 (bagian 14.5, kemungkinan `dy`
+   −0,12 di bagian 15.3), suara dari
+   override CMT, serta mobil yang belum dibalap.
+8. Sisa format: 12 nilai S16 terakhir vertex FM2, header 0x100 byte, record 140 byte,
    dan arti pembagian dua buffer vertex (bagian 5.4 dan 7.3).
 
 ## 5. Dekode `.carbin` FM2
@@ -1357,8 +1372,8 @@ Inggris seperti package `fm3`; logikanya tidak diubah, kecuali satu perbaikan di
 | `package_fm2_test.py`, `package_fm2_batch.py` | [`fm2/package.py`](../../src/fm4_converter/fm2/package.py) |
 | path disc FM2/FM4 | [`fm2/sources.py`](../../src/fm4_converter/fm2/sources.py) |
 
-- Paket satu mobil dengan donor pilihan sendiri tidak dipindahkan. Untuk satu mobil, gunakan
-  `fm2.package --cars <mobil>`; donornya dipilih otomatis.
+- Paket satu mobil dengan donor pilihan sendiri tidak dipindahkan sebagai skrip tersendiri.
+  Penggantinya adalah `fm2.package --cars <mobil> --donor <mobil>=<donor>` (bagian 15.4).
 - Skrip survei dan audit (`survey_carbin`, `check_fm2_*`, `cockpit_paint_fm2`, `inventory`,
   `fm4_model_files`, `physics_swap_test`) tetap di `research/` dan meng-import package ini.
 
@@ -1412,8 +1427,82 @@ yang divalidasi di bagian 9.
 - Keduanya berjalan tanpa crash.
 
 **Batas.**
-- Dari 48 mobil yang `_cockpit`-nya berubah, baru 2 yang dilihat di game.
-- Paket satu mobil dengan donor manual (bagian 8–11) tidak lagi tersedia sebagai perintah.
+- Dari 48 mobil yang `_cockpit`-nya berubah, 2 dilihat di sini; bagian 15.3 menambah 16.
+- Paket satu mobil dengan donor manual (bagian 8–11) kini tersedia lagi lewat `--donor`
+  (bagian 15.4).
+
+### 15.3 Uji kokpit `package-v3` per merek
+
+Lanjutan 4 November 2026. Satu mobil per merek dari 48 mobil yang `_cockpit`-nya berubah, ditambah
+Celica APR (`window` hanya di LOD 2–5) dan Supra AB Flug (spion tengah UV konstan). S4 dan Evo IX
+(bagian 15.2) serta XK07 (bagian 9) tidak diulang. Disc uji `fm2-batch-v3`, langkah sama dengan
+bagian 15.2: Quick Race Bernese Alps, AI menyetir, `back` empat kali untuk kamera kokpit, kap,
+bumper, lalu chase. Run: `I:\FM4-build-usa\e2e\fm2-v3cam-<mobil>`.
+
+`dz` dan `dy` adalah selisih origin section `steering_wheel` model FM2 terhadap `_cockpit` donor,
+dalam meter. Sumbu +z mengarah ke belakang mobil, jadi `dz` positif berarti setir FM2 lebih dekat
+ke kursi daripada setir donor.
+
+| Mobil | Donor | dz | dy | Kokpit |
+|---|---|---:|---:|---|
+| AB Flug RX-7 | `MAZ_RX7SpiritR_02` | +0,00 | +0,02 | Benar: setir kanan, tangan di setir, spion samping dan tengah memantul. Dasbor atas putih terang, seperti RX-7 FD '97 native (run `fm2-v3cam-fd97`) yang sedikit lebih gelap |
+| AB Flug S900 Supra | `TOY_SupraRZ_98` | +0,06 | +0,08 | Sebagian: setir terlalu dekat dan tinggi, tangan tidak terlihat. Spion tengah blok gelap (UV konstan, bagian 14.2) |
+| APR Celica GTS | `TOY_Aygo_11` | −0,19 | −0,04 | Benar: setir kanan, tangan di setir, spanduk kaca depan terbaca terbalik dari dalam |
+| Mugen S2000 | `JAG_33_XKR_10` | +0,35 | −0,00 | **Salah:** kamera di depan setir, di atas dasbor; setir dan tangan tidak terlihat |
+| Camaro SS | `CHE_2_MonteCarloSS_11` | −0,14 | −0,06 | **Salah:** kamera rendah, atap menutupi setengah layar, dasbor tidak terlihat |
+| Elise 135R | `LOT_Elise111S_05` | −0,13 | +0,01 | Benar |
+| Foose IS430 | `LEX_IS300_03` | −0,08 | −0,06 | Benar |
+| #58 Viper GTS-R | `DOD_2_ViperCC_08` | +0,18 | +0,02 | **Salah:** benda gelap kabur tepat di depan kamera, satu sarung tangan di bawah |
+| RL A-Spec | `SAA_93TurboX_08` | −0,21 | −0,03 | Benar: setir Acura, donor lintas merek tidak terlihat |
+| Fairlady Z 432R | `NIS_SilviaK_92` | +0,33 | −0,07 | **Salah:** kamera di depan setir, di atas dasbor; atap dan pilar tidak tampak |
+| Spirra (merek Shelby) | `SHE_Cobra427_65` | −0,59 | −0,04 | **Salah:** kamera di belakang kursi; separuh kiri layar tertutup |
+| Tommy Kaira Impreza M20b | `SUB_LegacyB4GT_10` | +0,17 | −0,02 | Benar, setir agak dekat |
+| FocusSport SVT Focus | `FOR_Ka_11` | −0,23 | −0,03 | Benar. Run berhenti di langkah menu setelah start, frame kokpit tetap terekam |
+| Tuscan R | `TVR_Sagaris_05` | −0,13 | −0,08 | Benar |
+| #44 911 GT3-RSR | `MAZ_Miata_94` | −0,16 | +0,12 | Benar: setir balap, layar data, cage |
+| Cupra GT | `BMW_2002Turbo_73` | −0,01 | −0,05 | Dapat dipakai: gelap, kaca depan sempit, setir di tepi bawah |
+
+- Semua run tanpa crash. Kaca depan bening di semua mobil, dan spion yang terlihat memantul.
+- Kokpit salah pada 5 dari 16 mobil, dan sebagian salah pada 1. Penyebabnya posisi, bukan material:
+  kamera kokpit ikut donor (bagian 14.5), sedangkan geometri kokpit dari FM2.
+  - Setir FM2 lebih dekat ke kursi: +0,17 masih benar (Impreza), +0,18 sampai +0,35 salah (Viper,
+    432R, S2000 Mugen).
+  - Setir FM2 lebih jauh: sampai −0,31 benar (GT3 Cup, bagian 14.5), −0,59 salah (Spirra).
+  - Camaro (−0,14) salah karena donornya stock car dengan posisi duduk rendah, bukan karena `dz`.
+  - Supra AB Flug punya `dy` tertinggi di antara mobil yang diuji (+0,08). Tommy Kaira R34, yang
+    sudut pandangnya rendah di bagian 14.5, punya `dy` −0,12: setir FM2 12 cm lebih rendah dari donor.
+- Dengan batas itu, 10 dari 50 mobil berisiko. Lima punya `dz` ≥ +0,18: S2000 Mugen (+0,35),
+  432R, dan tiga Viper (+0,18 sampai +0,19); tiga di antaranya sudah terbukti salah. Lima lainnya ≤ −0,35: dua Audi R8 (−0,83 dan −0,85,
+  donor A4), Spirra, dan dua MR2 (−0,35 dan −0,36).
+- **Gambar mobil di kartu "CAR" sebelum balapan adalah foto garasi donor**, misalnya Monte Carlo #04
+  untuk Camaro, Ford Ka untuk Focus, dan Saab 9-3 untuk RL A-Spec. Nama, logo merek, dan kelas sudah
+  milik mobil FM2. Gambar ini bukan atlas thumbnail Car Select (bagian 8), dan sumbernya belum
+  ditelusuri.
+
+**Batas.** Satu run per mobil, 16 dari 48 mobil. Ambang `dz` disimpulkan dari 19 mobil (16 di sini
+dan 3 di bagian 14.5–15.2), bukan diukur dari posisi kamera donor. Posisi kamera kokpit di data FM4
+belum ditemukan (bagian 6.4).
+
+### 15.4 Donor manual
+
+`fm2.package --donor <mobil>=<donor>` menggantikan donor otomatis untuk satu mobil dan boleh
+diulang. Fungsi ini menggantikan paket satu mobil dengan donor manual di bagian 8–11.
+- Donor manual diambil dari pool yang sama dengan donor otomatis (`donor_pool`) dan harus sesisi
+  setir. Donor di luar pool atau dengan setir di sisi lain ditolak dengan pesan yang menyebut
+  alasannya.
+- `--donor` untuk mobil yang tidak ada di `--cars` ditolak sebelum paket dibuat.
+- `manifest.json` mencatat `donor_choice` (`automatic` atau `manual`) per mobil.
+
+```powershell
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.package --out <paket-baru> `
+    --cars MAZ_RX7_ReAmemiya_95 --donor MAZ_RX7_ReAmemiya_95=MAZ_Rx8Mazdaspeed_04
+```
+
+Dengan perintah ini, RE-Amemiya RX-7 dipaketkan dengan donor RX-8 seperti di bagian 11. Kelas S,
+PI 0,538968, dan aturan PI `pi_hinge` sama dengan `package-v3`, karena fisika tetap dari studi FM2.
+Donor `MAZ_Miata_94` ditolak karena setirnya di sisi lain. Lima tes baru di
+`tests/fm2/test_package.py` menguji pilihan otomatis, donor manual, kedua penolakan, dan parsing
+argumen.
 
 ## Batas riset
 

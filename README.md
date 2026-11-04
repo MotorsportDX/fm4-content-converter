@@ -8,7 +8,8 @@ meliputi konfigurasi kendaraan, model, tekstur, dan metadata presentasi.
 ## Status dan arah pengembangan
 
 Project masih berupa prototipe riset. Jalur yang saat ini diimplementasikan
-adalah **FM3 → FM4**; dukungan game sumber lain masih direncanakan.
+adalah **FM3 → FM4** dan **FM2 → FM4** (mobil FM2-only); dukungan game sumber lain
+masih direncanakan.
 
 | Sumber | Status | Cakupan saat ini |
 |---|---|---|
@@ -26,6 +27,8 @@ memakai PaintScale FM4 yang diukur dari mobil yang ada di kedua game. Hasil ini 
 membuktikan semua mobil, kesamaan handling, atau DLC siap pasang.
 Source dan dokumentasi implementasi FM3 berada di
 [`src/fm4_converter/fm3`](src/fm4_converter/fm3/) dan [panduan FM3](docs/fm3.md).
+Jalur FM2 berada di [`src/fm4_converter/fm2`](src/fm4_converter/fm2/) dengan
+[panduan FM2](docs/fm2.md).
 
 Arah pengembangan berikutnya adalah menambahkan adapter pembaca untuk game
 sumber lain, memetakan data dan asetnya ke kebutuhan FM4, serta memvalidasi

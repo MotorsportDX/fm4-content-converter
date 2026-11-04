@@ -61,7 +61,8 @@ sebagai model FM3, lalu helper `carbin-cpu` membuat model FM4. `models` membuat
 model utama, `_lod0`, `_cockpit` dan velg; `physics` memuat studi kalibrasi
 FM2 → FM4 sendiri; `package` menulis semua mobil ke satu overlay. Riset dan
 batas validasinya ada di
-[`research/cars-fm2-2026-11-02/REPORT.md`](../research/cars-fm2-2026-11-02/REPORT.md).
+[`research/cars-fm2-2026-11-02/REPORT.md`](../research/cars-fm2-2026-11-02/REPORT.md);
+cara menjalankannya ada di [panduan FM2](fm2.md).
 
 ## Evidence dan riset
 

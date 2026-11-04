@@ -76,6 +76,36 @@ class DonorTests(unittest.TestCase):
         self.assertEqual([d['media'] for d in package.same_side(pool, 0.35)], ['RHD'])
         self.assertEqual([d['media'] for d in package.same_side(pool, -0.41)], ['LHD'])
 
+    POOL = [{'media': 'JAG_XKRS_09', 'id': 1, 'drive': 1, 'make': 19, 'mass': 1700, 'power': 380, 'steer': 0.37},
+            {'media': 'JAG_33_XKR_10', 'id': 2, 'drive': 1, 'make': 19, 'mass': 1600, 'power': 300, 'steer': 0.4},
+            {'media': 'JAG_XJ220_93', 'id': 3, 'drive': 1, 'make': 19, 'mass': 1500, 'power': 400, 'steer': -0.4}]
+    SOURCE = {'nodes': {'List_UpgradeCarBodyWeight': {'Mass': 1600}, 'engine': {'EngineGraphingMaxPower': 300},
+                        'drivetrain': {'DrivetypeID': 1}, 'car': {'MakeID': 19}}}
+
+    def test_automatic_donor_keeps_the_steering_side(self):
+        self.assertEqual(package.choose_donor(self.POOL, self.SOURCE, 490, 0.47), ('JAG_33_XKR_10', 'automatic'))
+
+    def test_manual_donor_from_the_pool(self):
+        self.assertEqual(package.choose_donor(self.POOL, self.SOURCE, 490, 0.47, 'jag_xkrs_09'),
+                         ('JAG_XKRS_09', 'manual'))
+
+    def test_manual_donor_outside_the_pool_or_on_the_other_side_is_refused(self):
+        with self.assertRaisesRegex(package.c.MappingError, 'not a usable donor'):
+            package.choose_donor(self.POOL, self.SOURCE, 490, 0.47, 'AUD_2_R15TDI_09')
+        with self.assertRaisesRegex(package.c.MappingError, 'other side'):
+            package.choose_donor(self.POOL, self.SOURCE, 490, 0.47, 'JAG_XJ220_93')
+
+    def test_donor_arguments(self):
+        self.assertEqual(package.parse_donors(['JAG_XK_07=JAG_XKRS_09']), {'jag_xk_07': 'JAG_XKRS_09'})
+        self.assertEqual(package.parse_donors(None), {})
+        for bad in (['JAG_XK_07'], ['=JAG_XKRS_09'], ['A=B', 'a=C']):
+            with self.assertRaises(package.c.MappingError):
+                package.parse_donors(bad)
+
+    def test_donor_for_a_car_that_is_not_packaged_is_refused(self):
+        with self.assertRaisesRegex(package.c.MappingError, 'not packaged'):
+            package.build('unused', cars=['JAG_XK_07'], donors={'maz_rx7_reamemiya_95': 'MAZ_RX8_04'})
+
 
 if __name__ == '__main__':
     unittest.main()

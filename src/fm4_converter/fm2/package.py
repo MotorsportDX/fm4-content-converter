@@ -15,7 +15,8 @@ package database, so new keys never collide; installed DLC keys stay reserved.
 
 - Donor: `physics.donor` (same make and drive type, nearest mass and power) among FM4 disc cars with
   _lod0, _cockpit, four calipers and rotors and the FM2 model's steering side. The cockpit camera
-  and driver position follow the donor (REPORT 14.5).
+  and driver position follow the donor (REPORT 14.5). `--donor CAR=DONOR` picks one car's donor
+  from the same pool, with the same steering side.
 - `MakeID`: FM2's when FM4 or an installed DLC has a make with the same ID and manufacturer code
   (the DLC goes to `requires`); otherwise the donor's, recorded.
 - Wheels FM4 already ships are used as they are; a wheel several FM2 cars share is shipped once.
@@ -27,6 +28,7 @@ package database, so new keys never collide; installed DLC keys stay reserved.
 Failed cars are recorded with their reason; the other cars are still packaged. No game is run.
 
   python -m fm4_converter.fm2.package --out <new package folder> [--cars JAG_XK_07 ...]
+                                      [--donor JAG_XK_07=JAG_XKRS_09 ...]
 """
 from contextlib import closing
 from pathlib import Path
@@ -282,6 +284,35 @@ def same_side(pool, steer):
     return [d for d in pool if (d['steer'] > 0) == (steer > 0)]
 
 
+def choose_donor(pool, source, car_id, steer, manual=None):
+    """(donor MediaName, 'automatic' or 'manual'). A manual donor must be in the pool and keep the
+    steering side, as an automatic one."""
+    side = same_side(pool, steer)
+    if manual is None:
+        return physics.donor(side, source, car_id)['media'], 'automatic'
+    found = [d for d in pool if d['media'].casefold() == manual.casefold()]
+    if not found:
+        raise c.MappingError(f'{manual} is not a usable donor: an FM4 disc car with _lod0, _cockpit, '
+                             'four calipers and rotors and readable close-up headers')
+    if found[0] not in side:
+        raise c.MappingError(f'{manual} has the steering wheel on the other side; the cockpit camera '
+                             'would sit on the passenger seat')
+    return found[0]['media'], 'manual'
+
+
+def parse_donors(pairs):
+    """{car casefold: donor} from CAR=DONOR arguments."""
+    donors = {}
+    for pair in pairs or ():
+        car, sep, donor = pair.partition('=')
+        if not (sep and car and donor):
+            raise c.MappingError(f'Expected CAR=DONOR, got {pair!r}')
+        if car.casefold() in donors:
+            raise c.MappingError(f'Two donors for {car}')
+        donors[car.casefold()] = donor
+    return donors
+
+
 def models_for(car, donor, root, helper=fm4_models.HELPER):
     """The `models` folder for (car, donor); built when missing."""
     folder = root / f'{car.lower()}--{donor.lower()}'
@@ -308,8 +339,13 @@ def make_for(fm2_db, work, registry, fm2_make):
 
 
 def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUDY, models_root=OUT / 'models',
-          helper=fm4_models.HELPER):
+          helper=fm4_models.HELPER, donors=None):
+    """`donors`: {car casefold: donor MediaName} replacing the automatic donor of those cars."""
     target, out = Path(target).resolve(), Path(out).resolve()
+    cars, donors = list(cars or fm2_only()), dict(donors or {})
+    unknown = sorted(set(donors) - {car.casefold() for car in cars})
+    if unknown:
+        raise c.MappingError(f'Donor given for cars that are not packaged: {unknown}')
     target_root, disc = target.parents[1], target.parents[2]
     if out.exists():
         raise c.MappingError('Choose a new package directory')
@@ -342,7 +378,7 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
         pool = donor_pool(work)
         tables, _ = ui_names.winning_tables(target_root, content_root, archive_read, c.sha)
         taken = {k for _, _, _, data in tables.values() for k in ui_names.StringTable(data).texts}
-        for car in cars or fm2_only():
+        for car in cars:
             log, car_keys = {'media': car}, {}
             try:
                 fm2_car = c.one(c.rows(fm2_db, 'Data_Car', 'MediaName=?', (car,)), f'FM2 {car}')
@@ -358,7 +394,7 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
                 steer = fm2_steer(car, fm2_zips[car.lower()])
                 if steer is None:
                     raise c.MappingError('FM2 model has no single steering_wheel section')
-                donor = physics.donor(same_side(pool, steer), source, car_id)['media']
+                donor, log['donor_choice'] = choose_donor(pool, source, car_id, steer, donors.get(car.casefold()))
                 log['steering'] = 'right' if steer > 0 else 'left'
                 log['donor'] = donor
                 models = models_for(car, donor, Path(models_root), helper)
@@ -537,8 +573,10 @@ def main():
     p.add_argument('--study', type=Path, default=STUDY)
     p.add_argument('--models-root', type=Path, default=OUT / 'models')
     p.add_argument('--helper', type=Path, default=fm4_models.HELPER, help='reviewed CPU-only carbin-cpu.exe')
+    p.add_argument('--donor', action='append', metavar='CAR=DONOR',
+                   help='FM4 donor for one car instead of the automatic choice (same pool and steering side)')
     a = p.parse_args()
-    m = build(a.out, a.cars, a.fm4, a.content_root, a.study, a.models_root, a.helper)
+    m = build(a.out, a.cars, a.fm4, a.content_root, a.study, a.models_root, a.helper, parse_donors(a.donor))
     print(json.dumps({k: m[k] for k in ('packaged_count', 'failed_count', 'requires', 'failed')}, indent=1))
 
 
