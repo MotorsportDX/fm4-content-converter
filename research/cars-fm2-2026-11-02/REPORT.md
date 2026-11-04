@@ -1026,8 +1026,12 @@ Durasi diukur dari event layar (`push`/`pop 12-Car_Race`). Kedua run memakai dis
 - Car Select menampilkan "1995 Mazda RE-Amemiya RX-7 (FM2)". Rating acceleration 8,2 dan launch
   6,4; RX-7 FD 6,7 dan 7,1.
 - Tidak ada crash. Kunci error runtime sama dengan run `fm2-xk07-v6-fin`.
-- Kokpit dirender bersama dasbor, setir, dan gauge donor. Di sisi kanan tampak panel cokelat
-  polos yang besar, kemungkinan pilar atau plafon interior FM2. Panel ini belum diperiksa.
+- Kokpit dirender bersama dasbor, setir, dan gauge donor. Di sisi kanan dan atas tampak panel
+  cokelat muda polos yang besar: plafon dan pilar-A bagian dalam. Mesh-nya `interior/interior`
+  FM2, dan 112 segitiganya menghadap ke bawah di atas kepala pengemudi. Semua verteksnya memakai
+  satu UV (0,344; 0,496), yang jatuh di swatch panel pintu cokelat pada atlas `nodamage.xds`
+  FM2 (RGB 134, 108, 86). Warna ini berasal dari sumber, sama seperti plafon hitam XK07 (UV ke
+  texel hitam), dan tidak diubah. Panel tampak polos karena seluruh mesh memakai satu texel.
 - RX-7 FM2 28 s lebih cepat dari FD native. Ini sesuai dengan boost dua kali lipat, massa
   162 kg lebih ringan, dan ban lebih lebar. Lawan di grid berbeda kelas (S lawan B), jadi
   selisih ini bukan ukuran kemiripan handling.
