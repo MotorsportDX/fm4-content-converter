@@ -66,6 +66,9 @@ Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
   (Skyline R34, S60 R, Eclipse GSX), fisika FM2 ditanam di mobil native dengan aset dan kelas
   tetap. Durasi balapan AI berbeda −1,5% sampai +0,8% dari FM4 asli. PI hasil pemetaan FM2
   ternyata satu kelas terlalu rendah pada ketiganya.
+- **PI dipetakan dengan model hinge plus hasil simulasi FM2** (bagian 13). MAE validation turun
+  dari 0,0274 ke 0,0223. Kecocokan kelas validation tetap 25/37, dan pada CV naik dari 71% ke 78%.
+  Dari tiga mobil bagian 12, hanya S60 R yang kelasnya kini benar.
 
 ## 1. Rute sumber per mobil
 
@@ -1134,13 +1137,73 @@ Pengaturan run sama dengan bagian 10.5. Durasi dihitung dari event layar.
 - PI hasil pemetaan FM2 lebih rendah dari PI native pada ketiga mobil: 0,399 lawan 0,420,
   0,347 lawan 0,362, dan 0,261 lawan 0,289. Masing-masing jatuh satu kelas lebih rendah.
   Mobil FM2-only memakai PI ini (bagian 10.4), jadi kelasnya kemungkinan terlalu rendah satu
-  tingkat. Ini perlu kalibrasi PI tersendiri.
+  tingkat. Ini perlu kalibrasi PI tersendiri (bagian 13).
 
 **Batas.** Tiga mobil, satu lintasan, AI driver, dan satu run per versi. Waktu balapan adalah
 ringkasan kasar handling: pegas 40–50% lebih kaku dan torsi efektif +10% bisa saling
 mengimbangi tanpa terlihat di durasi. Mobil dengan selisih terbesar (Skyline) adalah satu-satunya
 dengan perubahan boost dan anti-roll yang besar. Belum diuji per komponen, misalnya hanya pegas
 FM2 atau hanya `GameTorqueScale` FM2.
+
+## 13. Kalibrasi PI
+
+Lebar kelas FM4 hanya 0,06–0,14 PI. Aturan linear `value_scales` (bagian 10.2,
+PI FM4 = 0,0983 + 0,7912 × PI FM2) punya MAE validation 0,0274, jadi sering meleset satu kelas.
+Ia hanya mencocokkan kelas pada 25 dari 37 mobil validation.
+
+**Apa yang tidak membantu.** PI FM4 native hampir sepenuhnya ditentukan oleh hasil simulasi
+yang tersimpan: regresi linear PI pada sembilan kolom `Sim*` FM4 punya MAE 0,011. Kolom yang
+sama di FM2 dihitung dari fisika FM2 dan bergeser secara sistematis. Contohnya,
+`SimLatGees60MPH` FM4/FM2 median 0,88 dan `SimTimeTo60MPH` 1,09. Akibatnya, model native
+yang diberi nilai `Sim*` FM2 meleset jauh (MAE validation 0,09). Fitur fisika saja (rasio
+tenaga/berat, berat, downforce) juga lebih buruk dari aturan linear (MAE 0,045–0,058).
+
+**Model.** Kandidatnya, dari yang paling sederhana:
+
+- linear;
+- hinge pada PI FM2 dengan knot di batas kelas FM2 D..S (seperti studi PI FM3);
+- hinge + empat fitur (`SimSpeedQuarterMile`, `SimLatGees60MPH`, `SimBrakeDistance60MPH`, `Year`);
+- hinge + sembilan `Sim*`;
+- hinge + sembilan `Sim*` + `Year`.
+
+Kandidat dipilih dengan CV per mesin pada 147 pasangan training. Yang diambil adalah kandidat
+paling sederhana dengan MAE dalam 5% dari yang terbaik, dan model harus monoton terhadap PI FM2
+di setiap fold. Model dibekukan sebelum validation dibaca. Model diterima bila MAE validation
+lebih kecil dari aturan linear dan kecocokan kelas tidak lebih buruk.
+
+| Kandidat | MAE CV | MAE validation | Kelas validation |
+|---|---:|---:|---:|
+| linear (aturan lama) | 0,0267 | 0,0274 | 25/37 |
+| hinge | 0,0234 | — | — |
+| **hinge + 4 fitur (dipilih)** | **0,0209** | **0,0223** | **25/37** |
+| hinge + 9 `Sim*` | 0,0213 | — | — |
+| hinge + 9 `Sim*` + `Year` | 0,0208 | — | — |
+
+- Kecocokan kelas pada CV: 78% untuk model terpilih, 71% untuk linear. Pada validation tidak
+  naik.
+- Di luar domain training satu fitur saja, model abstain dan aturan linear dipakai. Pada 108
+  mobil FM2 yang Id-nya tidak ada di FM4, ada tiga yang abstain: Porsche 997 GT3/Turbo dan
+  `JAG_XK_07`, karena `Year` 2007 di luar 1954–2006.
+- Pada 105 mobil lainnya, kelas naik pada 15, turun pada 13, dan sama pada 77. Selisih PI
+  terhadap aturan linear ada di −0,046 sampai +0,044 (median −0,002).
+- `MAZ_RX7_ReAmemiya_95` dari 0,558 ke 0,539, tetap S.
+
+**Tiga mobil bagian 12** (semuanya validation):
+
+| Mobil | Native | Aturan linear | Model baru |
+|---|---:|---:|---:|
+| Skyline GT-R V-Spec II | 0,420 A | 0,399 B | 0,399 B |
+| S60 R | 0,362 B | 0,347 C | 0,351 B |
+| Eclipse GSX | 0,289 C | 0,261 D | 0,271 D |
+
+Kesalahan kelas pada Skyline dan Eclipse tetap ada. Keduanya dekat batas kelas: Skyline 0,002
+di atas batas B/A, Eclipse 0,006 di atas batas D/C. Kesalahan MAE ~0,02 pada model mana pun
+cukup untuk memindahkan kelas mobil semacam ini.
+
+**Batas.** Model dinilai pada 37 mobil validation saja. Kelas mobil yang PI-nya dekat batas
+tetap tidak pasti. Penyebab sisa galat tidak diketahui; perbaikan berikutnya kemungkinan perlu
+menjalankan simulasi FM4 sendiri (misalnya dari performa di game), bukan data FM2 yang
+tersimpan.
 
 ## Batas riset
 

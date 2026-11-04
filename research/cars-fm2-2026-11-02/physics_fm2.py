@@ -285,7 +285,7 @@ def fm4_table(role, nodes=None):
 def observations(fm2, fm4):
     found, excluded = pairs(fm2, fm4)
     index = fm4_index(fm4)
-    obs, curves, cm, missing = [], [], [], Counter()
+    obs, curves, cm, pi, missing = [], [], [], [], Counter()
     for pair in found:
         source = extract(fm2, pair['id'], fm4)
         native = fm4_nodes(fm4, pair['media'])
@@ -295,6 +295,8 @@ def observations(fm2, fm4):
         features = cm_features(source['nodes'], source['bounds'])
         cm.append({'media': pair['media'], 'split': pair['split'], 'engine': pair['engine'], 'features': features,
                    'y': target[WEIGHT]['CMHeight']})
+        pi.append({'media': pair['media'], 'split': pair['split'], 'engine': pair['engine'],
+                   'car': pi_car(source['nodes']['car']), 'y': target['car']['PerformanceIndex']})
         for role, row in source['nodes'].items():
             if role not in target:
                 missing[role] += 1
@@ -308,13 +310,15 @@ def observations(fm2, fm4):
                             'y': target[role][column], 'd': chosen['nodes'].get(role, {}).get(column)})
                 if role == WEIGHT and column == 'CMHeight':
                     obs[-1]['cm'] = features
+                if role == 'car' and column == 'PerformanceIndex':
+                    obs[-1]['pi'] = pi[-1]['car']
         reference = torque_curve(target)
         curves.append({'media': pair['media'], 'split': pair['split'], 'engine': pair['engine'],
                        'fm2': curve_error(torque_curve(source['nodes']), reference),
                        'donor': curve_error(torque_curve(chosen['nodes']), reference),
                        'samples': (source['nodes']['torque.full']['NumTorqueValues'],
                                    target['torque.full']['NumTorqueValues'])})
-    return {'pairs': found, 'excluded': excluded, 'observations': obs, 'curves': curves, 'cm': cm,
+    return {'pairs': found, 'excluded': excluded, 'observations': obs, 'curves': curves, 'cm': cm, 'pi': pi,
             'roles_missing_in_fm4': dict(missing),
             'conventions': drive_conventions(index) | table_conventions(fm4)}
 
@@ -480,6 +484,97 @@ def cm_study(items, rule):
             'pairs': {'training': len(train), 'validation': len(valid)}}
 
 
+# PerformanceIndex: lebar kelas FM4 hanya 0,06-0,14, sehingga aturan linear value_scales (MAE 0,027)
+# sering meleset satu kelas. Kandidat: hinge pada PI FM2 di batas kelas FM2 (seperti studi PI FM3),
+# ditambah hasil simulasi FM2 yang tersimpan; diurutkan dari yang paling sederhana.
+PI_SIM = ('SimTopSpeed', 'SimTimeTo60MPH', 'SimTimeTo100MPH', 'SimTimeQuarterMile', 'SimSpeedQuarterMile',
+          'SimLatGees60MPH', 'SimLatGees120MPH', 'SimBrakeDistance60MPH', 'SimBrakeDistance100MPH')
+PI_CANDIDATES = [('linear', ()), ('hinge', ()),
+                 ('hinge', ('SimSpeedQuarterMile', 'SimLatGees60MPH', 'SimBrakeDistance60MPH', 'Year')),
+                 ('hinge', PI_SIM), ('hinge', PI_SIM + ('Year',))]
+PI_KNOTS = (0.265, 0.3565, 0.4596, 0.585, 0.72)   # CarClasses.MaxPerformanceIndex D..S di FM2
+PI_TOLERANCE = 1.05   # kandidat paling sederhana dalam 5% dari MAE CV terbaik, seperti performance_index
+
+
+def pi_car(car):
+    return {f: car[f] for f in ('PerformanceIndex', 'Year') + PI_SIM}
+
+
+def pi_basis(model, car):
+    x = car['PerformanceIndex']
+    return [1.0, x] + [max(0.0, x - k) for k in model['knots']] + [float(car[f]) for f in model['features']]
+
+
+def pi_fit(items, kind, features):
+    import numpy as np
+    pis = [i['car']['PerformanceIndex'] for i in items]
+    model = {'kind': kind, 'features': list(features),
+             'knots': [k for k in PI_KNOTS if min(pis) < k < max(pis)] if kind == 'hinge' else [],
+             'domain': {f: [min(i['car'][f] for i in items), max(i['car'][f] for i in items)]
+                        for f in ('PerformanceIndex',) + tuple(features)}}
+    x = np.array([pi_basis(model, i['car']) for i in items])
+    model['coef'] = [float(b) for b in np.linalg.lstsq(x, np.array([i['y'] for i in items]), rcond=None)[0]]
+    return model
+
+
+def pi_monotone(model):
+    """PI hasil harus naik terhadap PI FM2 di setiap segmen hinge."""
+    slope = model['coef'][1]
+    for w in model['coef'][2:2 + len(model['knots'])]:
+        if slope <= 0:
+            return False
+        slope += w
+    return slope > 0
+
+
+def pi_predict(model, car):
+    """(PI, fitur di luar domain training atau None). Di luar domain tidak ada prediksi (None)."""
+    for f, (low, high) in model['domain'].items():
+        if not low <= car[f] <= high:
+            return None, f
+    return round(sum(b * v for b, v in zip(model['coef'], pi_basis(model, car))), 6), None
+
+
+def pi_study(items, rule, bounds):
+    """Pilih model PI dengan CV per mesin pada training, lalu ukur validation. Diterima bila monoton
+    dan MAE validation serta kecocokan kelas tidak lebih buruk dari aturan linear value_scales."""
+    from fm4_converter.fm3 import performance_index as pim
+    train = [i for i in items if i['split'] == 'training']
+    valid = [i for i in items if i['split'] == 'validation']
+    ruled = lambda i: vs.predict(rule, i['car']['PerformanceIndex']) \
+        if rule and vs.in_domain(rule, i['car']['PerformanceIndex']) else i['car']['PerformanceIndex']
+
+    def score(predict, part):
+        pairs = [(predict(i), i['y']) for i in part]
+        used = [(p, y) for p, y in pairs if p is not None]
+        cls = lambda v: pim.class_for(min(max(v, 1e-6), bounds[-1][1]), bounds)
+        return {'n': len(used), 'abstained': len(pairs) - len(used),
+                'mae': statistics.mean(abs(p - y) for p, y in used),
+                'class_match_rate': statistics.mean(cls(p) == cls(y) for p, y in used)}
+
+    candidates = []
+    for kind, features in PI_CANDIDATES:
+        cv, monotone = [], True
+        for fit, held in engine_folds(train):
+            if fit and held:
+                model = pi_fit(fit, kind, features)
+                monotone &= pi_monotone(model)
+                cv += [(pi_predict(model, i['car'])[0] or ruled(i), i['y']) for i in held]
+        candidates.append({'kind': kind, 'features': list(features), 'monotone_every_fold': monotone,
+                           'cv_mae': statistics.mean(abs(p - y) for p, y in cv)})
+    eligible = [e for e in candidates if e['monotone_every_fold']]
+    best = min(e['cv_mae'] for e in eligible)
+    chosen = next(e for e in eligible if e['cv_mae'] <= best * PI_TOLERANCE)
+    model = pi_fit(train, chosen['kind'], chosen['features'])   # dibekukan sebelum validation dibaca
+    model['validation'] = score(lambda i: pi_predict(model, i['car'])[0] or ruled(i), valid)
+    model['validation_baselines'] = {'value_scales_rule': score(ruled, valid),
+                                     'fm2_identity': score(lambda i: i['car']['PerformanceIndex'], valid)}
+    base = model['validation_baselines']['value_scales_rule']
+    model['accepted'] = pi_monotone(model) and model['validation']['mae'] < base['mae'] and \
+        model['validation']['class_match_rate'] >= base['class_match_rate']
+    return {**model, 'candidates': candidates, 'pairs': {'training': len(train), 'validation': len(valid)}}
+
+
 def part_scales(observations, conventions):
     """Skala rasio median FM4/FM2 untuk kolom kontinu part aspirasi yang bukan konvensi (mis.
     PowerMaxScale). Studi `value_scales` menolaknya karena tabel turbo FM4 terpecah single/twin
@@ -514,7 +609,7 @@ def part_scales(observations, conventions):
     return out
 
 
-def decide(observations, curves, rules, conventions, cm=None, scales=None):
+def decide(observations, curves, rules, conventions, cm=None, scales=None, pi=None):
     """Per grup: nilai FM2 (identity atau aturan yang diterima) melawan donor. Dipilih pada training
     dan dikonfirmasi pada validation; FM2 dipakai hanya bila tidak lebih buruk di keduanya."""
     accepted = {(r['table'], r['column']): r for r in rules}
@@ -525,6 +620,8 @@ def decide(observations, curves, rules, conventions, cm=None, scales=None):
             return fixed['value']
         if 'cm' in r and cm and cm['accepted']:
             return cm_predict(cm, r['cm'])[0]
+        if 'pi' in r and pi and pi['accepted'] and pi_predict(pi, r['pi'])[0] is not None:
+            return pi_predict(pi, r['pi'])[0]
         scale = (scales or {}).get(f"{r['table']}:{r['column']}")
         if scale and scale['accepted']:
             return scale['ratio'] * r['x']
@@ -580,12 +677,16 @@ def study(fm2, fm4):
             entry['status'] = 'too_few_rows'
     rule = next((r for r in result['rules'] if (r['table'], r['column']) == (WEIGHT, 'CMHeight')), None)
     cm = cm_study(data['cm'], rule)
+    from fm4_converter.fm3 import performance_index as pim
+    pi_rule = next((r for r in result['rules'] if (r['table'], r['column']) == ('Data_Car', 'PerformanceIndex')), None)
+    pi = pi_study(data['pi'], pi_rule, pim.classes(fm4))
     scales = part_scales(data['observations'], data['conventions'])
-    decisions = decide(data['observations'], data['curves'], result['rules'], data['conventions'], cm, scales)
+    decisions = decide(data['observations'], data['curves'], result['rules'], data['conventions'], cm, scales, pi)
     summary = {'pairs': Counter(p['split'] for p in data['pairs']), 'excluded': data['excluded'],
                'donors': {p['media']: p['donor'] for p in data['pairs']},
                'roles_missing_in_fm4': data['roles_missing_in_fm4'], 'curves': data['curves']}
-    return {**result, 'conventions': data['conventions'], 'cm_height': cm, 'part_scales': scales,
+    return {**result, 'conventions': data['conventions'], 'cm_height': cm, 'performance_index': pi,
+            'part_scales': scales,
             'decisions': decisions, 'summary': summary}
 
 
@@ -655,6 +756,7 @@ def apply(nodes, source, study, fm4):
     rules = {(r['table'], r['column']): r for r in study['rules']}
     decisions = {name: d['source'] for name, d in study['decisions'].items()}
     cm = study.get('cm_height')
+    pi = study.get('performance_index')
     drive = source['nodes']['drivetrain']['DrivetypeID']
     log = {'changed': [], 'kept_donor': [], 'abstained': [], 'unknown_enum': [], 'removed_roles': [],
            'added_roles': [], 'installed': []}
@@ -690,6 +792,8 @@ def apply(nodes, source, study, fm4):
                 entry['rule'] = 'cm_height_' + (cm['kind'] if outside is None else 'coordinate')
                 if outside is not None:
                     entry['outside_domain'] = outside
+            elif role == 'car' and column == 'PerformanceIndex' and pi and pi['accepted'] and                     pi_predict(pi, pi_car(row))[0] is not None:
+                new, entry['rule'] = pi_predict(pi, pi_car(row))[0], 'pi_' + pi['kind']
             elif scale and scale['accepted']:
                 new, entry['rule'] = scale['ratio'] * value, 'part_scale'
             elif rule is not None:
