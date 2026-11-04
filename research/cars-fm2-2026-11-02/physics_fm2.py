@@ -7,9 +7,14 @@ yang tidak punya sumber FM2 tidak diisi; di paket uji kolom itu tetap milik dono
 `study` mengikuti metode `value_scales` jalur FM3: pasangan FM2∩FM4 dengan Id, MediaName, tahun,
 dan merek sama; split training/validation dikelompokkan per mesin FM2 (1/5 validation);
 kandidat dipilih dengan CV 5 fold per mesin pada training lalu dibekukan sebelum validation.
+
+`CMHeight` diestimasi dari CMHeight FM2, tinggi stock tertimbang, dan bounding box model `.carbin`
+FM2 (`cm_study`, REPORT 11.1). Part aspirasi FM2 yang tidak dimiliki donor dipasang sebagai baris
+stock baru (`apply`, REPORT 11.2).
 """
 from collections import Counter, defaultdict
 from contextlib import closing
+from functools import lru_cache
 import argparse
 import hashlib
 import json
@@ -17,8 +22,11 @@ import math
 from pathlib import Path
 import statistics
 import sys
+import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import carbin_fm2
+import survey_carbin as sv
 from fm4_converter.fm3 import converter as c, value_scales as vs
 from fm4_converter.paths import PROJECT_ROOT
 
@@ -109,9 +117,30 @@ def auto_steer(fm4, car):
     return min(r['Id'] for r in found) if len(payloads) == 1 else None
 
 
+@lru_cache(maxsize=1)
+def fm2_zips():
+    return sv.zips(sv.FM2)
+
+
+def model_bounds(media):
+    """(min, max) Y vertex LOD1 model utama FM2, posisi + origin section, dalam meter.
+
+    Max cocok dengan PristineBoundingBoxMaxY FM4 pada mobil yang sama (median selisih 0 pada 184
+    pasangan). Min tidak: bounding box FM4 turun ±0,27 m di bawah bodi FM2."""
+    with zipfile.ZipFile(fm2_zips()[media.casefold()]) as z:
+        name = c.one([i.filename for i in z.infolist() if i.filename.casefold() == media.casefold() + '.carbin'],
+                     f'{media}.carbin')
+        model = carbin_fm2.parse(z.read(name))
+    ys = [(model.glass if s.buffer == 'glass' else model.body)[i][0][1] + s.origin[1]
+          for s in model.sections for sub in s.subsections if sub.lod == 1 for i in sub.indices if i >= 0]
+    if not ys:
+        raise c.MappingError(f'{media}: no LOD1 vertices')
+    return min(ys), max(ys)
+
+
 def extract(db, car_id, fm4=None):
     """Konfigurasi stock FM2 dalam role/tabel/kolom FM4. Nilai mentah FM2, tanpa aturan.
-    Dengan `fm4`, `AutoSteerOverrideID` dicari dari ambang STM FM2."""
+    Dengan `fm4`, `AutoSteerOverrideID` dicari dari ambang STM FM2. `bounds` = `model_bounds`."""
     car = c.one(rows(db, 'Data_Car', 'Id=?', (car_id,)), f'Data_Car {car_id}')
     choice = stock(db, 'List_UpgradeEngine', 'Ordinal', car_id)
     engine = c.one(rows(db, 'Data_Engine', 'EngineID=?', (choice['EngineID'],)), 'Data_Engine')
@@ -162,7 +191,7 @@ def extract(db, car_id, fm4=None):
         if steer is not None:
             nodes['car']['AutoSteerOverrideID'] = steer
     return {'car_id': car_id, 'media_name': car['MediaName'], 'engine_id': engine['EngineID'],
-            'nodes': nodes, 'torque_zero': source['torque.zero']}
+            'nodes': nodes, 'torque_zero': source['torque.zero'], 'bounds': model_bounds(car['MediaName'])}
 
 
 def fm4_nodes(db, media):
@@ -239,6 +268,7 @@ def donor(index, source, exclude_id):
     return min(pool, key=lambda d: (abs(math.log(d['mass'] / mass)) + abs(math.log(d['power'] / power)), d['id']))
 
 
+WEIGHT = 'List_UpgradeCarBodyWeight'
 TABLES = {'spring.front': 'List_SpringDamperPhysics', 'spring.rear': 'List_SpringDamperPhysics',
           'antiroll.front': 'List_AntiSwayPhysics', 'antiroll.rear': 'List_AntiSwayPhysics',
           'aero.front': 'List_AeroPhysics', 'aero.rear': 'List_AeroPhysics', 'torque.full': 'List_TorqueCurve',
@@ -255,13 +285,16 @@ def fm4_table(role, nodes=None):
 def observations(fm2, fm4):
     found, excluded = pairs(fm2, fm4)
     index = fm4_index(fm4)
-    obs, curves, missing = [], [], Counter()
+    obs, curves, cm, missing = [], [], [], Counter()
     for pair in found:
         source = extract(fm2, pair['id'], fm4)
         native = fm4_nodes(fm4, pair['media'])
         target = flat(native)
         chosen = donor(index, source, pair['id'])
         pair['donor'] = chosen['media']
+        features = cm_features(source['nodes'], source['bounds'])
+        cm.append({'media': pair['media'], 'split': pair['split'], 'engine': pair['engine'], 'features': features,
+                   'y': target[WEIGHT]['CMHeight']})
         for role, row in source['nodes'].items():
             if role not in target:
                 missing[role] += 1
@@ -273,14 +306,17 @@ def observations(fm2, fm4):
                 obs.append({'media': pair['media'], 'split': pair['split'], 'engine': pair['engine'],
                             'drive': source['nodes']['drivetrain']['DrivetypeID'], 'role': role, 'table': native[role]['table'], 'column': column, 'x': value,
                             'y': target[role][column], 'd': chosen['nodes'].get(role, {}).get(column)})
+                if role == WEIGHT and column == 'CMHeight':
+                    obs[-1]['cm'] = features
         reference = torque_curve(target)
         curves.append({'media': pair['media'], 'split': pair['split'], 'engine': pair['engine'],
                        'fm2': curve_error(torque_curve(source['nodes']), reference),
                        'donor': curve_error(torque_curve(chosen['nodes']), reference),
                        'samples': (source['nodes']['torque.full']['NumTorqueValues'],
                                    target['torque.full']['NumTorqueValues'])})
-    return {'pairs': found, 'excluded': excluded, 'observations': obs, 'curves': curves,
-            'roles_missing_in_fm4': dict(missing), 'conventions': drive_conventions(index)}
+    return {'pairs': found, 'excluded': excluded, 'observations': obs, 'curves': curves, 'cm': cm,
+            'roles_missing_in_fm4': dict(missing),
+            'conventions': drive_conventions(index) | table_conventions(fm4)}
 
 
 TIRES = {'FrontTireWidthMM', 'FrontTireAspect', 'FrontWheelDiameterIN', 'RearTireWidthMM', 'RearTireAspect',
@@ -340,6 +376,21 @@ def drive_conventions(index):
     return out
 
 
+def table_conventions(fm4):
+    """Kolom part aspirasi yang di FM4 bernilai tunggal pada ≥ 99% baris stock tabelnya, mis.
+    TorqueDropOffRPM0 9000 pada semua turbo/SC stock (FM2: 8000), harga dan massa part 0."""
+    out = {}
+    for table in ASPIRATION:
+        stock_rows = rows(fm4, table, 'IsStock=1', ())
+        for column in stock_rows[0]:
+            if column in KEYS:
+                continue
+            value, n = Counter(r[column] for r in stock_rows).most_common(1)[0]
+            if n / len(stock_rows) >= vs.POLICY['constant_coverage']:
+                out[f'{table}:{column}'] = {'value': value, 'cars': len(stock_rows), 'coverage': n / len(stock_rows)}
+    return out
+
+
 def errors(items, predict, continuous):
     """Galat ternormalisasi: MAE / rata-rata |FM4| (kontinu) atau 1 - kecocokan (kategori)."""
     if continuous:
@@ -351,9 +402,119 @@ def errors(items, predict, continuous):
 def convention(conventions, drive, table, column):
     if table == 'List_UpgradeDrivetrainDifferential':
         return conventions.get(f'{drive}:{column}')
+    return conventions.get(f'{table}:{column}')
 
 
-def decide(observations, curves, rules, conventions):
+def engine_folds(items, k=vs.POLICY['folds']):
+    """Fold CV per mesin pada training. Salt berbeda dari split, karena hash split menaruh semua
+    mesin training di luar bucket 0."""
+    fold = lambda e: int(hashlib.sha256(f'{SALT}:cv:{e}'.encode()).hexdigest()[:8], 16) % k
+    return [([i for i in items if fold(i['engine']) != f], [i for i in items if fold(i['engine']) == f])
+            for f in range(k)]
+
+
+# CMHeight: rumus koordinat FM3 (code_semantics, tanpa fit) dan menu linear tetap; dipilih dengan CV.
+CM_CANDIDATES = [('coordinate', ()), ('linear', ('cm_height',)), ('linear', ('cm_height', 'stock_height')),
+                 ('linear', ('cm_height', 'stock_height', 'bbox_height')),
+                 ('linear', ('cm_height', 'stock_height', 'block_height')),
+                 ('linear', ('cm_height', 'stock_height', 'bbox_height', 'block_height'))]
+
+
+def cm_features(nodes, bounds):
+    """Fitur CMHeight dari sumber FM2. `stock_height` = tinggi stock depan/belakang dibobot CMBackFront,
+    yang dikurangkan FM4 dari CMHeight (docs/fm3.md, adapter koordinat); `bbox_height` dari model."""
+    car, weight = nodes['car'], nodes[WEIGHT]
+    front, rear = car['FrontStockRideHeight'], car['RearStockRideHeight']
+    return {'cm_height': weight['CMHeight'], 'stock_height': rear + (front - rear) * weight['CMBackFront'],
+            'bbox_height': bounds[1] - bounds[0], 'block_height': weight['BlockDimY']}
+
+
+def cm_fit(items, kind, features):
+    import numpy as np
+    model = {'kind': kind, 'features': list(features),
+             'domain': {f: [min(i['features'][f] for i in items), max(i['features'][f] for i in items)]
+                        for f in features}}
+    if kind == 'linear':
+        x = np.array([[1.0] + [i['features'][f] for f in features] for i in items])
+        model['coef'] = [float(b) for b in np.linalg.lstsq(x, np.array([i['y'] for i in items]), rcond=None)[0]]
+    return model
+
+
+def cm_predict(model, features):
+    """(nilai, fitur di luar domain training atau None). Di luar domain: rumus koordinat."""
+    coordinate = features['cm_height'] + features['stock_height']
+    for f in model['features']:
+        low, high = model['domain'][f]
+        if not low <= features[f] <= high:
+            return round(coordinate, 4), f
+    if model['kind'] == 'coordinate':
+        return round(coordinate, 4), None
+    return round(model['coef'][0] + sum(b * features[f] for b, f in zip(model['coef'][1:], model['features'])), 4), None
+
+
+def cm_study(items, rule):
+    """Pilih kandidat CMHeight dengan CV per mesin pada training, lalu validation. Diterima bila
+    MAE validation lebih kecil dari aturan linear `value_scales` dan dari rumus koordinat."""
+    train = [i for i in items if i['split'] == 'training']
+    valid = [i for i in items if i['split'] == 'validation']
+    mae = lambda model, part: statistics.mean(abs(cm_predict(model, i['features'])[0] - i['y']) for i in part)
+    candidates = []
+    for kind, features in CM_CANDIDATES:
+        cv = [abs(cm_predict(cm_fit(fit, kind, features), i['features'])[0] - i['y'])
+              for fit, held in engine_folds(train) if held for i in held]
+        candidates.append({'kind': kind, 'features': list(features), 'cv_mae': statistics.mean(cv),
+                           'cv_p90': sorted(cv)[math.ceil(.9 * len(cv)) - 1]})
+    best = min(candidates, key=lambda e: (e['cv_mae'], len(e['features'])))
+    model = cm_fit(train, best['kind'], best['features'])
+    model['validation_mae'] = mae(model, valid)
+    errors = sorted(abs(cm_predict(model, i['features'])[0] - i['y']) for i in valid)
+    model['validation_p90'] = errors[math.ceil(.9 * len(errors)) - 1]
+    model['abstained_validation'] = sum(cm_predict(model, i['features'])[1] is not None for i in valid)
+    ruled = lambda x: vs.predict(rule, x) if rule and vs.in_domain(rule, x) else x
+    baselines = {'coordinate': mae(cm_fit(train, 'coordinate', ()), valid),
+                 'value_scales_rule': statistics.mean(abs(ruled(i['features']['cm_height']) - i['y']) for i in valid),
+                 'fm2_identity': statistics.mean(abs(i['features']['cm_height'] - i['y']) for i in valid)}
+    model['accepted'] = model['validation_mae'] <= baselines['coordinate'] and \
+        model['validation_mae'] < min(baselines['value_scales_rule'], baselines['fm2_identity'])
+    return {**model, 'candidates': candidates, 'validation_baselines': baselines,
+            'pairs': {'training': len(train), 'validation': len(valid)}}
+
+
+def part_scales(observations, conventions):
+    """Skala rasio median FM4/FM2 untuk kolom kontinu part aspirasi yang bukan konvensi (mis.
+    PowerMaxScale). Studi `value_scales` menolaknya karena tabel turbo FM4 terpecah single/twin
+    (< 30 baris per tabel). Diterima bila MAE CV training dan MAE validation lebih kecil dari identity."""
+    out = {}
+    columns = defaultdict(list)
+    for r in observations:
+        if r['table'] in ASPIRATION and not convention(conventions, r['drive'], r['table'], r['column']) and \
+                vs.number(r['x']) and vs.number(r['y']) and r['x'] > 0 and r['column'] not in ('Level',):
+            columns[r['table'], r['column']].append(r)
+    for (table, column), items in sorted(columns.items()):
+        train = [r for r in items if r['split'] == 'training']
+        valid = [r for r in items if r['split'] == 'validation']
+        if len(train) < 10 or len(valid) < 3:
+            continue
+        ratio = lambda part: statistics.median(r['y'] / r['x'] for r in part)
+        cv = {'identity': [], 'ratio': []}
+        for fit, held in engine_folds(train):
+            if fit and held:
+                k = ratio(fit)
+                cv['identity'] += [abs(r['x'] - r['y']) for r in held]
+                cv['ratio'] += [abs(k * r['x'] - r['y']) for r in held]
+        k = ratio(train)
+        entry = {'ratio': k, 'domain': [min(r['x'] for r in train), max(r['x'] for r in train)],
+                 'cv_mae': {n: statistics.mean(v) for n, v in cv.items()},
+                 'validation_mae': {'identity': statistics.mean(abs(r['x'] - r['y']) for r in valid),
+                                    'ratio': statistics.mean(abs(k * r['x'] - r['y']) for r in valid)},
+                 'rows': {'training': len(train), 'validation': len(valid)}}
+        entry['accepted'] = entry['cv_mae']['ratio'] < entry['cv_mae']['identity'] and \
+            entry['validation_mae']['ratio'] < entry['validation_mae']['identity']
+        out[f'{table}:{column}'] = entry
+    return out
+
+
+def decide(observations, curves, rules, conventions, cm=None, scales=None):
     """Per grup: nilai FM2 (identity atau aturan yang diterima) melawan donor. Dipilih pada training
     dan dikonfirmasi pada validation; FM2 dipakai hanya bila tidak lebih buruk di keduanya."""
     accepted = {(r['table'], r['column']): r for r in rules}
@@ -362,6 +523,11 @@ def decide(observations, curves, rules, conventions):
         fixed = convention(conventions, r['drive'], r['table'], r['column'])
         if fixed:
             return fixed['value']
+        if 'cm' in r and cm and cm['accepted']:
+            return cm_predict(cm, r['cm'])[0]
+        scale = (scales or {}).get(f"{r['table']}:{r['column']}")
+        if scale and scale['accepted']:
+            return scale['ratio'] * r['x']
         rule = accepted.get((r['table'], r['column']))
         return vs.predict(rule, r['x']) if rule and vs.in_domain(rule, r['x']) else r['x']
 
@@ -412,11 +578,15 @@ def study(fm2, fm4):
         if entry['status'] == 'not_systematic' and entry['training_difference_rate'] >= \
                 vs.POLICY['min_training_difference']:
             entry['status'] = 'too_few_rows'
-    decisions = decide(data['observations'], data['curves'], result['rules'], data['conventions'])
+    rule = next((r for r in result['rules'] if (r['table'], r['column']) == (WEIGHT, 'CMHeight')), None)
+    cm = cm_study(data['cm'], rule)
+    scales = part_scales(data['observations'], data['conventions'])
+    decisions = decide(data['observations'], data['curves'], result['rules'], data['conventions'], cm, scales)
     summary = {'pairs': Counter(p['split'] for p in data['pairs']), 'excluded': data['excluded'],
                'donors': {p['media']: p['donor'] for p in data['pairs']},
                'roles_missing_in_fm4': data['roles_missing_in_fm4'], 'curves': data['curves']}
-    return {**result, 'conventions': data['conventions'], 'decisions': decisions, 'summary': summary}
+    return {**result, 'conventions': data['conventions'], 'cm_height': cm, 'part_scales': scales,
+            'decisions': decisions, 'summary': summary}
 
 
 # Kolom Data_Car yang tetap milik paket atau donor: identitas, keluarga, model dan warna kaliper
@@ -426,21 +596,78 @@ PACKAGE_OWNED = {'Year', 'MakeID', 'IsPurchased', 'IsUnicorn', 'AIPlayerID', 'Fa
                  'WingMask', 'MaterialTypeID', 'BaseRarity', 'BaseCost', 'ClassID'}
 TURBO = ('List_UpgradeEngineTurboSingle', 'List_UpgradeEngineTurboTwin')
 ASPIRATION = TURBO + ('List_UpgradeEngineCSC', 'List_UpgradeEngineDSC', 'List_UpgradeEngineIntercooler')
+# Tabel part aspirasi stock per AspirationTypeId pada 503 mobil FM4 (tanpa pengecualian): turbo
+# single 81, twin 56, DSC 26, CSC 3, masing-masing dengan intercooler stock. FM4 tidak punya mobil
+# stock quad turbo (4) atau turbo + SC (7).
+ASPIRATION_PARTS = {1: (), 2: (TURBO[0], 'List_UpgradeEngineIntercooler'),
+                    3: (TURBO[1], 'List_UpgradeEngineIntercooler'),
+                    5: ('List_UpgradeEngineDSC', 'List_UpgradeEngineIntercooler'),
+                    6: ('List_UpgradeEngineCSC', 'List_UpgradeEngineIntercooler')}
 TRIPLETS = {'List_SpringDamperPhysics': ('SpringRate', 'DampenBumpRate', 'DampenReboundRate', 'RideHeight'),
             'List_AntiSwayPhysics': ('SwaybarStiffness',)}
+
+
+def fm2_part_value(table, column, value, study, drive):
+    """Nilai kolom part FM2 di FM4: konvensi tabel, skala part, aturan yang diterima, atau identity."""
+    fixed = convention(study['conventions'], drive, table, column)
+    if fixed:
+        return fixed['value'], 'convention'
+    scale = study.get('part_scales', {}).get(f'{table}:{column}')
+    if scale and scale['accepted']:
+        return scale['ratio'] * value, 'part_scale'
+    rule = next((r for r in study['rules'] if (r['table'], r['column']) == (table, column)), None)
+    if rule is not None and vs.in_domain(rule, value):
+        return vs.predict(rule, value), rule['kind']
+    return value, 'identity'
+
+
+def new_part(table, fm2_row, engine_id, study, drive, fm4):
+    """Baris stock baru untuk part aspirasi FM2 yang tidak ada di donor. Kunci diisi paket."""
+    schema = c.schema(fm4)[table]
+    row, origin = {}, {}
+    by_name = {k.casefold(): k for k in fm2_row}   # FM2 menulis `Massdiff` di tabel intercooler
+    for column in (x['name'] for x in schema['columns']):
+        if column == c.pk(schema):
+            row[column] = None
+        elif column == 'EngineID':
+            row[column] = engine_id
+        elif column == 'IsStock':
+            row[column] = 1
+        elif convention(study['conventions'], drive, table, column):
+            row[column] = convention(study['conventions'], drive, table, column)['value']
+            origin[column] = 'convention'
+        elif column.casefold() in by_name:
+            row[column], origin[column] = fm2_part_value(table, column, fm2_row[by_name[column.casefold()]], study, drive)
+        else:
+            raise c.MappingError(f'{table}.{column}: no FM2 value and no FM4 convention')
+    return {'table': table, 'pk': c.pk(schema), 'row': row}, origin
 
 
 def apply(nodes, source, study, fm4):
     """Tulis fisika FM2 ke graf stock donor yang sudah dikloning (`package_fm2_test.clone_stock`).
 
     Grup yang di studi lebih dekat ke FM4 asli lewat FM2 memakai nilai FM2 (aturan yang diterima
-    bila ada); grup lain tetap donor. Part aspirasi donor yang tidak dimiliki mobil FM2 dibuang.
-    `nodes` diubah di tempat; hasilnya log perubahan dan daftar role yang dibuang."""
+    bila ada); grup lain tetap donor. Part aspirasi mengikuti AspirationTypeId mobil FM2: part donor
+    yang tidak dimiliki mobil FM2 (atau turbo di tabel single/twin lain) dibuang, part FM2 yang
+    tidak dimiliki donor dipasang sebagai baris stock baru dengan kunci None (`added_roles`).
+    `nodes` diubah di tempat; hasilnya log perubahan dan daftar role yang dibuang/ditambah."""
     from fm4_converter.fm3 import performance_index
     rules = {(r['table'], r['column']): r for r in study['rules']}
     decisions = {name: d['source'] for name, d in study['decisions'].items()}
-    log = {'changed': [], 'kept_donor': [], 'abstained': [], 'unknown_enum': [], 'removed_roles': []}
-    roles = {('turbo' if r in TURBO else r): r for r in nodes}
+    cm = study.get('cm_height')
+    drive = source['nodes']['drivetrain']['DrivetypeID']
+    log = {'changed': [], 'kept_donor': [], 'abstained': [], 'unknown_enum': [], 'removed_roles': [],
+           'added_roles': [], 'installed': []}
+    aspiration = source['nodes']['car']['AspirationTypeId']
+    if aspiration not in ASPIRATION_PARTS:
+        raise c.MappingError(f'FM4 has no stock part layout for AspirationTypeId {aspiration}')
+    wanted = ASPIRATION_PARTS[aspiration]
+    fm2_roles = {r for r in ('turbo', 'List_UpgradeEngineCSC', 'List_UpgradeEngineDSC',
+                             'List_UpgradeEngineIntercooler') if r in source['nodes']}
+    if {'turbo' if t in TURBO else t for t in wanted} != fm2_roles:
+        raise c.MappingError(f'FM2 aspiration parts {sorted(fm2_roles)} do not match AspirationTypeId {aspiration}')
+    # Part donor di luar susunan aspirasi FM2 tidak disentuh lagi; turbo donor di tabel lain diganti.
+    roles = {('turbo' if r in TURBO else r): r for r in nodes if r not in ASPIRATION or r in wanted}
     for role, row in source['nodes'].items():
         if role not in roles:
             continue
@@ -454,9 +681,17 @@ def apply(nodes, source, study, fm4):
                 log['kept_donor'].append(entry)
                 continue
             new, rule = value, rules.get((table, column))
-            fixed = convention(study['conventions'], source['nodes']['drivetrain']['DrivetypeID'], table, column)
+            fixed = convention(study['conventions'], drive, table, column)
+            scale = study.get('part_scales', {}).get(f'{table}:{column}')
             if fixed:
-                new, entry['rule'] = fixed['value'], 'drive_convention'
+                new, entry['rule'] = fixed['value'], 'convention'
+            elif role == WEIGHT and column == 'CMHeight' and cm and cm['accepted']:
+                new, outside = cm_predict(cm, cm_features(source['nodes'], source['bounds']))
+                entry['rule'] = 'cm_height_' + (cm['kind'] if outside is None else 'coordinate')
+                if outside is not None:
+                    entry['outside_domain'] = outside
+            elif scale and scale['accepted']:
+                new, entry['rule'] = scale['ratio'] * value, 'part_scale'
             elif rule is not None:
                 if vs.in_domain(rule, value):
                     new, entry['rule'] = vs.predict(rule, value), rule['kind']
@@ -496,13 +731,25 @@ def apply(nodes, source, study, fm4):
         gears = nodes['List_UpgradeDrivetrainTransmission']['row']
         for i in range(gears['NumGears'], 9):  # slot gigi tak terpakai = -1 di FM4
             gears[f'GearRatio{i}'] = -1.0
-    for role in ASPIRATION:
-        if role in nodes and ('turbo' if role in TURBO else role) not in source['nodes']:
-            log['removed_roles'].append(role)
-    for role in ('turbo', 'List_UpgradeEngineCSC', 'List_UpgradeEngineDSC', 'List_UpgradeEngineIntercooler'):
-        if role in source['nodes'] and role not in roles:
-            raise c.MappingError(f'FM2 car has {role} but the donor does not')
-    car = nodes['car']['row']
+    log['removed_roles'] = [r for r in ASPIRATION if r in nodes and r not in wanted]
+    engine_id = nodes['engine']['row']['EngineID']
+    for table in wanted:
+        if table in nodes:
+            continue
+        fm2_row = source['nodes']['turbo' if table in TURBO else table]
+        nodes[table], origin = new_part(table, fm2_row, engine_id, study, drive, fm4)
+        log['added_roles'].append(table)
+        log['installed'].append({'table': table, 'row': nodes[table]['row'], 'origin': origin,
+                                 'fm2': {k: v for k, v in fm2_row.items() if k not in KEYS}})
+    # Graf akhir harus mengikuti konvensi FM4: Data_Car dan Data_Engine menyebut aspirasi yang sama,
+    # dan tepat part stock milik aspirasi itu yang tersisa.
+    car, engine = nodes['car']['row'], nodes['engine']['row']
+    left = {r for r in ASPIRATION if r in nodes and r not in log['removed_roles']}
+    if car['AspirationTypeId'] != aspiration or engine['AspirationID_Stock'] != aspiration or left != set(wanted):
+        raise c.MappingError(f'Aspiration graph not consistent: car {car["AspirationTypeId"]}, engine '
+                             f'{engine["AspirationID_Stock"]}, parts {sorted(left)}, FM2 {aspiration}')
+    if (engine['StockBoost-bar'] > 0) != (aspiration != 1):
+        raise c.MappingError(f'StockBoost-bar {engine["StockBoost-bar"]} does not match AspirationTypeId {aspiration}')
     log['class'] = performance_index.apply(car, fm4, None)
     for node in nodes.values():
         for stem in TRIPLETS.get(node['table'], ()):

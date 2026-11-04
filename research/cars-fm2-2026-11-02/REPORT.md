@@ -58,6 +58,10 @@ Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
   aturan skala dan konvensi FM4) lebih dekat ke FM4 asli daripada donor pada 34 dari 46 grup
   fisika, termasuk kurva torsi, massa, transmisi, dan pegas. `JAG_XK_07` dengan fisika FM2
   (kelas B, mesin NA, 1.595 kg) balapan sampai finis tanpa crash.
+- **`CMHeight` diestimasi dari bounding box model FM2, dan part aspirasi dipasang tanpa donor**
+  (bagian 11). MAE validation `CMHeight` turun dari 0,069 ke 0,029. `apply` lolos pada 48 dari
+  51 mobil FM2-only; 12 di antaranya mendapat turbo atau SC baru. `MAZ_RX7_ReAmemiya_95`
+  (donor RX-8 NA, turbo terpasang, kelas S) balapan sampai finis tanpa crash.
 
 ## 1. Rute sumber per mobil
 
@@ -866,10 +870,178 @@ Semua run memakai Quick Race Bernese Alps sampai finis dengan AI mengemudikan mo
   ke angka FM4 asli daripada donor, bukan bahwa mobil terasa seperti di FM4.
 - Validation 37 pasangan dipakai untuk memilih sumber per grup; tidak ada test set ketiga. Donor
   pada studi dipilih otomatis, sedangkan donor paket dipilih manual.
-- `CMHeight` memakai aturan linear (MAE 0,069). Jalur FM3 punya estimasi dari ride height dan
-  bounding box (`code_semantics`); padanannya untuk FM2 belum dikerjakan.
+- `CMHeight` memakai aturan linear (MAE 0,069). Diganti estimasi dari bounding box model di
+  bagian 11.1.
 - Turbo dan supercharger FM2 belum bisa dipasang bila donor tidak punya part yang sama
-  (`apply` menolak). Massa velg, aero part, dan grip chassis tetap milik donor.
+  (`apply` menolak). Diselesaikan di bagian 11.2. Massa velg, aero part, dan grip chassis tetap
+  milik donor.
+
+## 11. `CMHeight`, part aspirasi, dan mobil uji kedua
+
+Lanjutan 4 November 2026. Studi dijalankan ulang dengan perintah yang sama (bagian 10). Hasil
+sebelumnya disimpan sebagai `physics/study-v1.json`.
+
+### 11.1 `CMHeight` dari bounding box model
+
+`model_bounds` membaca rentang Y vertex LOD1 `.carbin` FM2 (posisi + origin section). Pada 184
+pasangan, Y maksimum cocok dengan `PristineBoundingBoxMaxY` FM4 (median selisih 0,00005 m). Y
+minimum tidak cocok: bounding box FM4 turun ±0,27 m di bawah bodi FM2, sehingga bounding box FM4
+tidak bisa diturunkan langsung.
+
+Fitur yang tersedia dari sumber FM2:
+
+- `cm_height`: `CMHeight` FM2;
+- `stock_height`: tinggi stock belakang + (depan − belakang) × `CMBackFront`, besaran yang
+  dikurangkan FM4 dari `CMHeight` (adapter koordinat FM3, [docs/fm3.md](../../docs/fm3.md));
+- `bbox_height`: tinggi bounding box model FM2;
+- `block_height`: `BlockDimY` FM2.
+
+Menu kandidat tetap, dipilih dengan CV 5 fold per mesin pada training, lalu dibekukan sebelum
+validation (`cm_study`):
+
+| Kandidat | CV MAE | CV p90 |
+|---|---:|---:|
+| Rumus koordinat FM3, `cm_height + stock_height` (tanpa fit) | 0,0374 | 0,073 |
+| Linear `cm_height` (setara aturan lama) | 0,0583 | 0,145 |
+| Linear `cm_height`, `stock_height` | 0,0333 | 0,067 |
+| + `bbox_height` | 0,0320 | 0,063 |
+| + `block_height` | 0,0262 | 0,054 |
+| **+ `bbox_height` + `block_height`** | **0,0244** | 0,058 |
+
+Model terpilih pada validation (37 pasangan): MAE **0,0286** (p90 0,061), dibanding aturan linear
+lama 0,0692, rumus koordinat 0,0425, dan identity 0,1465. Tiga mobil validation berada di luar
+domain fitur training; untuk mobil seperti ini `cm_predict` memakai rumus koordinat, dan nilainya
+ikut dihitung dalam MAE. Skor kolom `CMHeight` di grup massa turun dari 0,13/0,16 menjadi
+0,05/0,07 (galat FM2 ternormalisasi, training/validation). Grup massa tetap memakai FM2.
+
+Koefisien bbox bernilai negatif (−0,12) sedangkan `block_height` positif (0,56). Keduanya
+berkorelasi (r = 0,70), jadi koefisien ini tidak bisa dibaca sebagai efek fisik masing-masing.
+Pada `JAG_XK_07`, `CMHeight` menjadi 0,4682; nilai dari aturan lama 0,4395, nilai donor XKR-S
+0,4534. Paket `package-v7` hanya berbeda dari `package-v6` pada kolom ini.
+
+### 11.2 Part aspirasi yang tidak dimiliki donor
+
+Pada 503 mobil FM4, susunan part aspirasi stock mengikuti `AspirationTypeId` tanpa pengecualian:
+
+- turbo single (2): 81 mobil;
+- twin turbo (3): 56 mobil;
+- DSC (5): 26 mobil;
+- CSC (6): 3 mobil.
+
+Masing-masing disertai intercooler stock. `Data_Engine.AspirationID_Stock` selalu sama dengan
+`Data_Car.AspirationTypeId`. Tidak ada mobil stock quad turbo (4) atau turbo + SC (7).
+
+`apply` kini menyusun part dari `AspirationTypeId` FM2:
+
+- Part donor di luar susunan itu dibuang. Ini termasuk turbo donor di tabel lain, misalnya twin
+  turbo donor untuk mobil FM2 bertipe single.
+- Part yang tidak dimiliki donor dipasang sebagai baris stock baru (`new_part`). `EngineID`
+  adalah mesin hasil kloning. Kunci diisi `package_fm2_test.free_key`, mulai 2000, dengan
+  melewati kunci database, DLC, dan baris paket.
+- Setelah itu dicek bahwa `Data_Car`, `Data_Engine`, dan part yang tersisa menyebut aspirasi yang
+  sama, serta `StockBoost-bar` > 0 tepat untuk mesin berboost.
+- Mobil FM2 dengan aspirasi yang tidak punya susunan FM4 ditolak.
+
+Nilai kolom part baru:
+
+- **Konvensi tabel** (`table_conventions`). Kolom yang bernilai tunggal pada ≥ 99% baris stock
+  tabel FM4 itu memakai nilai FM4: `TorqueDropOffRPM0/1` 9.000/15.000 (FM2 8.000/12.000),
+  `TorqueDropOffScale1` 0,75 (FM2 0,7), `PowerMinScale` 10, `MaxScaleScale` intercooler 1, serta
+  harga, massa, `WeightDistDiff`, dan drag 0 atau 1. Totalnya 45 kolom pada lima tabel.
+- **Skala part** (`part_scales`). `PowerMaxScale` FM4 berbeda sistematis dari FM2. Rasio median
+  FM4/FM2 adalah 0,836 untuk turbo single dan 0,513 untuk twin. MAE validation turun dari 60,9
+  menjadi 49,4 (single, 8 baris) dan dari 103 menjadi 9,9 (twin, 4 baris). Studi `value_scales`
+  tidak menilainya, karena tabel turbo FM4 terpecah menjadi single/twin dan tiap tabel kurang dari
+  30 baris training.
+- Kolom lain memakai identity FM2: `MaxScale`, `MinScale`, `RobScale`, `MomentInertia`,
+  `ZeroRPMScale`, `RedlineRPMScale`, dan `Level`. Rasio median kolom besaran boost tepat 1,0.
+
+Konvensi tabel juga mengubah keputusan grup turbo bila donor punya turbo. Skor FM2 turun dari
+0,52/0,64 menjadi 0,22/0,39, sehingga sumbernya berpindah dari donor ke FM2. Skor lama didominasi
+kolom konstanta. Kolom besaran boost FM2 sudah lebih dekat ke FM4 asli daripada part dari mobil
+FM4 terdekat beraspirasi sama: MAE ternormalisasi `MaxScale` 0,058 lawan 0,137, `MomentInertia`
+0,096 lawan 0,210. Grup DSC tetap donor (validation 2 pasangan, skor 1,0). Bila donor tidak
+punya DSC, part tetap dipasang dari FM2.
+
+**Cakupan.** `apply` dijalankan kering pada 51 mobil FM2-only di disc utama dengan donor
+otomatis bagian 10.3. Hasilnya:
+
+- **48 lolos.** Pada 12 mobil, part dipasang: turbo/twin turbo, DSC, atau CSC, masing-masing
+  beserta intercooler. Pada 2 Supra VeilSide, twin turbo donor diganti single.
+- **3 ditolak:**
+  - `CHR_ME412_05` adalah quad turbo.
+  - `TOY_SupraABFlugS900_98` dan `SEA_5_CupraGT_05` menghasilkan triplet damper rebound
+    yang tidak berurutan. Def FM2 (13,0 dan 12,1) melebihi Max dari aturan rate maksimum
+    (11,96). Supra sudah gagal dengan pesan yang sama di kode bagian 10. Cupra GT dulu berhenti
+    lebih awal, di penolakan turbo. Masalah ini belum ditangani.
+
+Empat mobil Bonus Disc tidak ada di database disc utama FM2.
+
+### 11.3 `MAZ_RX7_ReAmemiya_95` dengan turbo terpasang
+
+Mobil uji kedua dipilih dari mobil FM2-only yang:
+
+- bermesin turbo;
+- punya tuning audio native FM4 (`*_CMT.xml`, syarat paket);
+- donor visualnya tidak punya part aspirasi.
+
+Donornya `MAZ_RX8Mazdaspeed_04`: rotary NA, RWD, tanpa turbo dan intercooler.
+
+```powershell
+.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/prototype_fm4_model.py MAZ_RX7_ReAmemiya_95 --donor MAZ_RX8Mazdaspeed_04
+.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/package_fm2_test.py MAZ_RX7_ReAmemiya_95 --donor MAZ_RX8Mazdaspeed_04 --physics outputs/car-fm2-research-2026-11-02/physics/study.json --out outputs/car-fm2-prototype-2026-11-03/package-rx7ame-v1
+```
+
+Model utama, `_lod0`, `_cockpit`, dan velg lolos audit. Paket mengubah 149 nilai donor dan
+memasang `List_UpgradeEngineTurboSingle` 2000 serta `List_UpgradeEngineIntercooler` 2003 pada
+mesin 2000. Graf database paket dibaca ulang dengan `extract_stock` dan sama dengan graf yang
+ditulis.
+
+| Nilai | RX-8 Mazdaspeed (donor) | RX-7 Amemiya (FM2 → FM4) | RX-7 FD '97 native | RX-7 Spirit R native |
+|---|---:|---:|---:|---:|
+| PI / kelas | 0,315 / C | 0,558 / S | 0,362 / B | 0,415 / B |
+| Massa | 1.406 kg | 1.122 kg | 1.284 kg | 1.270 kg |
+| Aspirasi / boost | NA | turbo 1,36 bar | twin 0,68 bar | twin 0,75 bar |
+| Turbo `MaxScale` / `PowerMaxScale` | — | 1,68 / 220,7 | 1,34 / 104,4 | 1,374 / 109,8 |
+| `CMHeight` | 0,4573 | 0,4158 | 0,4336 | 0,4657 |
+| Pegas depan / belakang | 40,3 / 37,2 | 58,7 / 48,1 | 38,8 / 38,8 | 38,8 / 38,8 |
+| Tinggi stock | 0,185 m | 0,100 m | 0,201 m | 0,211 m |
+| Ban depan / belakang | 225 / 225 | 255 / 265 | 225 / 225 | 235 / 255 |
+
+### 11.4 Uji game
+
+```powershell
+python -m fm4_converter.fm3.test_disc --disc <FM4 Disc 1> --package outputs/car-fm2-prototype-2026-11-03/package-rx7ame-v1 --out D:\Data\FM3-to-FM4-tests\fm2-rx7ame-v1
+```
+
+Pengaturan run sama dengan bagian 10.5: Quick Race Bernese Alps sampai finis, AI mengemudikan
+mobil pemain, `FM4_FIXED_SEED=1`, `FM4_FIXED_FRAME_TIME=1`. Merek dipilih lewat OCR "Toyo Kogyo".
+Durasi diukur dari event layar (`push`/`pop 12-Car_Race`). Kedua run memakai disc uji yang sama.
+
+| Run | Mobil | Kelas | Durasi balapan | Posisi |
+|---|---|---|---:|---|
+| `fm2-rx7ame-v1-fin1` | RE-Amemiya RX-7 (FM2), turbo terpasang | S | 245,1 s | 1st |
+| `fm2-fd97-ref-fin` | RX-7 FD '97 native FM4 | B | 273,2 s | 1st |
+
+- Car Select menampilkan "1995 Mazda RE-Amemiya RX-7 (FM2)". Rating acceleration 8,2 dan launch
+  6,4; RX-7 FD 6,7 dan 7,1.
+- Tidak ada crash. Kunci error runtime sama dengan run `fm2-xk07-v6-fin`.
+- Kokpit dirender bersama dasbor, setir, dan gauge donor. Di sisi kanan tampak panel cokelat
+  polos yang besar, kemungkinan pilar atau plafon interior FM2. Panel ini belum diperiksa.
+- RX-7 FM2 28 s lebih cepat dari FD native. Ini sesuai dengan boost dua kali lipat, massa
+  162 kg lebih ringan, dan ban lebih lebar. Lawan di grid berbeda kelas (S lawan B), jadi
+  selisih ini bukan ukuran kemiripan handling.
+- Run pertama gagal sebelum boot karena path disc salah (`fm2-rx7ame-v1-fin`). Run pembanding
+  RX-7 Spirit R (`fm2-spiritr-ref-fin1`) gagal di Car Select: Spirit R tidak muncul di daftar
+  Mazda Quick Race.
+
+### 11.5 Batas
+
+- Uji game tetap satu lintasan dengan AI driver. Ini membuktikan turbo terpasang dimuat dan
+  dikendarai sampai finis, bukan bahwa boost atau handling sama dengan RX-7 Amemiya FM2.
+- Pembanding native berbeda kelas. Run donor-only RX-7 Amemiya tidak dibuat.
+- `PowerMaxScale` twin dinilai pada 4 baris validation, DSC pada 2 pasangan.
+- Quad turbo dan dua kasus triplet damper rebound (11.2) masih ditolak.
 
 ## Batas riset
 
@@ -879,5 +1051,5 @@ membuktikan geometri, fisika, atau livery yang identik. Decoder `.carbin` FM2 ha
 diverifikasi terhadap FM3 untuk LOD1; LOD2–5 dibaca dengan aturan yang sama tetapi
 tidak dibandingkan. Penulis model FM4 (bagian 7) baru prototipe, diaudit secara statis
 untuk satu mobil lengkap dan model utama semua mobil FM2. Uji game baru dilakukan untuk
-satu mobil di satu lintasan (bagian 8–10). Kalibrasi fisika (bagian 10) dinilai pada nilai
+dua mobil di satu lintasan (bagian 8–11). Kalibrasi fisika (bagian 10) dinilai pada nilai
 database pasangan FM2∩FM4, bukan pada perilaku berkendara.

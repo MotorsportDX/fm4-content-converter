@@ -172,6 +172,16 @@ def clone_stock(work, donor, media, car_id, year, reserved):
     return graph, nodes, rows
 
 
+def free_key(work, table, pk, reserved, rows):
+    """Kunci bebas pertama mulai 2000, seperti clone_stock: tidak dipakai database, DLC, atau baris paket."""
+    occupied = {r[0] for r in work.execute(f'SELECT {c.qi(pk)} FROM {c.qi(table)}')}
+    occupied |= set(reserved.get(table, ())) | {r['row'][pk] for r in rows if r['table'] == table}
+    value = 2000
+    while value in occupied:
+        value += 1
+    return value
+
+
 def names(car_id, label, taken):
     """Dua kunci Data_Car.str bebas (tertinggi) untuk DisplayName dan ModelShort."""
     keys = {}
@@ -256,6 +266,10 @@ def build(car, donor, out, target=c.FM4_DEFAULT, content_root=CONTENT, models=No
                                             work)
             removed = {id(nodes.pop(role)['row']) for role in physics_log['removed_roles']}
             rows = [r for r in rows if id(r['row']) not in removed]
+            for role in physics_log['added_roles']:   # part aspirasi FM2 yang tidak dimiliki donor
+                node = nodes[role]
+                node['row'][node['pk']] = free_key(work, node['table'], node['pk'], reserved, rows)
+                rows.append({'table': node['table'], 'row': node['row']})
         tables, _ = ui_names.winning_tables(target_root, content_root, archive_read, c.sha)
         taken = {k for _, _, _, data in tables.values() for k in ui_names.StringTable(data).texts}
         keys = names(car_id, label, taken)
@@ -326,7 +340,8 @@ def build(car, donor, out, target=c.FM4_DEFAULT, content_root=CONTENT, models=No
         'packaged': 1, 'failed': 0, 'requires': [], 'inputs': inputs, 'sources_unchanged': True,
         'overlays_checked': len(overlays), 'content_root': str(content_root),
         'physics': None if physics is None else dict(study=str(physics), changed=len(physics_log['changed']),
-                                                      removed_roles=physics_log['removed_roles']),
+                                                      removed_roles=physics_log['removed_roles'],
+                                                      added_roles=physics_log['added_roles']),
         'donor_values': (['physics', 'class', 'performance_index'] if physics is None else
                          ['physics groups not chosen by the FM2 study']) +
                         ['List_Wheels row except MediaName', 'CarPartPositions',
