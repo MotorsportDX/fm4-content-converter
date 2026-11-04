@@ -59,8 +59,8 @@ Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
   fisika, termasuk kurva torsi, massa, transmisi, dan pegas. `JAG_XK_07` dengan fisika FM2
   (kelas B, mesin NA, 1.595 kg) balapan sampai finis tanpa crash.
 - **`CMHeight` diestimasi dari bounding box model FM2, dan part aspirasi dipasang tanpa donor**
-  (bagian 11). MAE validation `CMHeight` turun dari 0,069 ke 0,029. `apply` lolos pada 48 dari
-  51 mobil FM2-only; 12 di antaranya mendapat turbo atau SC baru. `MAZ_RX7_ReAmemiya_95`
+  (bagian 11). MAE validation `CMHeight` turun dari 0,069 ke 0,029. `apply` lolos pada 50 dari
+  51 mobil FM2-only (hanya quad turbo yang ditolak); 12 di antaranya mendapat turbo atau SC baru. `MAZ_RX7_ReAmemiya_95`
   (donor RX-8 NA, turbo terpasang, kelas S) balapan sampai finis tanpa crash.
 
 ## 1. Rute sumber per mobil
@@ -973,7 +973,7 @@ otomatis bagian 10.3. Hasilnya:
   - `TOY_SupraABFlugS900_98` dan `SEA_5_CupraGT_05` menghasilkan triplet damper rebound
     yang tidak berurutan. Def FM2 (13,0 dan 12,1) melebihi Max dari aturan rate maksimum
     (11,96). Supra sudah gagal dengan pesan yang sama di kode bagian 10. Cupra GT dulu berhenti
-    lebih awal, di penolakan turbo. Masalah ini belum ditangani.
+    lebih awal, di penolakan turbo. Diselesaikan di bagian 11.6.
 
 Empat mobil Bonus Disc tidak ada di database disc utama FM2.
 
@@ -1041,7 +1041,37 @@ Durasi diukur dari event layar (`push`/`pop 12-Car_Race`). Kedua run memakai dis
   dikendarai sampai finis, bukan bahwa boost atau handling sama dengan RX-7 Amemiya FM2.
 - Pembanding native berbeda kelas. Run donor-only RX-7 Amemiya tidak dibuat.
 - `PowerMaxScale` twin dinilai pada 4 baris validation, DSC pada 2 pasangan.
-- Quad turbo dan dua kasus triplet damper rebound (11.2) masih ditolak.
+- Quad turbo (`CHR_ME412_05`) masih ditolak.
+
+### 11.6 Triplet suspensi yang tidak berurutan
+
+Aturan `MaxDampenReboundRate` yang diterima (linear, Max FM2 20 → 11,96) memetakan batas atas
+FM2 ke batas FM4. Batas FM4 untuk Max rebound adalah 12,0 di seluruh 2.686 baris. Aturan Def
+ditolak validation, jadi Def FM2 disalin identity dan bisa melebihi Max baru.
+
+Pada pasangan FM2∩FM4 kasus ini muncul di 6 gandar yang bisa disetel, semuanya di training. FM4
+asli memakai Max 12 dan menurunkan Def ke 6,3–10,9. `apply` kini memetakan Def ke posisi
+relatif yang sama di rentang baru: `Min + (Def FM2 − Min FM2) × (Max − Min) / (Max FM2 − Min FM2)`.
+Ini hanya terjadi bila triplet tidak berurutan. MAE terhadap Def FM4 asli pada 6 gandar itu:
+
+| Pilihan | MAE |
+|---|---:|
+| identity | 5,54 |
+| clamp ke Max | 3,93 |
+| posisi relatif (dipakai) | 1,61 |
+
+Enam gandar adalah bukti yang kecil, dan tidak ada kasus serupa di validation. Pada Supra
+AB Flug, Def rebound depan menjadi 7,93 (FM2 13,01).
+
+`SEA_5_CupraGT_05` punya pegas belakang Def 133,1 di atas Max 120 di FM2 sendiri; 4 baris FM2 dan
+4 baris FM4 asli punya pola seperti ini. `apply` mengikuti validator FM3
+([docs/fm3.md](../../docs/fm3.md), Audi R10): triplet tak berurutan yang diwarisi persis dari
+sumber dipertahankan dan dicatat di `inherited_unordered`, karena runtime menormalisasi default
+ke batasnya. Triplet tak berurutan yang baru tetap ditolak.
+
+Hasil uji kering setelah perubahan ini: **50 dari 51** mobil FM2-only disc utama lolos `apply`.
+Satu-satunya yang tersisa adalah `CHR_ME412_05`. Paket `JAG_XK_07` dan `MAZ_RX7_ReAmemiya_95`
+tidak berubah, karena kedua aturan ini hanya aktif pada graf yang sebelumnya ditolak.
 
 ## Batas riset
 

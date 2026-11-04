@@ -718,6 +718,22 @@ def apply(nodes, source, study, fm4):
                                                'donor': out[prefix + stem], 'fm2': fm2[prefix + stem],
                                                'after': out['Def' + stem], 'rule': 'fixed_stock_triplet'})
                         out[prefix + stem] = out['Def' + stem]
+    # Aturan Max (mis. rebound 20 -> 11,96) bisa jatuh di bawah Def FM2 yang disalin identity. FM4
+    # tidak punya Def > Max (2/2686 baris); Def dipetakan ke posisi relatif yang sama di rentang
+    # baru. Pada 6 gandar training dengan konflik ini: MAE 1,61 lawan clamp ke Max 3,93, identity 5,54.
+    for role in ('spring.front', 'spring.rear', 'antiroll.front', 'antiroll.rear'):
+        if decisions.get(group(role, 'DefSpringRate')) != 'fm2':
+            continue
+        fm2, out = source['nodes'][role], nodes[role]['row']
+        for stem in TRIPLETS[nodes[role]['table']]:
+            low, mid, high = (out[p + stem] for p in ('Min', 'Def', 'Max'))
+            src_low, src_high = fm2['Min' + stem], fm2['Max' + stem]
+            if low <= mid <= high or src_high <= src_low:
+                continue
+            new = round(low + (fm2['Def' + stem] - src_low) * (high - low) / (src_high - src_low), 6)
+            log['changed'].append({'role': role, 'column': 'Def' + stem, 'group': group(role, stem), 'before': mid,
+                                   'fm2': fm2['Def' + stem], 'after': new, 'rule': 'range_position'})
+            out['Def' + stem] = new
     if decisions.get('torque') == 'fm2':
         curve, out = source['nodes']['torque.full'], nodes['torque.full']['row']
         count = curve['NumTorqueValues']
@@ -751,11 +767,19 @@ def apply(nodes, source, study, fm4):
     if (engine['StockBoost-bar'] > 0) != (aspiration != 1):
         raise c.MappingError(f'StockBoost-bar {engine["StockBoost-bar"]} does not match AspirationTypeId {aspiration}')
     log['class'] = performance_index.apply(car, fm4, None)
-    for node in nodes.values():
+    # Seperti validator FM3 (docs/fm3.md, Audi R10): triplet tak berurutan yang diwarisi persis dari
+    # FM2 dipertahankan dengan peringatan, karena runtime menormalisasi default ke batasnya; FM4
+    # asli juga punya 4 baris pegas Def > Max. Pelanggaran baru tetap ditolak.
+    log['inherited_unordered'] = []
+    for role, node in nodes.items():
         for stem in TRIPLETS.get(node['table'], ()):
-            low, mid, high = (node['row'][p + stem] for p in ('Min', 'Def', 'Max'))
-            if not low <= mid <= high:
-                raise c.MappingError(f'{node["table"]} {stem}: Min/Def/Max not ordered ({low}, {mid}, {high})')
+            triplet = tuple(node['row'][p + stem] for p in ('Min', 'Def', 'Max'))
+            if triplet[0] <= triplet[1] <= triplet[2]:
+                continue
+            if triplet == tuple(source['nodes'].get(role, {}).get(p + stem) for p in ('Min', 'Def', 'Max')):
+                log['inherited_unordered'].append({'role': role, 'stem': stem, 'triplet': triplet})
+                continue
+            raise c.MappingError(f'{node["table"]} {stem}: Min/Def/Max not ordered {triplet}')
     return log
 
 
