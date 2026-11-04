@@ -1,9 +1,9 @@
-"""Decoder riset .carbin bodi mobil FM2, mengikuti urutan baca Forza Studio (ForzaVersion.Two).
+"""Reader for FM2 car body and wheel .carbin files, in Forza Studio's read order (ForzaVersion.Two).
 
-Acuan: ForzaCarBin.cs, ForzaCarSection.cs, ForzaCarSubSection.cs dan ForzaVertex.cs dari
-Forza Studio (Mike Davis, MIT) di checkout ForzaEditor yang dipin untuk helper CPU. Berbeda
-dari Forza Studio, decoder ini tidak menelan exception, mencatat offset setiap blok, dan
-menolak indeks di luar buffer. Hanya membaca; tidak ada penulis FM2 atau FM4 di sini.
+Reference: ForzaCarBin.cs, ForzaCarSection.cs, ForzaCarSubSection.cs and ForzaVertex.cs from
+Forza Studio (Mike Davis, MIT) in the ForzaEditor checkout pinned for the CPU helper. Unlike
+Forza Studio, this reader swallows no exception, records the offset of every block and rejects
+indices outside their buffer. It only reads; there is no FM2 or FM4 writer here.
 """
 from dataclasses import dataclass, field
 import struct
@@ -54,14 +54,14 @@ class Reader:
         return self.data[self.pos - n:self.pos].decode('ascii')
 
     def counted_skip(self, unit):
-        """u32 jumlah lalu jumlah*unit byte; mengembalikan jumlah."""
+        """u32 count, then count*unit bytes; returns the count."""
         n = self.u32()
         self.skip(n * unit)
         return n
 
 
 def is_fm2(data):
-    """Aturan deteksi Forza Studio: type 1 + 0x2CA di 4, atau type 2 + 0x2CA di 0x104."""
+    """Forza Studio's detection: type 1 with 0x2CA at 4, or type 2 with 0x2CA at 0x104."""
     if len(data) <= 0x200:
         return False
     kind = struct.unpack_from('>I', data, 0)[0]
@@ -105,16 +105,16 @@ class Model:
 
 
 def uv_word(word):
-    """UV FM2: u16 fixed-point, (word - 32768) / 1310.72, rentang [-25, 25).
+    """FM2 UV: u16 fixed point, (word - 32768) / 1310.72, range [-25, 25).
 
-    Forza Studio membacanya sebagai half float lalu mengalikan 12800; itu hanya benar selama
-    exponent half <= 1. Skala 32768/25 dicocokkan dengan UV FM3 pada mobil yang sama.
+    Forza Studio reads it as a half float times 12800, which only holds while the half's
+    exponent is <= 1. The 32768/25 scale was matched against FM3 UVs of the same cars.
     """
     return (word - 32768) / 1310.72
 
 
 def read_vertices(r, count, size):
-    """Vertex: (posisi, uv0, uv1, normal 11:11:10, 40 byte sisa) dengan posisi = xyz*w (half)."""
+    """Vertex: (position, uv0, uv1, normal 11:11:10, remaining 40 bytes), position = xyz*w (half)."""
     if size != VERTEX_SIZE:
         raise FormatError(f'vertex size {size} at 0x{r.pos:x}, FM2 car parts use {VERTEX_SIZE}')
     r.need(count * size)
@@ -130,7 +130,7 @@ def read_vertices(r, count, size):
 
 
 def unpack_normal(u):
-    """ToN3 Forza Studio: X/Y 11 bit, Z 10 bit, bertanda."""
+    """Forza Studio's ToN3: signed X/Y 11 bits, Z 10 bits."""
     sx = lambda v, bits: v - (1 << bits) if v >> (bits - 1) else v
     return (sx(u & 0x7FF, 11) / 1023, sx((u >> 11) & 0x7FF, 11) / 1023, sx((u >> 22) & 0x3FF, 10) / 511)
 
@@ -196,7 +196,7 @@ def parse(data):
     type_id = skip_header(r)
     count = r.u32()
     sections_at = r.pos
-    # Pass 1 (seperti Forza Studio): lewati semua section untuk menemukan buffer kaca dan bodi bersama.
+    # Pass 1 (as Forza Studio): skip every section to find the shared glass and body buffers.
     for _ in range(count):
         *_, name = section_head(r)
         lod_count, lod_size = r.i32(), r.u32()
@@ -216,13 +216,13 @@ def parse(data):
     glass = read_vertices(r, glass_count, glass_size) if glass_count > 0 else []
     r.skip(12)
     body_count, body_size = r.i32(), r.u32()
-    # Velg FM2 (type 1) hanya punya buffer pertama; buffer kedua kosong dan file berakhir
-    # tanpa penanda 0x000DECAF yang mendahului vertex buffer kedua pada mobil.
+    # FM2 wheels (type 1) only have the first buffer; the second is empty and the file ends
+    # without the 0x000DECAF marker that precedes a car's second vertex buffer.
     if body_count > 0 or r.pos < len(data):
         r.skip(4)
     body = read_vertices(r, body_count, body_size) if body_count > 0 else []
     end = r.pos
-    # Pass 2: section dengan indeks. Indeks tiap section lokal, ditumpuk berurutan di buffer bersama.
+    # Pass 2: sections with indices. Indices are section-local, stacked in order in the shared buffer.
     r.pos = sections_at
     sections, next_base = [], {'glass': 0, 'body': 0}
     for _ in range(count):
@@ -252,7 +252,7 @@ def parse(data):
 
 
 def faces(sub):
-    """Segitiga dari tri list atau tri strip (restart -1, degenerasi dibuang), urutan seperti Forza Studio."""
+    """Triangles of a triangle list or strip (restart -1, degenerates dropped), in Forza Studio's order."""
     idx = sub.indices
     if sub.index_type == TRI_LIST:
         return [tuple(idx[i:i + 3]) for i in range(0, len(idx) - 2, 3)]

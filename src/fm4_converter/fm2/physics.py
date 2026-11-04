@@ -1,16 +1,17 @@
-"""Fisika stock FM2 -> FM4: extractor, studi pasangan mobil yang sama, dan aturan (REPORT bagian 10).
+"""FM2 -> FM4 stock physics: extractor, study of the cars both games ship, and rules (REPORT section 10).
 
-`extract(db, car_id)` membaca konfigurasi stock FM2 (IsStock=1, relasi Ordinal/EngineID) dan
-menyusunnya dalam role, tabel, dan nama kolom FM4 seperti `converter.extract_stock`. Kolom FM4
-yang tidak punya sumber FM2 tidak diisi; di paket uji kolom itu tetap milik donor.
+`extract(db, car_id)` reads the FM2 stock configuration (IsStock=1, Ordinal/EngineID relations)
+and lays it out in FM4 roles, tables and column names like `converter.extract_stock`. FM4 columns
+without an FM2 source stay unset; in a package they keep the donor's value.
 
-`study` mengikuti metode `value_scales` jalur FM3: pasangan FM2∩FM4 dengan Id, MediaName, tahun,
-dan merek sama; split training/validation dikelompokkan per mesin FM2 (1/5 validation);
-kandidat dipilih dengan CV 5 fold per mesin pada training lalu dibekukan sebelum validation.
+`study` follows the FM3 path's `value_scales` method: FM2 and FM4 pairs with the same Id,
+MediaName, year and make; the training/validation split is grouped by FM2 engine (1/5 validation);
+candidates are chosen by 5-fold engine-grouped CV on training and frozen before validation.
 
-`CMHeight` diestimasi dari CMHeight FM2, tinggi stock tertimbang, dan bounding box model `.carbin`
-FM2 (`cm_study`, REPORT 11.1). Part aspirasi FM2 yang tidak dimiliki donor dipasang sebagai baris
-stock baru (`apply`, REPORT 11.2).
+`CMHeight` is estimated from FM2's CMHeight, the weighted stock ride height and the bounding box
+of the FM2 `.carbin` model (`cm_study`, REPORT 11.1), PerformanceIndex by a hinge model on stored
+FM2 results (`pi_study`, REPORT 13). FM2 aspiration parts the donor lacks are installed as new
+stock rows (`apply`, REPORT 11.2).
 """
 from collections import Counter, defaultdict
 from contextlib import closing
@@ -21,20 +22,17 @@ import json
 import math
 from pathlib import Path
 import statistics
-import sys
 import zipfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import carbin_fm2
-import survey_carbin as sv
-from fm4_converter.fm3 import converter as c, value_scales as vs
-from fm4_converter.paths import PROJECT_ROOT
+from . import carbin, sources
+from ..fm3 import converter as c, value_scales as vs
+from ..paths import PROJECT_ROOT
 
-FM2_DB = Path(r'D:\Data\FM2\USA\Forza Motorsport 2 (USA)\Media\DB\gamedb.slt')
+FM2_DB = sources.FM2_DB
 OUT = PROJECT_ROOT / 'outputs/car-fm2-research-2026-11-02/physics'
 SALT = 'fm2-fm4-calibration-v1'
 
-# Tabel part FM2 -> role FM4 (= nama tabel FM4 di converter.extract_stock), kolom bernama sama.
+# FM2 part table -> FM4 role (= FM4 table name in converter.extract_stock), same column names.
 PARTS = [
     ('List_UpgradeEngine', 'Ordinal', 'List_UpgradeEngine'),
     ('List_UpgradeWeight', 'Ordinal', 'List_UpgradeCarBodyWeight'),
@@ -62,7 +60,7 @@ PARTS = [
     ('List_UpgradeEngineDSC', 'EngineID', 'List_UpgradeEngineDSC'),
     ('List_UpgradeEngineTurbo', 'EngineID', 'turbo'),
 ]
-# Satu baris FM2 dipecah menjadi dua role FM4 per gandar: {role: {kolom FM4: kolom FM2}}.
+# One FM2 row splits into two FM4 roles per axle: {role: {FM4 column: FM2 column}}.
 SPLIT = [
     ('List_UpgradeTireWidth', {'List_UpgradeCarBodyTireWidthFront': {'FrontTireWidth': 'FrontTireWidth'},
                                'List_UpgradeCarBodyTireWidthRear': {'RearTireWidth': 'RearTireWidth'}}),
@@ -70,7 +68,7 @@ SPLIT = [
                              'List_UpgradeRimSizeRear': {'RearWheelDiameter': 'RearWheelDiameter'}}),
 ]
 COMMON_PART = ('MassDiff', 'DragScale', 'WindInstabilityScale', 'Price', 'ManufacturerID', 'Level')
-# Kolom FM4 yang di FM2 berada di tabel atau nama lain: role -> {kolom FM4: (role FM2, kolom FM2)}.
+# FM4 columns that FM2 keeps in another table or name: role -> {FM4 column: (FM2 role, FM2 column)}.
 MOVED = {
     'car': {'DriveTypeID': ('engine', 'DriveTypeID'), 'NumGears': ('car', 'StockGears'),
             'FrontTireWidthMM': ('car', 'StockTire-FrontWidth-mm'),
@@ -92,7 +90,7 @@ MOVED = {
     'engine': {'Carbureted': ('List_UpgradeEngineFuelSystem', 'Carbureted')},
     'List_UpgradeEngineDisplacement': {'Disp': ('engine', 'Disp_cc')},
 }
-# Kunci baris dan referensi ke baris lain: tidak dibandingkan (nilainya nomor baris, bukan fisika).
+# Row keys and references to other rows: not compared (their values are row numbers, not physics).
 KEYS = {'Id', 'ID', 'Ordinal', 'EngineID', 'CarBodyID', 'CarBodyId', 'CarbodyId', 'DrivetrainID',
         'DrivetrainId', 'IsStock', 'AeroPhysicsID', 'AntiSwayPhysicsID', 'FrontSpringDamperPhysicsID',
         'RearSpringDamperPhysicsID', 'TorqueCurveFullThrottleID', 'TorqueCurveZeroThrottleID',
@@ -110,7 +108,7 @@ def stock(db, table, scope, value):
 
 
 def auto_steer(fm4, car):
-    """AutoSteerOverrides FM4 dengan ambang STM FM2 yang sama (seperti converter FM3)."""
+    """The FM4 AutoSteerOverrides row with the same STM thresholds as FM2 (as the FM3 converter)."""
     found = rows(fm4, 'AutoSteerOverrides', 'STMSlipMin=? AND STMSlipMax=?',
                  (car['AssistsSTMSlipDefMin'], car['AssistsSTMSlipDefMax']))
     payloads = {json.dumps({k: v for k, v in r.items() if k != 'Id'}, sort_keys=True) for r in found}
@@ -119,18 +117,18 @@ def auto_steer(fm4, car):
 
 @lru_cache(maxsize=1)
 def fm2_zips():
-    return sv.zips(sv.FM2)
+    return sources.zips(sources.FM2_CARS)
 
 
 def model_bounds(media):
-    """(min, max) Y vertex LOD1 model utama FM2, posisi + origin section, dalam meter.
+    """(min, max) Y of the FM2 main model's LOD1 vertices, position + section origin, in metres.
 
-    Max cocok dengan PristineBoundingBoxMaxY FM4 pada mobil yang sama (median selisih 0 pada 184
-    pasangan). Min tidak: bounding box FM4 turun ±0,27 m di bawah bodi FM2."""
+    Max matches FM4's PristineBoundingBoxMaxY of the same car (median difference 0 over 184
+    pairs). Min does not: the FM4 bounding box reaches +-0.27 m below the FM2 body."""
     with zipfile.ZipFile(fm2_zips()[media.casefold()]) as z:
         name = c.one([i.filename for i in z.infolist() if i.filename.casefold() == media.casefold() + '.carbin'],
                      f'{media}.carbin')
-        model = carbin_fm2.parse(z.read(name))
+        model = carbin.parse(z.read(name))
     ys = [(model.glass if s.buffer == 'glass' else model.body)[i][0][1] + s.origin[1]
           for s in model.sections for sub in s.subsections if sub.lod == 1 for i in sub.indices if i >= 0]
     if not ys:
@@ -139,8 +137,8 @@ def model_bounds(media):
 
 
 def extract(db, car_id, fm4=None):
-    """Konfigurasi stock FM2 dalam role/tabel/kolom FM4. Nilai mentah FM2, tanpa aturan.
-    Dengan `fm4`, `AutoSteerOverrideID` dicari dari ambang STM FM2. `bounds` = `model_bounds`."""
+    """FM2 stock configuration in FM4 roles/tables/columns. Raw FM2 values, no rules. With `fm4`,
+    `AutoSteerOverrideID` is looked up from the FM2 STM thresholds. `bounds` = `model_bounds`."""
     car = c.one(rows(db, 'Data_Car', 'Id=?', (car_id,)), f'Data_Car {car_id}')
     choice = stock(db, 'List_UpgradeEngine', 'Ordinal', car_id)
     engine = c.one(rows(db, 'Data_Engine', 'EngineID=?', (choice['EngineID'],)), 'Data_Engine')
@@ -184,7 +182,7 @@ def extract(db, car_id, fm4=None):
         for target, (origin, column) in moved.items():
             if origin in source and column in source[origin]:
                 nodes[role][target] = source[origin][column]
-    # FM4 menyimpan skala kurva zero-throttle di kurva full-throttle (seperti jalur FM3).
+    # FM4 keeps the zero-throttle curve scale on the full-throttle curve (as on the FM3 path).
     nodes['torque.full']['ZeroThrottleTorqueScale'] = source['torque.zero']['TorqueScale']
     if fm4 is not None:
         steer = auto_steer(fm4, car)
@@ -222,7 +220,7 @@ def pairs(fm2, fm4):
 
 
 def torque_curve(nodes):
-    """Kurva full-throttle efektif (rpm, Nm x GameTorqueScale); sampel i pada i * MaxRPM / (N - 1)."""
+    """Effective full-throttle curve (rpm, Nm x GameTorqueScale); sample i at i * MaxRPM / (N - 1)."""
     curve, cam = nodes['torque.full'], nodes['List_UpgradeEngineCamshaft']
     n, top = curve['NumTorqueValues'], cam['TorqueCurveMaxRPM']
     scale = curve['TorqueScale'] * nodes['car']['GameTorqueScale']
@@ -230,7 +228,7 @@ def torque_curve(nodes):
 
 
 def curve_error(candidate, reference):
-    """Rata-rata |selisih torsi| pada grid rpm referensi, dibagi torsi puncak referensi."""
+    """Mean |torque difference| on the reference rpm grid, divided by the reference peak torque."""
     def at(curve, rpm):
         if rpm >= curve[-1][0]:
             return curve[-1][1]
@@ -242,7 +240,7 @@ def curve_error(candidate, reference):
 
 
 def flat(nodes):
-    """fm4_nodes -> {role: row}, bentuk yang sama dengan extract()['nodes']."""
+    """fm4_nodes -> {role: row}, the same shape as extract()['nodes']."""
     return {role: node['row'] for role, node in nodes.items()}
 
 
@@ -260,7 +258,7 @@ def fm4_index(fm4):
 
 
 def donor(index, source, exclude_id):
-    """Donor seperti di paket uji: mobil FM4 semerek dan berpenggerak sama, massa dan tenaga terdekat."""
+    """Donor as in packages: an FM4 car of the same make and drive type, nearest in mass and power."""
     nodes = source['nodes']
     mass, power = nodes['List_UpgradeCarBodyWeight']['Mass'], nodes['engine']['EngineGraphingMaxPower']
     pool = [d for d in index if d['id'] != exclude_id and d['drive'] == nodes['drivetrain']['DrivetypeID']]
@@ -328,9 +326,9 @@ TIRES = {'FrontTireWidthMM', 'FrontTireAspect', 'FrontWheelDiameterIN', 'RearTir
 
 
 def group(role, column):
-    """Kolom yang harus berasal dari sumber yang sama: triplet tuning, kedua gandar, gigi, kurva
-    torsi beserta GameTorqueScale, aero bodi beserta GameDragScale, massa. Metadata performa
-    tersimpan (rating, Sim*, grafik mesin) tidak mengubah fisika dan diputuskan per kolom."""
+    """Columns that must come from the same source: tuning triplets, both axles, gears, the torque
+    curve with GameTorqueScale, body aero with GameDragScale, mass. Stored performance metadata
+    (ratings, Sim*, engine graphs) does not change physics and is decided per column."""
     if c.category(fm4_table(role), column) == 'stored_performance_metadata':
         return f'{role}.{column}'
     if role == 'car':
@@ -361,13 +359,13 @@ def group(role, column):
     return f'{role}.{column}'
 
 
-# Part yang kolomnya bekerja bersama (skala boost, LSD tiap gandar); kolom part lain diputuskan sendiri.
+# Parts whose columns work together (boost scales, per-axle LSD); other part columns are decided alone.
 COUPLED = {'turbo', 'List_UpgradeEngineCSC', 'List_UpgradeEngineDSC', 'List_UpgradeDrivetrainDifferential'}
 
 
 def drive_conventions(index):
-    """Kolom diferensial yang di FM4 bernilai tunggal pada ≥ 99% mobil sejenis penggerak
-    (mis. LSD tengah 0 pada semua mobil RWD)."""
+    """Differential columns with a single FM4 value on >= 99% of cars of a drive type
+    (e.g. centre LSD 0 on every RWD car)."""
     out = {}
     for column in ('FrontLimitedSlipTorqueAccel', 'FrontLimitedSlipTorqueDecel', 'RearLimitedSlipTorqueAccel',
                    'RearLimitedSlipTorqueDecel', 'CenterLimitedSlipTorqueAccel', 'CenterLimitedSlipTorqueDecel'):
@@ -381,8 +379,8 @@ def drive_conventions(index):
 
 
 def table_conventions(fm4):
-    """Kolom part aspirasi yang di FM4 bernilai tunggal pada ≥ 99% baris stock tabelnya, mis.
-    TorqueDropOffRPM0 9000 pada semua turbo/SC stock (FM2: 8000), harga dan massa part 0."""
+    """Aspiration part columns with a single FM4 value on >= 99% of their table's stock rows, e.g.
+    TorqueDropOffRPM0 9000 on every stock turbo/SC (FM2: 8000), part price and mass 0."""
     out = {}
     for table in ASPIRATION:
         stock_rows = rows(fm4, table, 'IsStock=1', ())
@@ -396,7 +394,7 @@ def table_conventions(fm4):
 
 
 def errors(items, predict, continuous):
-    """Galat ternormalisasi: MAE / rata-rata |FM4| (kontinu) atau 1 - kecocokan (kategori)."""
+    """Normalised error: MAE / mean |FM4| (continuous) or 1 - match rate (categories)."""
     if continuous:
         scale = sum(abs(r['y']) for r in items) / len(items) or 1.0
         return sum(abs(predict(r) - r['y']) for r in items) / len(items) / scale
@@ -410,14 +408,14 @@ def convention(conventions, drive, table, column):
 
 
 def engine_folds(items, k=vs.POLICY['folds']):
-    """Fold CV per mesin pada training. Salt berbeda dari split, karena hash split menaruh semua
-    mesin training di luar bucket 0."""
+    """Engine-grouped CV folds on training. The salt differs from the split's, because the split
+    hash puts every training engine outside bucket 0."""
     fold = lambda e: int(hashlib.sha256(f'{SALT}:cv:{e}'.encode()).hexdigest()[:8], 16) % k
     return [([i for i in items if fold(i['engine']) != f], [i for i in items if fold(i['engine']) == f])
             for f in range(k)]
 
 
-# CMHeight: rumus koordinat FM3 (code_semantics, tanpa fit) dan menu linear tetap; dipilih dengan CV.
+# CMHeight: the FM3 coordinate formula (code_semantics, no fit) and a fixed linear menu; chosen by CV.
 CM_CANDIDATES = [('coordinate', ()), ('linear', ('cm_height',)), ('linear', ('cm_height', 'stock_height')),
                  ('linear', ('cm_height', 'stock_height', 'bbox_height')),
                  ('linear', ('cm_height', 'stock_height', 'block_height')),
@@ -425,8 +423,9 @@ CM_CANDIDATES = [('coordinate', ()), ('linear', ('cm_height',)), ('linear', ('cm
 
 
 def cm_features(nodes, bounds):
-    """Fitur CMHeight dari sumber FM2. `stock_height` = tinggi stock depan/belakang dibobot CMBackFront,
-    yang dikurangkan FM4 dari CMHeight (docs/fm3.md, adapter koordinat); `bbox_height` dari model."""
+    """CMHeight features of an FM2 source. `stock_height` = front/rear stock ride height weighted by
+    CMBackFront, which FM4 subtracts from CMHeight (docs/fm3.md, coordinate adapter); `bbox_height`
+    from the model."""
     car, weight = nodes['car'], nodes[WEIGHT]
     front, rear = car['FrontStockRideHeight'], car['RearStockRideHeight']
     return {'cm_height': weight['CMHeight'], 'stock_height': rear + (front - rear) * weight['CMBackFront'],
@@ -445,7 +444,7 @@ def cm_fit(items, kind, features):
 
 
 def cm_predict(model, features):
-    """(nilai, fitur di luar domain training atau None). Di luar domain: rumus koordinat."""
+    """(value, feature outside the training domain or None). Outside the domain: coordinate formula."""
     coordinate = features['cm_height'] + features['stock_height']
     for f in model['features']:
         low, high = model['domain'][f]
@@ -457,8 +456,8 @@ def cm_predict(model, features):
 
 
 def cm_study(items, rule):
-    """Pilih kandidat CMHeight dengan CV per mesin pada training, lalu validation. Diterima bila
-    MAE validation lebih kecil dari aturan linear `value_scales` dan dari rumus koordinat."""
+    """Choose the CMHeight candidate by engine-grouped CV on training, then validate. Accepted when
+    the validation MAE is below the `value_scales` linear rule and the coordinate formula."""
     train = [i for i in items if i['split'] == 'training']
     valid = [i for i in items if i['split'] == 'validation']
     mae = lambda model, part: statistics.mean(abs(cm_predict(model, i['features'])[0] - i['y']) for i in part)
@@ -484,16 +483,16 @@ def cm_study(items, rule):
             'pairs': {'training': len(train), 'validation': len(valid)}}
 
 
-# PerformanceIndex: lebar kelas FM4 hanya 0,06-0,14, sehingga aturan linear value_scales (MAE 0,027)
-# sering meleset satu kelas. Kandidat: hinge pada PI FM2 di batas kelas FM2 (seperti studi PI FM3),
-# ditambah hasil simulasi FM2 yang tersimpan; diurutkan dari yang paling sederhana.
+# PerformanceIndex: FM4 classes are only 0.06-0.14 wide, so the value_scales linear rule (MAE 0.027)
+# often misses by one class. Candidates: a hinge on FM2 PI at the FM2 class bounds (as the FM3 PI
+# study), plus stored FM2 simulation results; ordered from the simplest.
 PI_SIM = ('SimTopSpeed', 'SimTimeTo60MPH', 'SimTimeTo100MPH', 'SimTimeQuarterMile', 'SimSpeedQuarterMile',
           'SimLatGees60MPH', 'SimLatGees120MPH', 'SimBrakeDistance60MPH', 'SimBrakeDistance100MPH')
 PI_CANDIDATES = [('linear', ()), ('hinge', ()),
                  ('hinge', ('SimSpeedQuarterMile', 'SimLatGees60MPH', 'SimBrakeDistance60MPH', 'Year')),
                  ('hinge', PI_SIM), ('hinge', PI_SIM + ('Year',))]
-PI_KNOTS = (0.265, 0.3565, 0.4596, 0.585, 0.72)   # CarClasses.MaxPerformanceIndex D..S di FM2
-PI_TOLERANCE = 1.05   # kandidat paling sederhana dalam 5% dari MAE CV terbaik, seperti performance_index
+PI_KNOTS = (0.265, 0.3565, 0.4596, 0.585, 0.72)   # FM2 CarClasses.MaxPerformanceIndex D..S
+PI_TOLERANCE = 1.05   # simplest candidate within 5% of the best CV MAE, as performance_index
 
 
 def pi_car(car):
@@ -518,7 +517,7 @@ def pi_fit(items, kind, features):
 
 
 def pi_monotone(model):
-    """PI hasil harus naik terhadap PI FM2 di setiap segmen hinge."""
+    """The mapped PI must rise with FM2 PI on every hinge segment."""
     slope = model['coef'][1]
     for w in model['coef'][2:2 + len(model['knots'])]:
         if slope <= 0:
@@ -528,7 +527,7 @@ def pi_monotone(model):
 
 
 def pi_predict(model, car):
-    """(PI, fitur di luar domain training atau None). Di luar domain tidak ada prediksi (None)."""
+    """(PI, feature outside the training domain or None). Outside the domain there is no prediction."""
     for f, (low, high) in model['domain'].items():
         if not low <= car[f] <= high:
             return None, f
@@ -536,9 +535,9 @@ def pi_predict(model, car):
 
 
 def pi_study(items, rule, bounds):
-    """Pilih model PI dengan CV per mesin pada training, lalu ukur validation. Diterima bila monoton
-    dan MAE validation serta kecocokan kelas tidak lebih buruk dari aturan linear value_scales."""
-    from fm4_converter.fm3 import performance_index as pim
+    """Choose the PI model by engine-grouped CV on training, then measure validation. Accepted when
+    monotone and its validation MAE and class match are no worse than the value_scales linear rule."""
+    from ..fm3 import performance_index as pim
     train = [i for i in items if i['split'] == 'training']
     valid = [i for i in items if i['split'] == 'validation']
     ruled = lambda i: vs.predict(rule, i['car']['PerformanceIndex']) \
@@ -565,7 +564,7 @@ def pi_study(items, rule, bounds):
     eligible = [e for e in candidates if e['monotone_every_fold']]
     best = min(e['cv_mae'] for e in eligible)
     chosen = next(e for e in eligible if e['cv_mae'] <= best * PI_TOLERANCE)
-    model = pi_fit(train, chosen['kind'], chosen['features'])   # dibekukan sebelum validation dibaca
+    model = pi_fit(train, chosen['kind'], chosen['features'])   # frozen before validation is read
     model['validation'] = score(lambda i: pi_predict(model, i['car'])[0] or ruled(i), valid)
     model['validation_baselines'] = {'value_scales_rule': score(ruled, valid),
                                      'fm2_identity': score(lambda i: i['car']['PerformanceIndex'], valid)}
@@ -576,9 +575,9 @@ def pi_study(items, rule, bounds):
 
 
 def part_scales(observations, conventions):
-    """Skala rasio median FM4/FM2 untuk kolom kontinu part aspirasi yang bukan konvensi (mis.
-    PowerMaxScale). Studi `value_scales` menolaknya karena tabel turbo FM4 terpecah single/twin
-    (< 30 baris per tabel). Diterima bila MAE CV training dan MAE validation lebih kecil dari identity."""
+    """Median FM4/FM2 ratio for continuous aspiration part columns without a convention (e.g.
+    PowerMaxScale). The `value_scales` study rejects them because FM4 splits turbos into single and
+    twin tables (< 30 rows each). Accepted when training CV MAE and validation MAE beat identity."""
     out = {}
     columns = defaultdict(list)
     for r in observations:
@@ -610,8 +609,8 @@ def part_scales(observations, conventions):
 
 
 def decide(observations, curves, rules, conventions, cm=None, scales=None, pi=None):
-    """Per grup: nilai FM2 (identity atau aturan yang diterima) melawan donor. Dipilih pada training
-    dan dikonfirmasi pada validation; FM2 dipakai hanya bila tidak lebih buruk di keduanya."""
+    """Per group: FM2 values (identity or an accepted rule) against the donor. Chosen on training
+    and confirmed on validation; FM2 is used only when it is no worse on both."""
     accepted = {(r['table'], r['column']): r for r in rules}
 
     def fm2_value(r):
@@ -634,7 +633,7 @@ def decide(observations, curves, rules, conventions, cm=None, scales=None, pi=No
             columns[group(r['role'], r['column']), r['role'], r['column']].append(r)
     groups = defaultdict(dict)
     for (name, role, column), items in sorted(columns.items()):
-        # Seperti value_scales: integer dengan ≤ 50 nilai adalah kategori.
+        # As value_scales: integers with <= 50 values are categories.
         continuous = all(vs.number(r['x']) and vs.number(r['y']) and vs.number(r['d']) for r in items) and not \
             (all(isinstance(r[k], int) for r in items for k in 'xyd') and len({r['y'] for r in items}) <= 50)
         entry = {'continuous': continuous, 'category': c.category(items[0]['table'], column),
@@ -651,8 +650,8 @@ def decide(observations, curves, rules, conventions, cm=None, scales=None, pi=No
         curve[split] = {'n': len(part), 'fm2': statistics.mean(e['fm2'] for e in part),
                         'donor': statistics.mean(e['donor'] for e in part)}
     groups['torque']['torque.full.curve'] = curve
-    # Skor grup: rata-rata bagian galat FM2, fm2 / (fm2 + donor), atas kolom yang galatnya tidak
-    # keduanya nol. Bebas skala, sehingga kolom bernilai hampir nol tidak mendominasi; 0,5 = seri.
+    # Group score: mean FM2 error share, fm2 / (fm2 + donor), over columns where not both errors
+    # are zero. Scale-free, so near-zero columns do not dominate; 0.5 = tie.
     decisions = {}
     for name, members in sorted(groups.items()):
         out = {'columns': members}
@@ -677,7 +676,7 @@ def study(fm2, fm4):
             entry['status'] = 'too_few_rows'
     rule = next((r for r in result['rules'] if (r['table'], r['column']) == (WEIGHT, 'CMHeight')), None)
     cm = cm_study(data['cm'], rule)
-    from fm4_converter.fm3 import performance_index as pim
+    from ..fm3 import performance_index as pim
     pi_rule = next((r for r in result['rules'] if (r['table'], r['column']) == ('Data_Car', 'PerformanceIndex')), None)
     pi = pi_study(data['pi'], pi_rule, pim.classes(fm4))
     scales = part_scales(data['observations'], data['conventions'])
@@ -690,16 +689,16 @@ def study(fm2, fm4):
             'decisions': decisions, 'summary': summary}
 
 
-# Kolom Data_Car yang tetap milik paket atau donor: identitas, keluarga, model dan warna kaliper
-# donor, mask livery, harga. ClassID ditulis ulang dari PerformanceIndex.
+# Data_Car columns owned by the package or donor: identity, family, the donor's caliper model and
+# colour, livery mask, price. ClassID is rewritten from PerformanceIndex.
 PACKAGE_OWNED = {'Year', 'MakeID', 'IsPurchased', 'IsUnicorn', 'AIPlayerID', 'FamilyModelID', 'FamilyBodyID',
                  'CaliperAngleFront', 'CaliperAngleRear', 'CaliperRGBFront', 'CaliperRGBRear', 'HasLivery',
                  'WingMask', 'MaterialTypeID', 'BaseRarity', 'BaseCost', 'ClassID'}
 TURBO = ('List_UpgradeEngineTurboSingle', 'List_UpgradeEngineTurboTwin')
 ASPIRATION = TURBO + ('List_UpgradeEngineCSC', 'List_UpgradeEngineDSC', 'List_UpgradeEngineIntercooler')
-# Tabel part aspirasi stock per AspirationTypeId pada 503 mobil FM4 (tanpa pengecualian): turbo
-# single 81, twin 56, DSC 26, CSC 3, masing-masing dengan intercooler stock. FM4 tidak punya mobil
-# stock quad turbo (4) atau turbo + SC (7).
+# Stock aspiration part tables per AspirationTypeId on the 503 FM4 cars (no exception): single
+# turbo 81, twin 56, DSC 26, CSC 3, each with a stock intercooler. FM4 has no stock quad turbo (4)
+# or turbo + SC (7) car.
 ASPIRATION_PARTS = {1: (), 2: (TURBO[0], 'List_UpgradeEngineIntercooler'),
                     3: (TURBO[1], 'List_UpgradeEngineIntercooler'),
                     5: ('List_UpgradeEngineDSC', 'List_UpgradeEngineIntercooler'),
@@ -709,7 +708,7 @@ TRIPLETS = {'List_SpringDamperPhysics': ('SpringRate', 'DampenBumpRate', 'Dampen
 
 
 def fm2_part_value(table, column, value, study, drive):
-    """Nilai kolom part FM2 di FM4: konvensi tabel, skala part, aturan yang diterima, atau identity."""
+    """An FM2 part column value in FM4: table convention, part scale, accepted rule or identity."""
     fixed = convention(study['conventions'], drive, table, column)
     if fixed:
         return fixed['value'], 'convention'
@@ -723,10 +722,10 @@ def fm2_part_value(table, column, value, study, drive):
 
 
 def new_part(table, fm2_row, engine_id, study, drive, fm4):
-    """Baris stock baru untuk part aspirasi FM2 yang tidak ada di donor. Kunci diisi paket."""
+    """A new stock row for an FM2 aspiration part the donor lacks. The package fills in the key."""
     schema = c.schema(fm4)[table]
     row, origin = {}, {}
-    by_name = {k.casefold(): k for k in fm2_row}   # FM2 menulis `Massdiff` di tabel intercooler
+    by_name = {k.casefold(): k for k in fm2_row}   # FM2 writes `Massdiff` in the intercooler table
     for column in (x['name'] for x in schema['columns']):
         if column == c.pk(schema):
             row[column] = None
@@ -745,14 +744,14 @@ def new_part(table, fm2_row, engine_id, study, drive, fm4):
 
 
 def apply(nodes, source, study, fm4):
-    """Tulis fisika FM2 ke graf stock donor yang sudah dikloning (`package_fm2_test.clone_stock`).
+    """Write FM2 physics into a cloned donor stock graph (`package.clone_stock`).
 
-    Grup yang di studi lebih dekat ke FM4 asli lewat FM2 memakai nilai FM2 (aturan yang diterima
-    bila ada); grup lain tetap donor. Part aspirasi mengikuti AspirationTypeId mobil FM2: part donor
-    yang tidak dimiliki mobil FM2 (atau turbo di tabel single/twin lain) dibuang, part FM2 yang
-    tidak dimiliki donor dipasang sebagai baris stock baru dengan kunci None (`added_roles`).
-    `nodes` diubah di tempat; hasilnya log perubahan dan daftar role yang dibuang/ditambah."""
-    from fm4_converter.fm3 import performance_index
+    Groups that the study found closer to real FM4 through FM2 take FM2 values (through an accepted
+    rule if any); other groups keep the donor's. Aspiration parts follow the FM2 car's
+    AspirationTypeId: donor parts the FM2 car lacks (or a turbo in the other single/twin table) are
+    removed, FM2 parts the donor lacks are installed as new stock rows with key None
+    (`added_roles`). `nodes` is changed in place; returns the change log and the removed/added roles."""
+    from ..fm3 import performance_index
     rules = {(r['table'], r['column']): r for r in study['rules']}
     decisions = {name: d['source'] for name, d in study['decisions'].items()}
     cm = study.get('cm_height')
@@ -768,7 +767,7 @@ def apply(nodes, source, study, fm4):
                              'List_UpgradeEngineIntercooler') if r in source['nodes']}
     if {'turbo' if t in TURBO else t for t in wanted} != fm2_roles:
         raise c.MappingError(f'FM2 aspiration parts {sorted(fm2_roles)} do not match AspirationTypeId {aspiration}')
-    # Part donor di luar susunan aspirasi FM2 tidak disentuh lagi; turbo donor di tabel lain diganti.
+    # Donor parts outside the FM2 aspiration layout are left alone; a donor turbo in the other table is replaced.
     roles = {('turbo' if r in TURBO else r): r for r in nodes if r not in ASPIRATION or r in wanted}
     for role, row in source['nodes'].items():
         if role not in roles:
@@ -808,8 +807,8 @@ def apply(nodes, source, study, fm4):
             if new != out[column]:
                 out[column] = entry['after'] = new
                 log['changed'].append(entry)
-    # Triplet stock yang tidak bisa disetel di FM2 (Min = Def = Max) tetap begitu, seperti 384/503
-    # suspensi stock FM4; aturan terpisah untuk Max tidak boleh membuka rentang setelan.
+    # Stock triplets that FM2 does not let you tune (Min = Def = Max) stay so, as 384/503 FM4 stock
+    # suspensions; a separate rule for Max must not open a tuning range.
     for role in ('spring.front', 'spring.rear', 'antiroll.front', 'antiroll.rear'):
         if decisions.get(group(role, 'DefSpringRate')) != 'fm2':
             continue
@@ -822,9 +821,9 @@ def apply(nodes, source, study, fm4):
                                                'donor': out[prefix + stem], 'fm2': fm2[prefix + stem],
                                                'after': out['Def' + stem], 'rule': 'fixed_stock_triplet'})
                         out[prefix + stem] = out['Def' + stem]
-    # Aturan Max (mis. rebound 20 -> 11,96) bisa jatuh di bawah Def FM2 yang disalin identity. FM4
-    # tidak punya Def > Max (2/2686 baris); Def dipetakan ke posisi relatif yang sama di rentang
-    # baru. Pada 6 gandar training dengan konflik ini: MAE 1,61 lawan clamp ke Max 3,93, identity 5,54.
+    # A Max rule (e.g. rebound 20 -> 11.96) can fall below the identity-copied FM2 Def. FM4 has no
+    # Def > Max (2/2686 rows); Def is mapped to the same relative position in the new range. On the
+    # 6 training axles with this conflict: MAE 1.61 against 3.93 for clamping to Max, 5.54 identity.
     for role in ('spring.front', 'spring.rear', 'antiroll.front', 'antiroll.rear'):
         if decisions.get(group(role, 'DefSpringRate')) != 'fm2':
             continue
@@ -844,12 +843,12 @@ def apply(nodes, source, study, fm4):
         samples = [k for k in out if k[:1] == 'v' and k[1:].isdigit()]
         if count > len(samples):
             raise c.MappingError('FM2 torque curve has more samples than FM4 stores')
-        for k in samples:  # sampel tak aktif = 0, seperti kurva FM4 asli
+        for k in samples:  # inactive samples = 0, as native FM4 curves
             out[k] = curve[k] if int(k[1:]) < count else 0.0
         log['torque_samples'] = count
     if decisions.get('transmission') == 'fm2':
         gears = nodes['List_UpgradeDrivetrainTransmission']['row']
-        for i in range(gears['NumGears'], 9):  # slot gigi tak terpakai = -1 di FM4
+        for i in range(gears['NumGears'], 9):  # unused gear slots = -1 in FM4
             gears[f'GearRatio{i}'] = -1.0
     log['removed_roles'] = [r for r in ASPIRATION if r in nodes and r not in wanted]
     engine_id = nodes['engine']['row']['EngineID']
@@ -861,8 +860,8 @@ def apply(nodes, source, study, fm4):
         log['added_roles'].append(table)
         log['installed'].append({'table': table, 'row': nodes[table]['row'], 'origin': origin,
                                  'fm2': {k: v for k, v in fm2_row.items() if k not in KEYS}})
-    # Graf akhir harus mengikuti konvensi FM4: Data_Car dan Data_Engine menyebut aspirasi yang sama,
-    # dan tepat part stock milik aspirasi itu yang tersisa.
+    # The final graph must follow FM4's conventions: Data_Car and Data_Engine name the same
+    # aspiration, and exactly that aspiration's stock parts remain.
     car, engine = nodes['car']['row'], nodes['engine']['row']
     left = {r for r in ASPIRATION if r in nodes and r not in log['removed_roles']}
     if car['AspirationTypeId'] != aspiration or engine['AspirationID_Stock'] != aspiration or left != set(wanted):
@@ -871,9 +870,9 @@ def apply(nodes, source, study, fm4):
     if (engine['StockBoost-bar'] > 0) != (aspiration != 1):
         raise c.MappingError(f'StockBoost-bar {engine["StockBoost-bar"]} does not match AspirationTypeId {aspiration}')
     log['class'] = performance_index.apply(car, fm4, None)
-    # Seperti validator FM3 (docs/fm3.md, Audi R10): triplet tak berurutan yang diwarisi persis dari
-    # FM2 dipertahankan dengan peringatan, karena runtime menormalisasi default ke batasnya; FM4
-    # asli juga punya 4 baris pegas Def > Max. Pelanggaran baru tetap ditolak.
+    # As the FM3 validator (docs/fm3.md, Audi R10): unordered triplets inherited exactly from FM2
+    # are kept with a warning, because the runtime normalises defaults to their limits; native FM4
+    # also has 4 spring rows with Def > Max. New violations are still rejected.
     log['inherited_unordered'] = []
     for role, node in nodes.items():
         for stem in TRIPLETS.get(node['table'], ()):

@@ -21,7 +21,8 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import carbin_fm2, survey_carbin as sv
+import survey_carbin as sv
+from fm4_converter.fm2 import carbin as carbin_fm2
 from fm4_converter.fm3 import appearance_audit, carbin_audit, effect_audit
 from fm4_converter.fm3.integration import archive_read
 from fm4_converter.fm3.texture_audit import Texture

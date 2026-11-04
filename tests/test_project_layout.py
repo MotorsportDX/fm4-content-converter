@@ -13,10 +13,11 @@ from fm4_converter.paths import PHYSICS_RESEARCH_OUTPUT, PROJECT_ROOT, TOOLS_ROO
 class ProjectLayoutTests(unittest.TestCase):
     def test_cli_modules_run_outside_repository(self):
         with tempfile.TemporaryDirectory() as directory:
-            for module in ("converter", "offline_package", "build_carbin_cpu"):
+            for module in ("fm3.converter", "fm3.offline_package", "fm3.build_carbin_cpu", "fm2.transcode",
+                           "fm2.models", "fm2.physics", "fm2.package"):
                 with self.subTest(module=module):
                     process = subprocess.run(
-                        [sys.executable, "-m", "fm4_converter.fm3." + module, "--help"],
+                        [sys.executable, "-m", "fm4_converter." + module, "--help"],
                         cwd=directory, capture_output=True, text=True, timeout=30,
                     )
                     self.assertEqual(process.returncode, 0, process.stderr)

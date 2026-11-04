@@ -14,12 +14,10 @@ from contextlib import closing
 from pathlib import Path
 import argparse, copy, json, shutil, sqlite3, sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import physics_fm2
-from package_fm2_test import free_key
+from fm4_converter.fm2 import physics as physics_fm2
+from fm4_converter.fm2.package import CONTENT, free_key
 from fm4_converter.fm3 import batch_package, integration
 from fm4_converter.fm3 import converter as c
-from package_fm2_test import CONTENT
 
 STUDY = physics_fm2.OUT / 'study.json'
 

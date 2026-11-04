@@ -3,10 +3,12 @@
 ```text
 src/fm4_converter/
   fm3/                 Converter sumber FM3, pengemasan, audit dan studi kalibrasi
+  fm2/                 Adapter mobil FM2-only: model, fisika, dan paket overlay
   archives/            Pembaca ZIP Forza dan STFS yang dipakai bersama
   paths.py             Lokasi checkout, tools dan evidence lokal
 tests/
   fm3/                 Regresi konversi, fisika, aset dan UI FM3 → FM4
+  fm2/                 Regresi pembaca .carbin FM2, transkode, fisika dan pengemasan
   test_project_layout.py
 docs/
   fm3.md               Panduan dan hasil validasi jalur FM3 → FM4
@@ -15,6 +17,7 @@ tools/
   lzx_bridge/          Source wrapper decoder LZX
 research/
   physics-2026-10-20/   Source dan laporan riset lintas versi
+  cars-fm2-2026-11-02/  Laporan dan skrip audit riset mobil FM2
 third_party/           Snapshot teks lisensi/notice upstream dan manifest hash
 outputs/               Hasil konversi, evidence dan decoder lokal; diabaikan Git
 external/              Checkout pihak ketiga lokal; diabaikan Git
@@ -34,6 +37,7 @@ Jalankan modul menggunakan nama package, misalnya:
 .\.venv\Scripts\python.exe -m fm4_converter.fm3.converter --help
 .\.venv\Scripts\python.exe -m fm4_converter.fm3.offline_package --help
 .\.venv\Scripts\python.exe -m fm4_converter.fm3.build_carbin_cpu --help
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.package --help
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
@@ -50,7 +54,14 @@ Implementasi FM3 berada di `fm4_converter.fm3`. Adapter untuk game sumber lain
 dapat ditambahkan sebagai subpackage tersendiri dengan tes dan dokumentasi
 masing-masing. Pembaca arsip bersama berada di `archives`; aturan kalibrasi
 FM3 tetap berada dalam package FM3 karena belum terbukti berlaku lintas game.
-Belum ada adapter game sumber lain yang diimplementasikan.
+
+`fm4_converter.fm2` adalah adapter kedua, untuk mobil FM2 yang tidak ada di FM3
+maupun FM4. Ia memakai ulang back-end FM3 → FM4: `transcode` menulis model FM2
+sebagai model FM3, lalu helper `carbin-cpu` membuat model FM4. `models` membuat
+model utama, `_lod0`, `_cockpit` dan velg; `physics` memuat studi kalibrasi
+FM2 → FM4 sendiri; `package` menulis semua mobil ke satu overlay. Riset dan
+batas validasinya ada di
+[`research/cars-fm2-2026-11-02/REPORT.md`](../research/cars-fm2-2026-11-02/REPORT.md).
 
 ## Evidence dan riset
 

@@ -8,8 +8,7 @@ Hasil: outputs/car-fm2-research-2026-11-02/carbin_survey.json (diabaikan Git).
 from pathlib import Path
 import argparse, collections, json, math, struct, sys, zipfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import carbin_fm2
+from fm4_converter.fm2 import carbin as carbin_fm2
 from fm4_converter.archives import forza_zip
 from fm4_converter.fm3 import carbin_audit
 from fm4_converter.paths import PROJECT_ROOT

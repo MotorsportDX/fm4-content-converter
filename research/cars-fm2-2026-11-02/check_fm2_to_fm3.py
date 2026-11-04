@@ -14,7 +14,8 @@ import argparse, collections, json, math, struct, subprocess, sys, tempfile, zip
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import carbin_fm2, fm2_to_fm3, survey_carbin as sv
+import survey_carbin as sv
+from fm4_converter.fm2 import carbin as carbin_fm2, transcode as fm2_to_fm3
 from fm4_converter.archives import forza_zip
 from fm4_converter.fm3 import carbin_audit
 from fm4_converter.paths import PROJECT_ROOT

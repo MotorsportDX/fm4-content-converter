@@ -9,8 +9,7 @@ outputs/car-fm2-research-2026-11-02/fm2_wheels_check.json.
 from pathlib import Path
 import argparse, json, struct, sys, tempfile, zipfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import carbin_fm2, fm2_to_fm3, prototype_fm4_model as proto
+from fm4_converter.fm2 import carbin as carbin_fm2, models as proto, sources, transcode as fm2_to_fm3
 from fm4_converter.fm3 import carbin_audit
 from fm4_converter.fm3.integration import archive_read
 from fm4_converter.paths import PROJECT_ROOT
@@ -25,7 +24,7 @@ def main():
     p.add_argument('--limit', type=int)
     a = p.parse_args()
     fm3 = {q.stem.lower(): q for q in FM3_WHEELS.glob('*.zip')}
-    wheels = sorted(proto.FM2_WHEELS.glob('*.zip'))[:a.limit]
+    wheels = sorted(sources.FM2_WHEELS.glob('*.zip'))[:a.limit]
     result = dict(wheels=len(wheels), not_fm2_format=[], failures={}, passed=0, header_checks=0,
                   header_same_except_end_floats=0, worst={})
     worst = result['worst']
@@ -51,9 +50,9 @@ def main():
                         and native[END_FLOATS_AT + 8:] == head[END_FLOATS_AT + 8:])
                 source, lod15, final = (temp / f'{number}.{k}.carbin' for k in ('fm3', 'lod15', 'fm4'))
                 source.write_bytes(out)
-                proto.helper('convert', source, lod15)
+                proto.run_helper(proto.HELPER, 'convert', source, lod15)
                 audit = carbin_audit.audit_conversion(out, lod15.read_bytes())
-                proto.helper('lod0', lod15, final)
+                proto.run_helper(proto.HELPER, 'lod0', lod15, final)
                 lod0 = proto.audit_wheel_lod0(lod15.read_bytes(), final.read_bytes())
                 for key, value in (('position_m', audit['position_error_m']),
                                    ('normal_deg', audit['normal_error_degrees']), ('uv', audit['uv_error']),

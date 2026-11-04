@@ -1,48 +1,49 @@
-"""Prototipe: .carbin FM2 -> .carbin berbentuk FM3, untuk konverter FM3 -> FM4. Bodi mobil (FM2 type 2
--> FM3 type 1) dan velg (FM2 type 1 -> FM3 type 2).
+"""FM2 .carbin -> FM3-shaped .carbin for the FM3 -> FM4 model converter. Car bodies (FM2 type 2
+-> FM3 type 1) and wheels (FM2 type 1 -> FM3 type 2).
 
-FM2 dan FM3 memakai struktur yang sama kecuali hal-hal di bawah (diukur pada 146 mobil yang ada
-di kedua game, lihat REPORT.md bagian 7). File hasilnya dibaca oleh carbin_audit (FM3) dan oleh
-helper ForzaEditor, lalu `carbin-cpu convert` membuat model FM4 dengan jalur yang sama seperti
-mobil FM3. Hanya membaca FM2; tidak ada data FM3 yang disalin selain konstanta struktural.
+FM2 and FM3 share their structure except for the points below (measured on the 146 cars both
+games ship, REPORT.md section 7). carbin_audit (FM3) and the ForzaEditor helper read the result,
+and `carbin-cpu convert` then builds the FM4 model along the same path as FM3 cars. Only FM2 is
+read; no FM3 data is copied besides structural constants.
 
-- header: FM2 [0x104] = 0x2CA, 1, N, N record 140 byte (sama dengan FM3), lalu 0x6C byte: word 1,
-  24 float driver rig, (4, 4). FM3 [0x104] = 0xD, 0xB, 1, N, record, lalu 0x1AC byte: word 3, driver
-  rig, 0xA8 byte konstan, 4 gauge frame netral (9 float), dua float x, y = -2x, (4, 4). Velg: FM2
-  [0] = 1, 0x2CA, 1, N tanpa blok 0x100 byte; FM3 [0] = 2, 20 byte nol, lalu blok format yang sama
-  (172 velg di kedua game). Velg FM2 hanya punya buffer kaca; buffer bodi kosong;
-- section: marker 0x2C9 -> 2; FM2 punya word rentang vertex (first, last u16) di depan vbTest dan
-  satu word ekstra setelah PostName; vertex ada di dua buffer bersama (kaca/bodi) di akhir file,
-  FM3 menyimpan buffer LOD per section;
-- subsection: FM2 8 byte di depan nama dan urutan (tipe indeks, LOD); FM3 9 byte, (LOD, tipe),
-  56 byte konstan setelahnya dan 4 byte nol di akhir;
-- vertex 60 -> 40 byte: posisi dan normal disalin; UV fixed-point u16 -> half; 4 nilai ambient
-  S16 FM3 = 4 S16 pertama FM2 (offset 28) x AMBIENT_SCALE; word damage dan word berikutnya dari
-  offset 20 dan 24; sumbu Z frame tangent (FM2 tidak menyimpannya) = -dP/dv dari UV segitiga.
+- header: FM2 [0x104] = 0x2CA, 1, N, N records of 140 bytes (as FM3), then 0x6C bytes: word 1,
+  24 driver rig floats, (4, 4). FM3 [0x104] = 0xD, 0xB, 1, N, records, then 0x1AC bytes: word 3,
+  driver rig, 0xA8 constant bytes, 4 neutral gauge frames (9 floats), two floats x, y = -2x, (4, 4).
+  Wheels: FM2 [0] = 1, 0x2CA, 1, N without the 0x100-byte block; FM3 [0] = 2, 20 zero bytes, then
+  the same format block (172 wheels in both games). FM2 wheels only fill the glass buffer;
+- section: marker 0x2C9 -> 2; FM2 has a vertex range word (first, last u16) before vbTest and one
+  extra word after PostName; vertices live in two shared buffers (glass/body) at the end of the
+  file, FM3 stores a LOD buffer per section;
+- subsection: FM2 has 8 bytes before the name and the order (index type, LOD); FM3 has 9 bytes,
+  (LOD, type), 56 constant bytes after it and 4 zero bytes at the end;
+- vertex 60 -> 40 bytes: position and normal copied; fixed-point u16 UV -> half; FM3's 4 S16
+  ambient values = FM2's first 4 S16 (offset 28) x AMBIENT_SCALE; the damage word and the next
+  word from offsets 20 and 24; the tangent frame Z axis (FM2 does not store it) = -dP/dv from the
+  triangle UVs.
 
-Empat mobil disc FM2 punya section 3-6 vertex dengan posisi NaN (w = 0x7FFF) dan bounds +-1.7e38;
-section seperti itu diciutkan ke satu titik (lihat repair) agar draw list tetap utuh.
+Four FM2 disc cars have sections of 3-6 vertices with NaN positions (w = 0x7FFF) and bounds of
++-1.7e38; such sections collapse to one point (see `repair`) so the draw lists stay intact.
 """
 from pathlib import Path
-import argparse, struct, sys
+import argparse, struct
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import carbin_fm2
+from . import carbin
 
 FM3_TYPE_CAR, FM3_TYPE_WHEEL = 1, 2
 FM2_TYPE_CAR, FM2_TYPE_WHEEL = 2, 1
 FM3_FORMAT = (0xD, 0xB)
-RIG_WORD = 3                      # FM3/FM4 main; FM2 menyimpan 1
+RIG_WORD = 3                      # FM3/FM4 main models; FM2 stores 1
 FM3_STRIDE = 40
-# 0xA8 byte setelah driver rig: konstan pada semua mobil disc FM3 (survei 200 mobil).
+# 0xA8 bytes after the driver rig: constant on every FM3 disc car (survey of 200 cars).
 AFTER_RIG = struct.pack('>42I', *([0] * 30 + [0x3F800000] + [0] * 9 + [1, 5]))
 NEUTRAL_FRAME = struct.pack('>9f', 0, 0, 0, 0, 0, 1, 0, 0, 1)
-# Dua float akhir header (x, y = -2x; arti belum diketahui). Median 200 mobil disc FM3.
+# The header's two final floats (x, y = -2x; meaning unknown). Median of 200 FM3 disc cars.
 END_FLOATS = (-0.33879199624061584, 0.6790955066680908)
-# Velg FM3: 270 dari 389 header identik sampai dua float akhir. Rig velg FM2 semuanya nol; rig velg
-# FM3 hanya berisi 1.0 di float ke-7, dan word ke-41 blok setelah rig 0 (mobil 1). Float akhir = median.
+# FM3 wheels: 270 of 389 headers are identical up to the two final floats. FM2 wheel rigs are all
+# zero; FM3 wheel rigs only hold 1.0 in float 7, and word 41 of the after-rig block is 0 (cars: 1).
+# Final floats = median.
 WHEEL_RIG = struct.pack('>24f', *([0] * 6 + [1] + [0] * 17))
 WHEEL_AFTER_RIG = struct.pack('>42I', *([0] * 30 + [0x3F800000] + [0] * 9 + [0, 5]))
 WHEEL_END_FLOATS = (-0.32778599858283997, 0.6643739938735962)
@@ -51,14 +52,14 @@ SUB_FIXED56 = bytes.fromhex('00000000000000010000000000000000000000000000'
                             '00003f8000003f8000003f8000003f80000000000000'
                             '000000003f8000003f800000')
 TRAILER = bytes.fromhex('000000010000000000000001000000000000000100000000')
-# FM3 ambient S16 ~ FM2 S16 x 1.48 (median rasio 1.47-1.49 pada 39031 pasangan vertex 4 mobil,
-# korelasi 0.96-0.99; FM3 dipanggang ulang, jadi bukan padanan persis).
+# FM3 ambient S16 ~ FM2 S16 x 1.48 (median ratio 1.47-1.49 over 39031 vertex pairs of 4 cars,
+# correlation 0.96-0.99; FM3 was rebaked, so this is no exact equivalent).
 AMBIENT_SCALE = 1.48
-# Panjang minimum sumbu Z tangent setelah diproyeksikan ke bidang normal (lihat frame_z).
+# Minimum length of the tangent Z axis after projection onto the normal plane (see frame_z).
 MIN_FRAME_AXIS = 0.1
 
 
-class FormatError(carbin_fm2.FormatError):
+class FormatError(carbin.FormatError):
     pass
 
 
@@ -67,19 +68,19 @@ def u32(v):
 
 
 def raw_section(data, offset):
-    """Field mentah satu section FM2 yang tidak disimpan decoder (urutan carbin_fm2.section_head)."""
-    r = carbin_fm2.Reader(data)
+    """Raw fields of one FM2 section that the reader does not keep (order of carbin.section_head)."""
+    r = carbin.Reader(data)
     r.pos = offset
     out = {}
     marker = r.u32()
-    if marker not in carbin_fm2.SECTION_MARKERS:
+    if marker not in carbin.SECTION_MARKERS:
         raise FormatError(f'section at 0x{offset:x} without marker')
     out['bounds'] = r.f32s(9)
     out['unk1c'] = data[r.pos:r.pos + 0x1C]
     r.skip(0x1C)
     start = r.pos
     r.counted_skip(0x10)
-    out['shards'] = data[start:r.pos]                 # count + 16-byte vertices (pecahan kaca)
+    out['shards'] = data[start:r.pos]                 # count + 16-byte vertices (glass shards)
     out['after_shards'] = data[r.pos:r.pos + 4]
     r.skip(4)
     start = r.pos
@@ -90,9 +91,9 @@ def raw_section(data, offset):
     r.skip(4)
     out['vb'] = (r.u32(), r.u32())
     out['name'] = r.ascii(r.u8())
-    out['post'] = data[r.pos:r.pos + 8]               # 2 (PostName FM3), 1
+    out['post'] = data[r.pos:r.pos + 8]               # 2 (FM3 PostName), 1
     r.skip(8)
-    if (r.i32(), r.u32()) != (0, carbin_fm2.VERTEX_SIZE):
+    if (r.i32(), r.u32()) != (0, carbin.VERTEX_SIZE):
         raise FormatError(f'{out["name"]}: section with its own vertices')
     out['after_lod'] = data[r.pos:r.pos + 4]
     r.skip(4)
@@ -100,8 +101,8 @@ def raw_section(data, offset):
 
 
 def raw_indices(data, sub):
-    """Indeks mentah (lokal section, restart utuh) tepat seperti di file FM2."""
-    r = carbin_fm2.Reader(data)
+    """Raw indices (section-local, restarts intact) exactly as in the FM2 file."""
+    r = carbin.Reader(data)
     r.pos = sub.offset + 8
     r.skip(r.i32() + 12)
     count, size = r.i32(), r.i32()
@@ -109,9 +110,10 @@ def raw_indices(data, sub):
 
 
 def header(data, model):
-    """Header FM3 dari header FM2: prefix, format FM3, record, driver rig, konstanta."""
+    """FM3 header from the FM2 header: prefix, FM3 format, records, driver rig, constants."""
     block = 0x104 if model.type_id == FM2_TYPE_CAR else 4
-    if model.type_id not in (FM2_TYPE_CAR, FM2_TYPE_WHEEL) or             struct.unpack_from('>2I', data, block) != (carbin_fm2.FM2_MARKER, 1):
+    if model.type_id not in (FM2_TYPE_CAR, FM2_TYPE_WHEEL) or \
+            struct.unpack_from('>2I', data, block) != (carbin.FM2_MARKER, 1):
         raise FormatError('unexpected FM2 format block')
     records = struct.unpack_from('>I', data, block + 8)[0]
     end = block + 12 + records * 140
@@ -131,7 +133,7 @@ def header(data, model):
 
 
 def pack111110(v):
-    """Vektor (n, 3) -> word 11:11:10 bertanda (kebalikan carbin_fm2.unpack_normal)."""
+    """Vectors (n, 3) -> signed 11:11:10 words (inverse of carbin.unpack_normal)."""
     x = np.clip(np.round(v[:, 0] * 1023), -1023, 1023).astype(np.int64) & 0x7FF
     y = np.clip(np.round(v[:, 1] * 1023), -1023, 1023).astype(np.int64) & 0x7FF
     z = np.clip(np.round(v[:, 2] * 511), -511, 511).astype(np.int64) & 0x3FF
@@ -139,11 +141,11 @@ def pack111110(v):
 
 
 def repair(pool, bounds, name):
-    """Vertex dengan posisi non-finite dipindah ke origin section (xyz = w = 0).
+    """Vertices with non-finite positions move to the section origin (xyz = w = 0).
 
-    Bounds yang rusak (non-finite atau |nilai| > 1e30) hanya diterima bila semua vertex section
-    juga rusak; section itu menjadi satu titik di origin yang masih finite, bounds +-1 mm.
-    Mengembalikan (vertex, bounds, jumlah vertex yang dipindah).
+    Broken bounds (non-finite or |value| > 1e30) are only accepted when every vertex of the
+    section is broken too; that section becomes one point at its still-finite origin, bounds
+    +-1 mm. Returns (vertices, bounds, number of vertices moved).
     """
     pos = pool[:, 0:8].copy().view('>f2').astype(np.float64).reshape(-1, 4)
     bad = ~np.all(np.isfinite(pos[:, :3] * pos[:, 3:4]), axis=1)
@@ -160,13 +162,13 @@ def repair(pool, bounds, name):
 
 
 def frame_z(section, raw, local):
-    """Sumbu Z frame tangent FM3 (= -dP/dv) per vertex section, dari segitiga semua LOD-nya."""
+    """FM3 tangent frame Z axis (= -dP/dv) per section vertex, from the triangles of all its LODs."""
     pos = raw[:, 0:8].copy().view('>f2').astype(np.float64).reshape(-1, 4)
     p = pos[:, :3] * pos[:, 3:4]
     uv = (raw[:, 8:12].copy().view('>u2').astype(np.float64).reshape(-1, 2) - 32768) / 1310.72
     acc = np.zeros((len(raw), 3))
     for sub in section.subsections:
-        faces = np.array(carbin_fm2.faces(sub), dtype=np.int64).reshape(-1, 3) - local
+        faces = np.array(carbin.faces(sub), dtype=np.int64).reshape(-1, 3) - local
         if not len(faces):
             continue
         e1, e2 = p[faces[:, 1]] - p[faces[:, 0]], p[faces[:, 2]] - p[faces[:, 0]]
@@ -176,10 +178,10 @@ def frame_z(section, raw, local):
         b = (e2[ok] * d1[ok, :1] - e1[ok] * d2[ok, :1]) / det[ok, None]
         for k in range(3):
             np.add.at(acc, faces[ok, k], b)
-    # Di bidang normal, seperti FM3. Bila -dP/dv (hampir) sejajar normal, nol: frame quaternion FM4
-    # dari sumbu sependek itu tidak stabil (normal bergeser sampai 0,8 derajat), dan writer FM4
-    # memakai sumbu bawaannya untuk sumbu nol.
-    normal = np.array([carbin_fm2.unpack_normal(int(w)) for w in raw[:, 16:20].copy().view('>u4').ravel()])
+    # In the normal plane, as FM3. When -dP/dv is (nearly) parallel to the normal, zero: the FM4
+    # quaternion frame of such a short axis is unstable (normals shift by up to 0.8 degrees), and
+    # the FM4 writer uses its default axis for a zero axis.
+    normal = np.array([carbin.unpack_normal(int(w)) for w in raw[:, 16:20].copy().view('>u4').ravel()])
     normal /= np.maximum(np.linalg.norm(normal, axis=1), 1e-12)[:, None]
     length = np.linalg.norm(acc, axis=1)
     z = np.where(length[:, None] > 1e-12, -acc / np.maximum(length, 1e-300)[:, None], 0.0)
@@ -190,7 +192,7 @@ def frame_z(section, raw, local):
 
 
 def vertices(raw, section, local):
-    """Vertex FM2 60 byte (array (n, 60) uint8) -> FM3 40 byte."""
+    """FM2 60-byte vertices ((n, 60) uint8 array) -> FM3 40-byte vertices."""
     n = len(raw)
     out = np.zeros((n, FM3_STRIDE), dtype=np.uint8)
     out[:, 0:8] = raw[:, 0:8]
@@ -206,15 +208,15 @@ def vertices(raw, section, local):
 
 
 def convert(data):
-    """Bytes .carbin FM2 (mobil atau velg) -> bytes .carbin FM3 dan ringkasan."""
-    model = carbin_fm2.parse(data)
+    """FM2 .carbin bytes (car or wheel) -> FM3 .carbin bytes and a summary."""
+    model = carbin.parse(data)
     head, lists_at = header(data, model)
-    # Draw list, word sebelum section dan jumlah section disalin apa adanya.
+    # Draw lists, the word before the sections and the section count are copied as they are.
     first_section = model.sections[0].offset
     out = [head, data[lists_at:first_section]]
-    # Lokasi data dua buffer bersama (urutan carbin_fm2.parse).
+    # Data of the two shared buffers (order of carbin.parse).
     buffers = {}
-    r = carbin_fm2.Reader(data)
+    r = carbin.Reader(data)
     r.pos = model.buffers_offset + 8
     count = r.i32()
     r.skip(8)
@@ -231,13 +233,13 @@ def convert(data):
         raw = raw_section(data, section.offset)
         first, last = raw['range']
         if first != section.base:
-            raise FormatError(f'{section.name}: range starts at {first}, decoder base {section.base}')
+            raise FormatError(f'{section.name}: range starts at {first}, reader base {section.base}')
         pool = buffers[section.buffer]
         if last >= len(pool) or last < first:
             raise FormatError(f'{section.name}: range {first}..{last} outside {section.buffer} buffer')
         bmin, bmax = raw['bounds'][3:6], raw['bounds'][6:9]
         if any(abs(a + b) > 1e-6 for a, b in zip(bmin, bmax)):
-            # FM3 menambahkan pusat bounds ke posisi, FM2 tidak; semua mobil disc FM2 simetris.
+            # FM3 adds the bounds centre to positions, FM2 does not; every FM2 disc car is symmetric.
             raise FormatError(f'{section.name}: asymmetric bounds')
         part, bounds, moved = repair(pool[first:last + 1], raw['bounds'], section.name)
         if moved:
@@ -265,8 +267,8 @@ def convert(data):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('source', type=Path, help='.carbin FM2')
-    p.add_argument('target', type=Path, help='.carbin FM3 baru (tidak menimpa)')
+    p.add_argument('source', type=Path, help='FM2 .carbin')
+    p.add_argument('target', type=Path, help='new FM3 .carbin (never overwritten)')
     a = p.parse_args()
     data, summary = convert(a.source.read_bytes())
     with open(a.target, 'xb') as f:

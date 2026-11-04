@@ -1,82 +1,97 @@
-"""Prototipe model FM4 untuk satu mobil FM2: <car>.carbin, <car>_lod0.carbin, <car>_cockpit.carbin, dan
-velg stock-nya wheel/<velg>.carbin.
+"""FM4 models for one FM2 car: <car>.carbin, <car>_lod0.carbin, <car>_cockpit.carbin and its stock
+wheel wheel/<wheel>.carbin.
 
-Alur: .carbin FM2 -> fm2_to_fm3 -> `carbin-cpu convert` (konverter FM3 -> FM4 yang dipakai untuk
-mobil FM3) -> model utama FM4 (LOD 1-5). `carbin-cpu closeup` (CloseUpFromLod1 ForzaEditor) lalu
-membuat _lod0 dan _cockpit dari LOD 1 model utama. Pembagian section mengikuti mobil disc FM4:
-section kokpit (COCKPIT) masuk _cockpit, sisanya _lod0; game menggambar keduanya bersama di LOD 0.
-Header kedua file close-up diambil dari file sejenis milik mobil FM4 donor (`--donor`), karena FM2
-tidak punya header close-up; blok cermin kokpit dinolkan bila tidak ada mesh mirrorMiddle.
-Material di _cockpit diganti menurut COCKPIT_MATERIALS: FM4 memetakan mesh kokpit LOD 0 ke teknik
-`cockpit_<material>`, dan `cockpit_interior` tidak ada di efek FM4.
+Path: FM2 .carbin -> `transcode` -> `carbin-cpu convert` (the FM3 -> FM4 converter used for FM3
+cars) -> FM4 main model (LOD 1-5). `carbin-cpu closeup` (ForzaEditor's CloseUpFromLod1) then builds
+_lod0 and _cockpit from the main model's LOD 1. Sections are split as on FM4 disc cars: cockpit
+sections (COCKPIT) go to _cockpit, the rest to _lod0; the game draws both together at LOD 0. Both
+close-up headers come from the same files of an FM4 donor car, because FM2 has no close-up
+header; the cockpit mirror block is zeroed when there is no mirrorMiddle mesh. Materials in
+_cockpit are renamed by COCKPIT_MATERIALS: FM4 maps LOD 0 cockpit meshes to the technique
+`cockpit_<material>`, and FM4's effects have no `cockpit_interior`.
 
-Audit: model utama dengan carbin_audit.audit_conversion (seperti mobil FM3); file close-up dibaca
-carbin_audit (FM4), lalu setiap mesh LOD 0 dibandingkan segitiga demi segitiga (posisi, normal,
-UV, word damage) dengan mesh LOD 1 yang sama di model utama. Tidak ada game yang dijalankan.
+Audit: the main model with carbin_audit.audit_conversion (as FM3 cars); the close-up files are
+read by carbin_audit (FM4), then every LOD 0 mesh is compared triangle by triangle (position,
+normal, UV, damage word) with the same LOD 1 mesh of the main model. No game is run.
 
-Velg: .carbin velg FM2 (type 1) -> fm2_to_fm3 (velg FM3 type 2) -> `carbin-cpu convert` (velg FM4
-type 3, LOD 1-5, diaudit dengan audit_conversion) -> `carbin-cpu lod0` (Lod0FromLod1 ForzaEditor:
-LOD 0 = salinan LOD 1 tanpa ban, seperti 441 dari 442 velg FM4). audit_wheel_lod0 membandingkan
-LOD 1-5 sebelum dan sesudah, dan setiap mesh LOD 0 dengan mesh LOD 1 yang sama.
-Hasil di --out (default outputs/car-fm2-prototype-2026-11-03/<car>, diabaikan Git).
+Wheel: FM2 wheel .carbin (type 1) -> `transcode` (FM3 wheel, type 2) -> `carbin-cpu convert` (FM4
+wheel type 3, LOD 1-5, audited with audit_conversion) -> `carbin-cpu lod0` (ForzaEditor's
+Lod0FromLod1: LOD 0 = copy of LOD 1 without the tyre, as 441 of 442 FM4 wheels). audit_wheel_lod0
+compares LOD 1-5 before and after, and every LOD 0 mesh with the same LOD 1 mesh.
 """
 from pathlib import Path
-import argparse, collections, hashlib, json, math, sqlite3, struct, subprocess, sys, zipfile
+import argparse, hashlib, json, math, sqlite3, struct, subprocess, sys, zipfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import fm2_to_fm3, survey_carbin as sv
-from fm4_converter.archives import forza_zip
-from fm4_converter.fm3 import carbin_audit
-from fm4_converter.paths import PROJECT_ROOT
+from . import sources, transcode
+from ..archives import forza_zip
+from ..fm3 import appearance_audit, carbin_audit
+from ..paths import PROJECT_ROOT
 
-FM4 = Path(r'D:\Data\forza-motorsport-4\Forza Motorsport 4 (Japan, Asia) (Disc 1) (Play Disc)\Media\cars')
 HELPER = PROJECT_ROOT / 'outputs/fm-car-converter/import-v1/carbin-cpu-v9/carbin-cpu.exe'
-FM2_DB = Path(r'D:\Data\FM2\USA\Forza Motorsport 2 (USA)\Media\DB\gamedb.slt')
-FM2_WHEELS = Path(r'D:\Data\FM2\USA\Forza Motorsport 2 (USA)\Media\wheels')
-OUT = PROJECT_ROOT / 'outputs/car-fm2-prototype-2026-11-03'
-# Section _cockpit FM4 yang juga ada di FM2 (a_pillar dan jarum gauge tidak ada di FM2).
+# FM4 _cockpit sections that FM2 also has (FM2 has no a_pillar or gauge needles).
 COCKPIT = ('seatL', 'seatR', 'steering_wheel', 'cagerace', 'glassLF', 'glassRF',
            'mirrorL', 'mirrorR', 'interior', 'glassF', 'hooda')
-# Material FM2 `interior` membaca atlas bodi (teknik `interior` di LOD 1-5). Di kokpit LOD 0 ia menjadi
-# `cockpit_plastic`, yang membaca Interior_LOD0.xds; paket uji mengisinya dengan atlas bodi yang sama.
-# Kaca spion FM2 bermaterial `chrome`; FM4 menggambar pantulan hanya untuk mirrorLeft/Right/Middle.
-# Ketiga mesh cocok posisi, ukuran, dan arah normalnya dengan mesh spion JAG_XKRS_09 (REPORT 9.2).
-# Material eksterior FM2 di section kokpit (REPORT 14.2) tidak punya teknik cockpit_<material> di FM4.
-# Semua teknik kokpit FM4 kecuali kaca membaca atlas interior (di sini atlas bodi): matte_colors, misc
-# dan weatherstrip FM2 memang membaca atlas bodi; UV mesh `black` (teknik FM4 tanpa tekstur) menunjuk
-# texel hampir hitam pada mobil yang diukur. tail_light membaca atlas lampu, yang tidak terbaca teknik
-# kokpit mana pun (5-6 vertex per mobil).
+# The FM2 material `interior` reads the body atlas (technique `interior` at LOD 1-5). In the LOD 0
+# cockpit it becomes `cockpit_plastic`, which reads Interior_LOD0.xds; packages fill that with the
+# same body atlas. FM2 mirror glass uses `chrome`; FM4 only draws reflections for
+# mirrorLeft/Right/Middle. The three meshes match the position, size and normal direction of the
+# JAG_XKRS_09 mirror meshes (REPORT 9.2).
+# FM2 exterior materials in cockpit sections (REPORT 14.2) have no cockpit_<material> technique in
+# FM4. Every FM4 cockpit technique except glass reads the interior atlas (here the body atlas):
+# FM2's matte_colors, misc and weatherstrip read the body atlas too; the UVs of `black` meshes (an
+# untextured FM4 technique) point at near-black texels on the cars measured. tail_light reads the
+# lights atlas, which no cockpit technique reads (5-6 vertices per car).
 COCKPIT_MATERIALS = {'interior': 'plastic', 'mirrorL/chrome': 'mirrorLeft', 'mirrorR/chrome': 'mirrorRight',
                      'interior/chrome': 'mirrorMiddle', 'black': 'plastic', 'matte_colors': 'plastic',
                      'misc': 'plastic', 'weatherstrip': 'rubber', 'black_glass': 'glass', 'window': 'glass',
                      'tail_light': 'reflector'}
-# Spion tengah dengan UV konstan tidak bisa dipetakan ke UV 0-1 mirrorMiddle; mesh itu tetap
-# cockpit_chrome dan blok cermin dinolkan seperti mobil tanpa spion tengah.
+# A middle mirror with constant UVs cannot be fitted to mirrorMiddle's 0-1 UVs; that mesh stays
+# cockpit_chrome and the mirror block is zeroed as on cars without a middle mirror.
 NO_MIDDLE_MIRROR = 'Mirror mesh mirrorMiddle has constant UVs'
 MIRROR_MATERIALS = ('mirrorLeft', 'mirrorRight', 'mirrorMiddle')
-NO_MIRROR = bytes(76) + struct.pack('>I', 1)   # blok cermin model tanpa mirrorMiddle (lihat carbin_audit)
+NO_MIRROR = bytes(76) + struct.pack('>I', 1)   # mirror block of a model without mirrorMiddle (see carbin_audit)
 
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def helper(*args):
-    result = subprocess.run([str(HELPER), *map(str, args)], capture_output=True, text=True)
+def run_helper(helper, *args):
+    result = subprocess.run([str(helper), *map(str, args)], capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stderr.strip())
     return json.loads(result.stdout)
 
 
+def cockpit_renames(model):
+    """`section/material` renames for the _cockpit sections of the FM4 main model. A `section/material`
+    key of COCKPIT_MATERIALS applies as written; a bare `material` key only applies in sections that
+    FM4 maps to `cockpit_<material>` (appearance_audit.COCKPIT_PARTS): glass, mirror, hood and cage
+    sections keep their exterior techniques (frontwindow, black, ...). The helper rejects renames
+    that match nothing, so only meshes that exist are listed."""
+    out = {}
+    for section in model['sections']:
+        if section['name'] not in COCKPIT:
+            continue
+        cockpit = any(p in section['name'].casefold() for p in appearance_audit.COCKPIT_PARTS)
+        for mesh in (m for m in section['meshes'] if m['lod'] == 1):   # close-ups are built from LOD 1
+            key = f"{section['name']}/{mesh['name']}"
+            if key in COCKPIT_MATERIALS:
+                out[key] = COCKPIT_MATERIALS[key]
+            elif cockpit and mesh['name'] in COCKPIT_MATERIALS:
+                out[key] = COCKPIT_MATERIALS[mesh['name']]
+    return out
+
+
 def fix_mirror(data):
-    """Blok cermin harus mengikuti mesh mirrorMiddle; header donor membawa milik donor."""
+    """The mirror block must follow the mirrorMiddle mesh; the donor header carries the donor's."""
     if carbin_audit.mirror_block(carbin_audit.parse(data, 'FM4')) is None:
         data = data[:carbin_audit.MIRROR_BLOCK] + NO_MIRROR + data[carbin_audit.MIRROR_BLOCK + 80:]
     return carbin_audit.with_mirror_block(data)
 
 
 def triangles(section, mesh, pool):
-    """Segitiga mesh sebagai tuple vertex (posisi, normal, uv0, word damage) dari file FM4."""
+    """A mesh's triangles as vertex tuples (position, normal, uv0, damage word) from an FM4 file."""
     positions = carbin_audit.positions(section, pool, 'FM4')
     damage = section['damage0' if mesh['lod'] == 0 else 'damage']
     idx = list(carbin_audit.index_values(mesh)) if mesh['primitive'] == 4 else None
@@ -104,8 +119,8 @@ def triangles(section, mesh, pool):
 
 
 def audit_closeup(main, data, donor_head, kind, renames=None):
-    """File close-up vs LOD 1 model utama: header donor, mesh, segitiga, posisi, normal, UV, damage.
-    `renames` = penggantian nama material yang diharapkan ({lama atau section/lama: baru})."""
+    """Close-up file vs the main model's LOD 1: donor header, meshes, triangles, positions, normals,
+    UVs, damage. `renames` = the expected material renames ({old or section/old: new})."""
     renames = renames or {}
     rename = lambda section, name: renames.get(f'{section}/{name}', renames.get(name, name))
     model = carbin_audit.parse(data, 'FM4')
@@ -127,7 +142,7 @@ def audit_closeup(main, data, donor_head, kind, renames=None):
             ta, tb = triangles(source, a, source['lod']), triangles(section, b, section['lod0'])
             if len(ta) != len(tb):
                 raise carbin_audit.FormatError(f'{kind}/{section["name"]}/{b["name"]}: triangle count')
-            # UV spion dipasang ulang ke 0..1 oleh helper (FitMirrorUv); yang lain harus sama.
+            # The helper refits mirror UVs to 0..1 (FitMirrorUv); everything else must match.
             mirror = b['name'] in MIRROR_MATERIALS and b['name'] != a['name']
             refitted += mirror
             for fa, fb in zip(ta, tb):
@@ -155,7 +170,7 @@ def audit_closeup(main, data, donor_head, kind, renames=None):
 
 
 def compare_meshes(sa, ma, pa, sb, mb, pb, worst, where):
-    """Segitiga mesh ma (pool pa) vs mb (pool pb): posisi, normal, UV, word damage; memperbarui worst."""
+    """Triangles of mesh ma (pool pa) vs mb (pool pb): position, normal, UV, damage word; updates worst."""
     ta, tb = triangles(sa, ma, pa), triangles(sb, mb, pb)
     if len(ta) != len(tb):
         raise carbin_audit.FormatError(f'{where}: triangle count')
@@ -171,7 +186,7 @@ def compare_meshes(sa, ma, pa, sb, mb, pb, worst, where):
 
 
 def audit_wheel_lod0(before, after):
-    """Velg FM4 setelah `lod0`: LOD 1-5 tetap, LOD 0 = mesh LOD 1 selain ban, rentang LOD 0-5."""
+    """FM4 wheel after `lod0`: LOD 1-5 unchanged, LOD 0 = LOD 1 meshes except the tyre, LOD range 0-5."""
     a, b = carbin_audit.parse(before, 'FM4'), carbin_audit.parse(after, 'FM4')
     if [s['name'] for s in a['sections']] != [s['name'] for s in b['sections']]:
         raise carbin_audit.FormatError('wheel: sections changed')
@@ -202,69 +217,62 @@ def audit_wheel_lod0(before, after):
                 **{f'lod0_worst_{k}': v for k, v in lod0.items()}, sha256=sha(after), runtime_tested=False)
 
 
-def build_wheel(car, out):
-    """Velg stock FM2 mobil `car` sebagai velg FM4 di out/wheel/<velg>.carbin; laporan velg."""
-    with sqlite3.connect(f'file:{FM2_DB}?mode=ro', uri=True) as db:
+def build_wheel(car, out, helper=HELPER):
+    """The FM2 stock wheel of `car` as an FM4 wheel in out/wheel/<wheel>.carbin; the wheel report."""
+    with sqlite3.connect(f'file:{sources.FM2_DB}?mode=ro', uri=True) as db:
         wheel, = db.execute('SELECT w.MediaName FROM Data_Car c JOIN List_Wheels w ON w.ID = c.StockWheelID '
                             'WHERE lower(c.MediaName) = ?', (car,)).fetchone()
     name = wheel.lower()
-    with zipfile.ZipFile(next(p for p in FM2_WHEELS.glob('*.zip') if p.stem.lower() == name)) as z:
+    with zipfile.ZipFile(sources.disc_zip(sources.FM2_WHEELS, name)) as z:
         fm2 = z.read(next(i.filename for i in z.infolist() if i.filename.lower() == name + '.carbin'))
     folder = out / 'wheel'
     folder.mkdir()
-    fm3, transcode = fm2_to_fm3.convert(fm2)
+    fm3, summary = transcode.convert(fm2)
     (folder / f'{name}.fm3.carbin').write_bytes(fm3)
-    convert = helper('convert', folder / f'{name}.fm3.carbin', folder / f'{name}.lod15.carbin')
+    convert = run_helper(helper, 'convert', folder / f'{name}.fm3.carbin', folder / f'{name}.lod15.carbin')
     lod15 = (folder / f'{name}.lod15.carbin').read_bytes()
-    helper('lod0', folder / f'{name}.lod15.carbin', folder / f'{name}.carbin')
-    return dict(media=wheel, source_sha256=sha(fm2), transcode=transcode,
+    run_helper(helper, 'lod0', folder / f'{name}.lod15.carbin', folder / f'{name}.carbin')
+    return dict(media=wheel, source_sha256=sha(fm2), transcode=summary,
                 conversion_report=convert['conversion'].splitlines(),
                 audit=carbin_audit.audit_conversion(fm3, lod15),
                 lod0=audit_wheel_lod0(lod15, (folder / f'{name}.carbin').read_bytes()))
 
 
-def main():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('car', help='MediaName FM2, mis. JAG_XK_07')
-    p.add_argument('--donor', required=True, help='mobil disc FM4 untuk header _lod0/_cockpit, mis. JAG_XKRS_09')
-    p.add_argument('--out', type=Path)
-    a = p.parse_args()
-    car, donor = a.car.lower(), a.donor.lower()
-    out = a.out or OUT / car
+def build(car_media, donor_media, out, helper=HELPER):
+    """Write the models of FM2 car `car_media` with close-up headers of FM4 disc car `donor_media`
+    into the new folder `out`; returns the report, also saved as out/report.json."""
+    car, donor, out = car_media.lower(), donor_media.lower(), Path(out)
     out.mkdir(parents=True, exist_ok=False)
-    with zipfile.ZipFile(sv.zips(sv.FM2)[car]) as z:
+    with zipfile.ZipFile(sources.disc_zip(sources.FM2_CARS, car)) as z:
         fm2 = z.read(next(i.filename for i in z.infolist() if i.filename.lower() == car + '.carbin'))
-    with zipfile.ZipFile(next(q for q in FM4.glob('*.zip') if q.stem.lower() == donor)) as z:
+    with zipfile.ZipFile(sources.disc_zip(sources.FM4_CARS, donor)) as z:
         heads = {k: forza_zip.read(z, f'{donor}_{k}.carbin') for k in ('lod0', 'cockpit')}
     for k, data in heads.items():
         (out / f'donor_{k}.carbin').write_bytes(data)
-    fm3, transcode = fm2_to_fm3.convert(fm2)
+    fm3, summary = transcode.convert(fm2)
     (out / f'{car}.fm3.carbin').write_bytes(fm3)
-    convert = helper('convert', out / f'{car}.fm3.carbin', out / f'{car}.carbin')
+    convert = run_helper(helper, 'convert', out / f'{car}.fm3.carbin', out / f'{car}.carbin')
     main_data = (out / f'{car}.carbin').read_bytes()
-    report = dict(car=a.car, donor=a.donor, source_sha256=sha(fm2), transcode=transcode,
+    report = dict(car=car_media, donor=donor_media, source_sha256=sha(fm2), transcode=summary,
                   main=dict(conversion_report=convert['conversion'].splitlines(),
                             audit=carbin_audit.audit_conversion(fm3, main_data),
                             mirror_block=carbin_audit.audit_mirror_block(main_data)))
     (out / 'cockpit_sections.txt').write_text('\n'.join(COCKPIT) + '\n')
     model = carbin_audit.parse(main_data, 'FM4')
-    # Helper menolak rename yang tidak mengenai mesh; hanya pasangan yang ada di section kokpit dipakai.
-    present = {(s['name'], m['name']) for s in model['sections'] if s['name'] in COCKPIT for m in s['meshes']}
-    materials = {k: v for k, v in COCKPIT_MATERIALS.items()
-                 if (tuple(k.split('/')) in present if '/' in k else any(m == k for _, m in present))}
+    materials = cockpit_renames(model)
     (out / 'cockpit_materials.txt').write_text(''.join(f'{a} {b}\n' for a, b in materials.items()))
     for kind, mode in (('lod0', 'exclude'), ('cockpit', 'include')):
         raw = out / f'{car}_{kind}.helper.carbin'
         renames = materials if kind == 'cockpit' else {}
         args = ('closeup', out / f'{car}.carbin', out / f'donor_{kind}.carbin', raw, out / 'cockpit_sections.txt', mode)
         try:
-            closeup = helper(*args, *([out / 'cockpit_materials.txt'] if renames else []))
+            closeup = run_helper(helper, *args, *([out / 'cockpit_materials.txt'] if renames else []))
         except RuntimeError as error:
             if not renames or NO_MIDDLE_MIRROR not in str(error):
                 raise
-            del materials['interior/chrome']
+            materials.pop('interior/chrome', None)
             (out / 'cockpit_materials.txt').write_text(''.join(f'{a} {b}\n' for a, b in materials.items()))
-            closeup = helper(*args, out / 'cockpit_materials.txt')
+            closeup = run_helper(helper, *args, out / 'cockpit_materials.txt')
             report['middle_mirror_dropped'] = str(error)
         data = fix_mirror(raw.read_bytes())
         (out / f'{car}_{kind}.carbin').write_bytes(data)
@@ -279,8 +287,19 @@ def main():
                            missing_vs_donor_cockpit=sorted(
                                {s['name'] for s in carbin_audit.parse(heads['cockpit'], 'FM4')['sections']}
                                - set(report['cockpit']['sections'])))
-    report['wheel'] = build_wheel(car, out)
+    report['wheel'] = build_wheel(car, out, helper)
     (out / 'report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
+    return report
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument('car', help='FM2 MediaName, e.g. JAG_XK_07')
+    p.add_argument('--donor', required=True, help='FM4 disc car for the _lod0/_cockpit headers, e.g. JAG_XKRS_09')
+    p.add_argument('--out', type=Path, required=True, help='new folder for the models')
+    p.add_argument('--helper', type=Path, default=HELPER, help='reviewed CPU-only carbin-cpu.exe')
+    a = p.parse_args()
+    report = build(a.car, a.donor, a.out, a.helper)
     brief = {k: report[k] for k in ('car', 'donor', 'transcode', 'split')}
     brief['main'] = {k: report['main']['audit'][k] for k in ('passed', 'vertices', 'meshes', 'position_error_m',
                                                              'normal_error_degrees', 'uv_error')}

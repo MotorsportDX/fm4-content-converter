@@ -14,7 +14,7 @@ Sumber: FM2 USA Disc 1 dan Bonus Disc, FM3 USA Disc 1 (katalog Ultimate Collecti
 ikut dibaca), FM4 Japan/Asia Disc 1 serta delapan DLC FM4. Path lengkap ada di
 konstanta script dan di [METHODS](../physics-2026-10-20/METHODS.md).
 
-Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
+Dekode model (bagian 5) memakai [`fm2/carbin.py`](../../src/fm4_converter/fm2/carbin.py) dan
 [`survey_carbin.py`](survey_carbin.py); hasilnya di
 `outputs/car-fm2-research-2026-11-02/carbin_survey.json`:
 
@@ -75,6 +75,9 @@ Dekode model (bagian 5) memakai [`carbin_fm2.py`](carbin_fm2.py) dan
   Lancer Evo IX GT dan Tommy Kaira R34 dari paket ini balapan sampai finis tanpa crash.
   Kamera kokpit dan posisi driver ternyata ikut donor. Karena itu donor kini harus punya sisi
   setir yang sama; sebelumnya 15 mobil memakai donor dengan sisi setir berbeda (bagian 14.5).
+- **Kode FM2 kini berada di `src/fm4_converter/fm2/`, lengkap dengan 28 unit test** (bagian 15).
+  Hasilnya dibuktikan identik dengan kode riset. Pemindahan ini juga menemukan bahwa rename
+  material kokpit terlalu luas, dan aturannya sudah diperbaiki di `package-v3`.
 
 ## 1. Rute sumber per mobil
 
@@ -205,7 +208,7 @@ CPU, sudah memiliki jalur baca `ForzaVersion.Two` di `ForzaCarBin.cs`,
 untuk ekspor; tidak ada penulis FM2. `CarbinModel.cs` ForzaEditor dan carbin-garage
 hanya mendeteksi FM2 tanpa membacanya.
 
-[`carbin_fm2.py`](carbin_fm2.py) mengikuti urutan baca Forza Studio, dengan
+[`fm2/carbin.py`](../../src/fm4_converter/fm2/carbin.py) mengikuti urutan baca Forza Studio, dengan
 perbedaan berikut:
 
 - exception tidak ditelan, setiap baca diperiksa terhadap panjang file;
@@ -392,7 +395,7 @@ Prototipe 3 November 2026. Ia membuat tiga file model FM4 untuk satu mobil FM2-o
 mengauditnya secara statis. Game tidak dijalankan.
 
 ```powershell
-.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/prototype_fm4_model.py JAG_XK_07 --donor JAG_XKRS_09
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.models JAG_XK_07 --donor JAG_XKRS_09 --out <folder-baru>
 .\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/check_fm2_to_fm3.py --helper <carbin-cpu-v9>\carbin-cpu.exe
 ```
 
@@ -404,7 +407,7 @@ utama dan `_lod0` `JAG_XK_07` dari v6 byte-identik dengan v5; v7–v9 dijelaskan
 
 ### 7.1 Alur
 
-1. [`fm2_to_fm3.py`](fm2_to_fm3.py) menulis ulang `.carbin` FM2 ke tata letak `.carbin` FM3
+1. [`fm2/transcode.py`](../../src/fm4_converter/fm2/transcode.py) menulis ulang `.carbin` FM2 ke tata letak `.carbin` FM3
    (type 1, vertex 40 byte).
 2. `carbin-cpu convert` membuat model utama FM4 (LOD1–5). Ini konverter FM3 → FM4 yang sama
    dengan yang dipakai untuk mobil FM3, dan hasilnya diaudit dengan
@@ -529,14 +532,14 @@ tumpang tindih. Dibanding kokpit donor, yang tidak ada adalah `a_pillar` dan ena
 
 ## 8. Uji game `JAG_XK_07` (paket overlay uji)
 
-Uji 3 November 2026 di Motorsport DX. [`package_fm2_test.py`](package_fm2_test.py) membuat
+Uji 3 November 2026 di Motorsport DX. [`fm2/package.py`](../../src/fm4_converter/fm2/package.py) membuat
 overlay dengan bentuk yang sama seperti paket FM3 `batch_package.py`, untuk satu mobil saja:
 satu `gamedb.slt`, `Media/Cars/JAG_XK_07.zip`, `Thumbnails.zip`, `stringtables.zip` dan
 `zipmanifest.xml`.
 
 ```powershell
-.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/prototype_fm4_model.py JAG_XK_07 --donor JAG_XKRS_09
-.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/package_fm2_test.py JAG_XK_07 --donor JAG_XKRS_09 --out <paket-baru>
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.models JAG_XK_07 --donor JAG_XKRS_09 --out <folder-baru>
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.package --cars JAG_XK_07 --out <paket-baru>
 python -m fm4_converter.fm3.test_disc --disc <FM4 Disc 1> --package <paket-baru> --out <disc-uji>
 ```
 
@@ -665,16 +668,16 @@ digambar untuk material `mirrorLeft`, `mirrorRight`, dan `mirrorMiddle`.
 
 Velg FM2 adalah `.carbin` type 1 dengan satu section `wheel` dan hanya buffer vertex pertama.
 Decoder sebelumnya berhenti di akhir file karena buffer kedua kosong dan tidak ada penanda
-`0x000DECAF` penutup. Kini [`carbin_fm2.py`](carbin_fm2.py) membaca 407 dari 411 velg; empat sisanya
+`0x000DECAF` penutup. Kini [`fm2/carbin.py`](../../src/fm4_converter/fm2/carbin.py) membaca 407 dari 411 velg; empat sisanya
 (`5zigen_hyper_5zr_02`, `enkei_rs5`, `mht_crossover_wheel`, `por_550_56`) berformat lain.
 
 Velg FM3 (type 2) memuat mesh LOD1–5 dengan urutan yang sama persis seperti FM2, ditambah mesh
 LOD0. Headernya: type 2, 20 byte nol, lalu blok format yang sama seperti mobil FM3. Sebanyak 270
 dari 389 velg FM3 identik sampai dua float akhir. Rig velg FM3 hanya berisi 1,0 di float ketujuh,
-dan word ke-41 setelah rig bernilai 0. [`fm2_to_fm3.py`](fm2_to_fm3.py) memakai konstanta itu, dan
+dan word ke-41 setelah rig bernilai 0. [`fm2/transcode.py`](../../src/fm4_converter/fm2/transcode.py) memakai konstanta itu, dan
 dua float akhir diisi median velg FM3.
 
-Alur velg di [`prototype_fm4_model.py`](prototype_fm4_model.py):
+Alur velg di [`fm2/models.py`](../../src/fm4_converter/fm2/models.py):
 
 1. transkode ke velg FM3;
 2. `carbin-cpu convert` menjadi velg FM4 type 3 dengan LOD1–5, diaudit `audit_conversion`;
@@ -717,12 +720,12 @@ garasi Car Select, velg 10 palang XK '07 FM2 dirender di LOD0 bersama ban dan ka
 
 ## 10. Kalibrasi fisika FM2 → FM4
 
-Lanjutan 3 November 2026. [`physics_fm2.py`](physics_fm2.py) membaca konfigurasi stock FM2,
+Lanjutan 3 November 2026. [`fm2/physics.py`](../../src/fm4_converter/fm2/physics.py) membaca konfigurasi stock FM2,
 membandingkannya dengan mobil yang sama di FM4, dan menulis hasilnya ke paket uji lewat
-`package_fm2_test.py --physics`. Hasil di `outputs/car-fm2-research-2026-11-02/physics/study.json`:
+`fm2.package`. Hasil di `outputs/car-fm2-research-2026-11-02/physics/study.json`:
 
 ```powershell
-.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/physics_fm2.py
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.physics
 ```
 
 ### 10.1 Extractor dan pasangan
@@ -829,7 +832,7 @@ grup fisika, 34 memakai FM2. Sisanya donor, antara lain:
 
 ### 10.4 `JAG_XK_07` dengan fisika FM2
 
-`physics_fm2.apply` menimpa graf stock donor yang sudah dikloning:
+`fm2.physics.apply` menimpa graf stock donor yang sudah dikloning:
 
 - Grup FM2 memakai nilai FM2, atau aturan yang diterima bila ada.
 - Triplet stock yang di FM2 tidak bisa disetel (Min = Def = Max) tetap begitu, seperti 384 dari
@@ -949,7 +952,7 @@ Masing-masing disertai intercooler stock. `Data_Engine.AspirationID_Stock` selal
 - Part donor di luar susunan itu dibuang. Ini termasuk turbo donor di tabel lain, misalnya twin
   turbo donor untuk mobil FM2 bertipe single.
 - Part yang tidak dimiliki donor dipasang sebagai baris stock baru (`new_part`). `EngineID`
-  adalah mesin hasil kloning. Kunci diisi `package_fm2_test.free_key`, mulai 2000, dengan
+  adalah mesin hasil kloning. Kunci diisi `fm2.package.free_key`, mulai 2000, dengan
   melewati kunci database, DLC, dan baris paket.
 - Setelah itu dicek bahwa `Data_Car`, `Data_Engine`, dan part yang tersisa menyebut aspirasi yang
   sama, serta `StockBoost-bar` > 0 tepat untuk mesin berboost.
@@ -1001,8 +1004,8 @@ Mobil uji kedua dipilih dari mobil FM2-only yang:
 Donornya `MAZ_RX8Mazdaspeed_04`: rotary NA, RWD, tanpa turbo dan intercooler.
 
 ```powershell
-.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/prototype_fm4_model.py MAZ_RX7_ReAmemiya_95 --donor MAZ_RX8Mazdaspeed_04
-.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/package_fm2_test.py MAZ_RX7_ReAmemiya_95 --donor MAZ_RX8Mazdaspeed_04 --physics outputs/car-fm2-research-2026-11-02/physics/study.json --out outputs/car-fm2-prototype-2026-11-03/package-rx7ame-v1
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.models MAZ_RX7_ReAmemiya_95 --donor MAZ_RX8Mazdaspeed_04 --out <folder-baru>
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.package --cars MAZ_RX7_ReAmemiya_95 --out <paket-baru>
 ```
 
 Model utama, `_lod0`, `_cockpit`, dan velg lolos audit. Paket mengubah 149 nilai donor dan
@@ -1213,18 +1216,18 @@ tersimpan.
 
 ## 14. Paket gabungan mobil FM2-only
 
-[`package_fm2_batch.py`](package_fm2_batch.py) memaketkan semua mobil rute `fm2_only` ke satu
+[`fm2/package.py`](../../src/fm4_converter/fm2/package.py) memaketkan semua mobil rute `fm2_only` ke satu
 overlay, seperti `fm3.batch_package`. Mobil direncanakan berurutan terhadap database paket yang
 terus bertambah, dan kunci DLC terpasang dicadangkan. Per mobil isinya sama dengan paket uji
 satu mobil (bagian 8–11), dengan fisika FM2 dari `study.json`.
 
 ```powershell
-.\.venv\Scripts\python.exe research/cars-fm2-2026-11-02/package_fm2_batch.py --out <paket-baru>
+.\.venv\Scripts\python.exe -m fm4_converter.fm2.package --out <paket-baru>
 ```
 
 ### 14.1 Pilihan per mobil
 
-- **Donor** dipilih dengan `physics_fm2.donor` di antara donor dengan sisi setir yang sama
+- **Donor** dipilih dengan `fm2.physics.donor` di antara donor dengan sisi setir yang sama
   (bagian 14.5): merek dan penggerak sama, lalu massa dan tenaga terdekat. Kandidatnya 309 mobil disc FM4 yang punya `_lod0` dan `_cockpit`, empat kaliper dan
   rotor, serta header close-up yang bisa dibaca (`AUD_2_R15TDI_09` berisi float tak hingga).
   Untuk mobil yang mereknya tidak ada di disc (Porsche, Proto Motors), donor jatuh ke merek lain,
@@ -1339,6 +1342,78 @@ setir.
 - Material `tail_light` (5–6 vertex) dan `misc` tidak terlihat jelas di frame.
 - Sudut pandang Tommy Kaira yang rendah belum diselidiki: bisa karena tidak ada `carattribs.xml`,
   bisa karena posisi kursi donor.
+
+## 15. Kode FM2 di `src/fm4_converter/fm2`
+
+Kode riset bagian 5–14 dipindah ke package `fm4_converter.fm2`. Komentar diterjemahkan ke bahasa
+Inggris seperti package `fm3`; logikanya tidak diubah, kecuali satu perbaikan di bagian 15.2.
+
+| Riset (dihapus) | Package |
+|---|---|
+| `carbin_fm2.py` | [`fm2/carbin.py`](../../src/fm4_converter/fm2/carbin.py) |
+| `fm2_to_fm3.py` | [`fm2/transcode.py`](../../src/fm4_converter/fm2/transcode.py) |
+| `prototype_fm4_model.py` | [`fm2/models.py`](../../src/fm4_converter/fm2/models.py) (`build`, `cockpit_renames`) |
+| `physics_fm2.py` | [`fm2/physics.py`](../../src/fm4_converter/fm2/physics.py) |
+| `package_fm2_test.py`, `package_fm2_batch.py` | [`fm2/package.py`](../../src/fm4_converter/fm2/package.py) |
+| path disc FM2/FM4 | [`fm2/sources.py`](../../src/fm4_converter/fm2/sources.py) |
+
+- Paket satu mobil dengan donor pilihan sendiri tidak dipindahkan. Untuk satu mobil, gunakan
+  `fm2.package --cars <mobil>`; donornya dipilih otomatis.
+- Skrip survei dan audit (`survey_carbin`, `check_fm2_*`, `cockpit_paint_fm2`, `inventory`,
+  `fm4_model_files`, `physics_swap_test`) tetap di `research/` dan meng-import package ini.
+
+### 15.1 Bukti pemindahan
+
+- **Studi fisika:** `python -m fm4_converter.fm2.physics` menghasilkan `study.json` yang identik
+  dengan versi riset.
+- **Paket gabungan:** dibangun ulang dengan folder model baru. Database, data 50 mobil, dan daftar
+  mobil gagal identik dengan `package-v2`. Perbedaannya hanya `_cockpit.carbin` pada 27 mobil,
+  dan bagian 15.2 menjelaskan penyebabnya.
+- **Tes:** `tests/fm2` berisi 28 tes tanpa data game.
+  - Model velg FM2 sintetis dirakit byte demi byte. Model itu di-parse dan ditranskode, dan
+    hasilnya harus terbaca `carbin_audit` sebagai velg FM3 dengan posisi, normal, dan UV yang
+    terjaga.
+  - Model PI hinge dan domainnya, serta fallback CMHeight.
+  - Fold CV per mesin, grup kolom, dan susunan part aspirasi.
+  - Rename material kokpit.
+  - `free_key`, kunci nama, `make_for`, dan pemilihan donor sesisi setir.
+- `test_project_layout` kini juga menjalankan `--help` keempat modul CLI FM2 dari luar
+  repository. Seluruh suite: 263 tes lulus.
+
+### 15.2 Rename material kokpit dibatasi ke section kokpit
+
+Pembangunan ulang model dari nol memperlihatkan bahwa kunci material umum di
+`COCKPIT_MATERIALS` (`black`, `matte_colors`, `misc`, `window`, `black_glass`) berlaku di semua
+section `_cockpit`. FM4 hanya mengubah material menjadi `cockpit_<material>` di section yang
+namanya termasuk `appearance_audit.COCKPIT_PARTS` (interior, seat, steering_wheel, dll.). Kaca
+(`glassF/LF/RF`), spion, `hooda`, dan `cagerace` tetap memakai teknik eksterior yang valid, jadi
+mengganti material di section itu tidak perlu dan mengubah tampilannya.
+
+Di model baru, 43 mobil kehilangan teknik `window` di kaca depan dan samping (diganti
+`cockpit_glass`), dan banyak spion, kap, serta cage memakai `plastic` sebagai pengganti `black`
+atau `matte_colors`. `package-v2` bercampur: model yang dibuat sebelum aturan `window` ditambahkan
+tidak terkena.
+
+`models.cockpit_renames` kini menghasilkan kunci `section/material`:
+- kunci `section/material` di `COCKPIT_MATERIALS` (spion) berlaku apa adanya;
+- kunci material umum hanya berlaku di section kokpit;
+- hanya mesh LOD 1 yang dihitung, karena close-up dibuat dari LOD 1. Celica APR punya `window`
+  di `interior` hanya pada LOD 2–5, dan helper menolak rename yang tidak mengenai mesh.
+
+Hasilnya `package-v3`: tetap 50 mobil, dengan database dan data mobil identik dengan v2.
+`_cockpit.carbin` berubah pada 48 mobil, dan semuanya karena material eksterior asli
+dipertahankan di kaca, spion, kap, dan cage. Kaca dan spion XK07 kini kembali sama dengan model
+yang divalidasi di bagian 9.
+
+**Uji game `package-v3`.** Evo IX dan S4 dicek dengan kamera kokpit, kap, bumper, dan chase.
+- Kaca depan bening dan spion samping serta tengah memantul.
+- Setir dan tangan driver berada di kursi yang benar.
+- Kap S4 tetap hitam-biru, sesuai livery.
+- Keduanya berjalan tanpa crash.
+
+**Batas.**
+- Dari 48 mobil yang `_cockpit`-nya berubah, baru 2 yang dilihat di game.
+- Paket satu mobil dengan donor manual (bagian 8–11) tidak lagi tersedia sebagai perintah.
 
 ## Batas riset
 
