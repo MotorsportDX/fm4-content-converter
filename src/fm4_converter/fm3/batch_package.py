@@ -144,7 +144,8 @@ def native_wheel(target_root, dlc_wheels, wheel):
 
 
 def build(source, target, out, helper, medias=None, rules=None, pi_model=None, content_root=None,
-          scales=None, physics_scales=False, disc2=FM3_DISC2_DEFAULT, log=print):
+          scales=None, physics_scales=False, disc2=FM3_DISC2_DEFAULT, log=print, progress=None):
+    """`progress`: called after each car with {index, total, car, status, error}."""
     source, target, out = (Path(p).resolve() for p in (source, target, out))
     for original in (source.parents[2], target.parents[2]):
         if out == original or out in original.parents or original in out.parents:
@@ -256,11 +257,16 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
                               class_id=plan["candidate"]["nodes"]["car"]["row"]["ClassID"],
                               performance_index=plan["candidate"]["nodes"]["car"]["row"]["PerformanceIndex"])
                 log(f"[{number}/{len(medias)}] {media}: packaged ({wheel_status})")
+                if progress:
+                    progress(dict(index=number, total=len(medias), car=media, status="packaged", error=None))
             except Exception as error:
                 record.update(status="failed", error=f"{type(error).__name__}: {error}"[:2000])
                 (reports/media).mkdir(exist_ok=True)
                 (reports/media/"error.txt").write_text(traceback.format_exc(), encoding="utf-8")
                 log(f"[{number}/{len(medias)}] {media}: FAILED {record['error'][:200]}")
+                if progress:
+                    progress(dict(index=number, total=len(medias), car=media, status="failed",
+                                  error=record["error"]))
         packaged = [r for r in cars if r["status"] == "packaged"]
         if not packaged:
             raise c.MappingError("No car could be packaged")

@@ -1,0 +1,5417 @@
+{
+ "version": 1,
+ "policy": {
+  "folds": 5,
+  "min_training_difference": 0.2,
+  "min_training_rows": 30,
+  "min_validation_rows": 10,
+  "constant_coverage": 0.99,
+  "lookup_consistency": 0.95,
+  "lookup_min_support": 3,
+  "categorical_validation_match": 0.95,
+  "continuous_mae_ratio": 0.5,
+  "cv_tolerance": 1.05,
+  "grids": [
+   0.01,
+   0.005,
+   0.0025,
+   0.001
+  ],
+  "grid_coverage": 0.99
+ },
+ "columns": [
+  {
+   "table": "Data_Car",
+   "column": "AccelerationRating",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 1.536422868644068
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.09365890254237287
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.07568616525423724
+    }
+   },
+   "rule": {
+    "kind": "loglinear",
+    "coef": [
+     0.9195152392319881,
+     0.6150020477066384
+    ],
+    "domain": [
+     3.0,
+     9.471461
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.07018998630136986
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 1.6232604109589044
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "AssistsTCSSlipDefMoving",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "AssistsTCSSlipDefTakeoff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BaseCost",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.788135593220339,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.211864406779661,
+     "mae": 198288.13559322033
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 355004.23728813557
+    },
+    "loglinear": {
+     "match_rate": 0.08898305084745763,
+     "mae": 243741.5254237288
+    }
+   },
+   "rule": {
+    "kind": "loglinear",
+    "coef": [
+     -0.7390099421931033,
+     1.0795056106761884
+    ],
+    "domain": [
+     4000,
+     20000000
+    ],
+    "integer": true,
+    "step": 1000
+   },
+   "validation": {
+    "n": 73,
+    "match": 9,
+    "match_rate": 0.1232876712328767,
+    "mae": 80383.56164383562
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 19,
+    "match_rate": 0.2602739726027397,
+    "mae": 79260.27397260274
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BaseRarity",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BodyAeroAngleZeroDownforce",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BodyAeroForwardDownforceFront",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.13983050847457626,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BodyAeroForwardDownforceRear",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.13983050847457626,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BodyAeroLateralDragFront",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BodyAeroLateralDragRear",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BodyAeroLongitudinalDrag",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.038135593220338986,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BodyAeroVerticalDrag",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BodyAeroWIForceScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "BrakingRating",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 0.28805161864406775
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.1476552415254237
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.1402022754237288
+    }
+   },
+   "rule": {
+    "kind": "loglinear",
+    "coef": [
+     -0.3972327842194441,
+     1.2299934699074309
+    ],
+    "domain": [
+     3.787833,
+     9.237435
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.13579917808219177
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.2742352465753424
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "CaliperAngleFront",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0211864406779661,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "CaliperAngleRear",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0211864406779661,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "CaliperRGBFront",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "CaliperRGBRear",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "CarClassModifier",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "CurbWeight",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.029661016949152543,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "Displacement",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FamilyBodyID",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.9830508474576272,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.01694915254237288
+    },
+    "lookup": {
+     "match_rate": 0.2584745762711864
+    }
+   },
+   "rule": {
+    "kind": "lookup",
+    "values": {
+     "8": 11,
+     "4": 7,
+     "9": 8,
+     "11": 12,
+     "12": 13,
+     "17": 18,
+     "7": 6
+    }
+   },
+   "validation": {
+    "n": 73,
+    "match": 8,
+    "match_rate": 0.1095890410958904
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 1,
+    "match_rate": 0.0136986301369863
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FixListingNormSlip0",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FixListingNormSlip1",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FixListingRearFricScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FixListingSteerAngle0",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FixListingSteerAngle1",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FrontTireAspect",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FrontTireWidthMM",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "FrontWheelDiameterIN",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "GameDragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.21610169491525424,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.7838983050847458,
+     "mae": 0.016222669491525427
+    },
+    "linear": {
+     "match_rate": 0.038135593220338986,
+     "mae": 0.024131355932203395
+    },
+    "loglinear": {
+     "match_rate": 0.03389830508474576,
+     "mae": 0.02417372881355933
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.013812027125299053,
+     0.978472684078149
+    ],
+    "domain": [
+     0.68,
+     1.25
+    ],
+    "grid": 0.01
+   },
+   "validation": {
+    "n": 73,
+    "match": 6,
+    "match_rate": 0.0821917808219178,
+    "mae": 0.015902397260273978
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 62,
+    "match_rate": 0.8493150684931506,
+    "mae": 0.008068493150684931
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "GameTorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.25,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.75,
+     "mae": 0.01483050847457627
+    },
+    "linear": {
+     "match_rate": 0.03389830508474576,
+     "mae": 0.02056144067796609
+    },
+    "loglinear": {
+     "match_rate": 0.046610169491525424,
+     "mae": 0.02058262711864406
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.10731356792046176,
+     0.8715037339140407
+    ],
+    "domain": [
+     0.7,
+     1.0
+    ],
+    "grid": 0.0025
+   },
+   "validation": {
+    "n": 73,
+    "match": 5,
+    "match_rate": 0.0684931506849315,
+    "mae": 0.015205479452054787
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 64,
+    "match_rate": 0.8767123287671232,
+    "mae": 0.00863013698630137
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "GaugeID",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.3855932203389831,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.614406779661017
+    },
+    "constant": {
+     "match_rate": 1.0
+    },
+    "lookup": {
+     "match_rate": 0.614406779661017
+    }
+   },
+   "rule": {
+    "kind": "constant",
+    "value": -1,
+    "fm4_rows": 503,
+    "fm4_coverage": 1.0
+   },
+   "validation": {
+    "n": 73,
+    "match": 73,
+    "match_rate": 1.0
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 41,
+    "match_rate": 0.5616438356164384
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "HandlingRating",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 0.3475324237288136
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.12123352966101691
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.12212076271186445
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     -1.9775161301739175,
+     1.3400130691674164
+    ],
+    "domain": [
+     4.016023,
+     9.231524
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.11600852054794514
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.3335114246575341
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "HasLivery",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.05508474576271186,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "HasRaceLivery",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.2033898305084746,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.7966101694915254
+    }
+   },
+   "status": "no_valid_candidate"
+  },
+  {
+   "table": "Data_Car",
+   "column": "LaunchRating",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 1.2150594491525422
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.17699231355932205
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.17457767372881353
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     2.3054162117028945,
+     0.8143791181486407
+    ],
+    "domain": [
+     3.533693,
+     9.380437
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.1862580410958904
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 1.2557242328767118
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "MakeIcon",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0
+    },
+    "constant": {
+     "match_rate": 1.0
+    },
+    "lookup": {
+     "match_rate": 0.75
+    }
+   },
+   "rule": {
+    "kind": "constant",
+    "value": "BOING",
+    "fm4_rows": 503,
+    "fm4_coverage": 1.0
+   },
+   "validation": {
+    "n": 73,
+    "match": 73,
+    "match_rate": 1.0
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "MakeName",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "MediaName",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "NumGears",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "QuarterMileSpeed-mph",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "QuarterMileTime-sec",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "RearTireAspect",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "RearTireWidthMM",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "RearWheelDiameterIN",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimBrakeDistance100MPH",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 3.952141186440679
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 2.714204656779661
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 2.683831559322034
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     6.131958740336955,
+     0.9128466345275648
+    ],
+    "domain": [
+     60.227051,
+     139.45752
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 2.1756041369863013
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 3.5531958904109593
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimBrakeDistance60MPH",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 1.6337353008474573
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 1.1520689067796612
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 1.0643239491525425
+    }
+   },
+   "rule": {
+    "kind": "loglinear",
+    "coef": [
+     0.05617004351035115,
+     0.9763122083819032
+    ],
+    "domain": [
+     25.245605,
+     61.007324
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.7908240136986305
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 1.5169359589041105
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimLatGees120MPH",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 0.11935304237288134
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.022626847457627115
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.022696754237288137
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.08347169072596794,
+     0.8153517043847318
+    ],
+    "domain": [
+     0.685601,
+     2.317343
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.021184698630136986
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.10446683561643837
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimLatGees60MPH",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 0.11315381355932207
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.01599308898305085
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.016647652542372885
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.1376824809231162,
+     0.7567209966370543
+    ],
+    "domain": [
+     0.750237,
+     1.589753
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.013878232876712322
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.10808643835616438
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimPeakAngVel",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimPeakPower",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.038135593220338986,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimPeakTorque",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.029661016949152543,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimPeakTorqueAngVel",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimRedlineAngVel",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimSpeedQuarterMile",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.9957627118644068,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.00423728813559322,
+     "mae": 0.46472048728813525
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.45311996610169436
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.456212851694915
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.3280121153878426,
+     0.9905985994063894
+    ],
+    "domain": [
+     37.184158,
+     69.362022
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.3660341917808216
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.3849041643835609
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimTimeQuarterMile",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.940677966101695,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.059322033898305086,
+     "mae": 0.3085404957627118
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.17357623305084746
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.17472720338983047
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     1.0012458510613982,
+     0.9468544305770594
+    ],
+    "domain": [
+     9.666691,
+     16.783249
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.15920497260273958
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 3,
+    "match_rate": 0.0410958904109589,
+    "mae": 0.30159360273972596
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimTimeTo100MPH",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.9703389830508474,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.029661016949152543,
+     "mae": 0.5334003008474577
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.5155552372881357
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.4097571991525426
+    }
+   },
+   "rule": {
+    "kind": "loglinear",
+    "coef": [
+     0.20154229649819255,
+     0.9344366619450192
+    ],
+    "domain": [
+     4.800007,
+     29.166393
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.3293145479452053
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 1,
+    "match_rate": 0.0136986301369863,
+    "mae": 0.45661727397260266
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimTimeTo60MPH",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.9491525423728814,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.05084745762711865,
+     "mae": 0.3663160593220339
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.2058722838983051
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.20982710169491525
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.5955839708381445,
+     0.9519110364088137
+    ],
+    "domain": [
+     2.549998,
+     8.900036
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.1726130410958904
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 3,
+    "match_rate": 0.0410958904109589,
+    "mae": 0.3527423835616437
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimTopSpeed",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 1.0404100211864407
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 1.1361359915254239
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 1.122224627118644
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     -1.5334043453297568,
+     1.0264394028121202
+    ],
+    "domain": [
+     50.418381,
+     102.721909
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.7310266849315079
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.5926127260273979
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SpeedRating",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 0.5278330084745763
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.17416060169491523
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.17973267372881357
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     -2.5812667908163256,
+     1.4635056151924342
+    ],
+    "domain": [
+     3.228427,
+     8.909677
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 1,
+    "match_rate": 0.0136986301369863,
+    "mae": 0.11603476712328764
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 1,
+    "match_rate": 0.0136986301369863,
+    "mae": 0.5487673835616439
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerAccelTimeToMaxRate",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerAngVelCountersteer",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerAngVelDynFindPeak",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerMaxAngVelStraighten",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerMaxAngVelTurning",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerMaxAngle",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerMaxAngleFiltered",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.05508474576271186,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerSpeedSensitiveFastRateScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerSpeedSensitiveFastSpeed",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerSpeedSensitiveMaxGees",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerSpeedSensitiveMinMaxAngle",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "SteerSpeedSensitiveSlowSpeed",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "Thumbnail",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "Time:0-100-sec",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "Time:0-60-sec",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "TireAeroHackMaxSpringLoad",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "TireAeroHackMinSpringLoad",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "TireAeroHackShouldApply",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "TopSpeed-mph",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "WeightDistribution",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "WingMask",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Car",
+   "column": "Year",
+   "category": "catalog_or_integration",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "BottomCenterWheelbasePosZ",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "BottomCenterWheelbasePosx",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "BottomCenterWheelbasePosy",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.029661016949152543,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "ModelFrontStockRideHeight",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "ModelFrontTrackOuter",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "ModelRearStockRideHeight",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "ModelRearTrackOuter",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "ModelWheelbase",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "PristineBoundingBoxMaxX",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "PristineBoundingBoxMaxY",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "PristineBoundingBoxMaxZ",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "PristineBoundingBoxMinX",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "PristineBoundingBoxMinY",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.025423728813559324,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_CarBody",
+   "column": "PristineBoundingBoxMinZ",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Drivetrain",
+   "column": "EngineMountingDirection",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "AspirationID_Stock",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "Carbureted",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "Compression",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "Diesel",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "EngineGraphingMaxPower",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.05508474576271186,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "EngineGraphingMaxTorque",
+   "category": "stored_performance_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.05508474576271186,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "EngineMass-kg",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.029661016949152543,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "EngineName",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "EngineRotation",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "GasTankSize",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 1.0,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.0,
+     "mae": 55.15836016949152
+    }
+   },
+   "status": "no_valid_candidate"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "MediaName",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "MomentInertia",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "Rotary",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "StockBoost-bar",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "TorqueSteerLeftSpeedScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "Data_Engine",
+   "column": "TorqueSteerRightSpeedScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "AngleZeroDownforce",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleOneSliderInput0",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleOneSliderInput1",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleOneSliderInput2",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleOneTorqueScaleOutput0",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleOneTorqueScaleOutput1",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleOneTorqueScaleOutput2",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleTwoSliderInput0",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleTwoSliderInput1",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleTwoSliderInput2",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleTwoTorqueScaleOutput0",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleTwoTorqueScaleOutput1",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DFTorqueScaleTwoTorqueScaleOutput2",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "DefaultTuneSlider",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "Downforce0",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.13771186440677965,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "Downforce1",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.13771186440677965,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "Drag0",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.00211864406779661,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "Drag1",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.059322033898305086,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AeroPhysics",
+   "column": "LateralDrag",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.01059322033898305,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_AntiSwayPhysics",
+   "column": "SwaybarDamping",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "BumpstopDamping",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "BumpstopStiffness",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "CamberChangeRatioCompression",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "CamberChangeRatioExpansion",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "Caster",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "ChassisPivotX",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.01694915254237288,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "ChassisPivotY",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "DampenBumpClamp",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "DampenReboundClamp",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "DefRideHeight",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.038135593220338986,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "MaxCompressHeight",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.046610169491525424,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "MaxRideHeight",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.046610169491525424,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "MinRideHeight",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.046610169491525424,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "StaticCamber",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "StaticToe",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0211864406779661,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "SteerRotAxisTireOffsetX",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "TirePivotX",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_SpringDamperPhysics",
+   "column": "YMaxSpringVel",
+   "category": "physics",
+   "training_rows": 472,
+   "validation_rows": 146,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_TorqueCurve",
+   "column": "NumTorqueValues",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_TorqueCurve",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_TorqueCurve",
+   "column": "ZeroThrottleTorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeAntiSwayFront",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeAntiSwayFront",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeAntiSwayRear",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeAntiSwayRear",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "BiasHandbrake",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "BrakeBiasSlider",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "BrakeTorqueSlider",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "DurationABS",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "FrontBrakeSize",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "FrontCaliperPistons",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "GameFrictionScaleBraking",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.3516949152542373,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.6483050847457628,
+     "mae": 0.011016949152542406
+    },
+    "linear": {
+     "match_rate": 0.7711864406779662,
+     "mae": 0.0005720338983050726
+    },
+    "loglinear": {
+     "match_rate": 0.7711864406779662,
+     "mae": 0.0005720338983050726
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.8245290140908844,
+     0.17606247853149767
+    ],
+    "domain": [
+     1.0,
+     1.05
+    ],
+    "grid": 0.0025
+   },
+   "validation": {
+    "n": 73,
+    "match": 53,
+    "match_rate": 0.726027397260274,
+    "mae": 0.0007191780821917686
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 54,
+    "match_rate": 0.7397260273972602,
+    "mae": 0.008835616438356186
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "RearBrakeSize",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "RearCaliperPistons",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "ReleasePointABS",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "ReleasePointABSFrontFullSteer",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "ReleasePointABSFrontNoSteer",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "ReleasePointABSRearFullSteer",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "ReleasePointABSRearNoSteer",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBody",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBody",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "CMHeightDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "FrontLatFrictionScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.7288135593220338,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.2711864406779661,
+     "mae": 0.0077330508474576076
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.002363258474576271
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.002396601694915262
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.4208652182704622,
+     0.5772989732413673
+    ],
+    "domain": [
+     0.9,
+     1.0
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.0025580136986301503
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 14,
+    "match_rate": 0.1917808219178082,
+    "mae": 0.007328767123287658
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "FrontLongFrictionScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.7288135593220338,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.2711864406779661,
+     "mae": 0.0077330508474576076
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.002363258474576271
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.002396601694915262
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.4208652182704622,
+     0.5772989732413673
+    ],
+    "domain": [
+     0.9,
+     1.0
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.0025580136986301503
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 14,
+    "match_rate": 0.1917808219178082,
+    "mae": 0.007328767123287658
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "RearLatFrictionScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.788135593220339,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.211864406779661,
+     "mae": 0.006302966101694905
+    },
+    "linear": {
+     "match_rate": 0.00423728813559322,
+     "mae": 0.00364672033898305
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.0036473389830508447
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.3625942915392486,
+     0.6316258919469923
+    ],
+    "domain": [
+     0.95,
+     1.0
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.0028399863013698575
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 11,
+    "match_rate": 0.1506849315068493,
+    "mae": 0.006301369863013689
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "RearLongFrictionScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.788135593220339,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.211864406779661,
+     "mae": 0.006302966101694905
+    },
+    "linear": {
+     "match_rate": 0.00423728813559322,
+     "mae": 0.00364672033898305
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.0036473389830508447
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.3625942915392486,
+     0.6316258919469923
+    ],
+    "domain": [
+     0.95,
+     1.0
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.0028399863013698575
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 11,
+    "match_rate": 0.1506849315068493,
+    "mae": 0.006301369863013689
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyFrontBumper",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyFrontBumper",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyFrontBumper",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyFrontBumper",
+   "column": "Sequence",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyFrontBumper",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyHood",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyHood",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyHood",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyHood",
+   "column": "Sequence",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyHood",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyHood",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyRearBumper",
+   "column": "BodyAeroForwardDownforceFront",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyRearBumper",
+   "column": "BodyAeroForwardDownforceRear",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyRearBumper",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyRearBumper",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyRearBumper",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyRearBumper",
+   "column": "Sequence",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyRearBumper",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodySideSkirt",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodySideSkirt",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodySideSkirt",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodySideSkirt",
+   "column": "Sequence",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodySideSkirt",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthFront",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthFront",
+   "column": "FrontTireWidth",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthFront",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthFront",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthFront",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthRear",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthRear",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthRear",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthRear",
+   "column": "RearTireWidth",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyTireWidthRear",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyWeight",
+   "column": "BlockDimX",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyWeight",
+   "column": "BlockDimY",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0635593220338983,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyWeight",
+   "column": "BlockDimZ",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyWeight",
+   "column": "CMBackFront",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyWeight",
+   "column": "CMLeftRight",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyWeight",
+   "column": "InitialMass",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.029661016949152543,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyWeight",
+   "column": "Mass",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.029661016949152543,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeCarBodyWeight",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrain",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrain",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrain",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainClutch",
+   "column": "ClutchInTime",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainClutch",
+   "column": "ClutchMaxTorque",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainClutch",
+   "column": "ClutchOutTime",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainClutch",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainClutch",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "CenterLimitedSlipAccelDefInputTorque",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "CenterLimitedSlipRelVelClamp",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "CenterLimitedSlipTorqueAccel",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "CenterLimitedSlipTorqueDecel",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "FrontLimitedSlipAccelDefInputTorque",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "FrontLimitedSlipRelVelClamp",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "FrontLimitedSlipTorqueAccel",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "FrontLimitedSlipTorqueDecel",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "RearLimitedSlipAccelDefInputTorque",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "RearLimitedSlipRelVelClamp",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "RearLimitedSlipTorqueAccel",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "RearLimitedSlipTorqueDecel",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDifferential",
+   "column": "RearToqueSplit",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDriveline",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDriveline",
+   "column": "MomentInertia",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainDriveline",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "CVTShiftTime",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "FinalDriveRatio",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.1694915254237288,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio0",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00847457627118644,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio1",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio2",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio3",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio4",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio5",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio6",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio7",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearRatio8",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "GearShiftTime",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.01694915254237288,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "MomentInertia",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.6228813559322034,
+   "accepted": false,
+   "cv": {
+    "identity": {
+     "match_rate": 0.3771186440677966,
+     "mae": 0.0006233050847457627
+    },
+    "linear": {
+     "match_rate": 0.0,
+     "mae": 0.0007104915254237288
+    },
+    "loglinear": {
+     "match_rate": 0.0,
+     "mae": 0.0007006525423728814
+    }
+   },
+   "rule": {
+    "kind": "linear",
+    "coef": [
+     0.0009387870714041256,
+     0.9649914457105726
+    ],
+    "domain": [
+     0.0075,
+     0.015
+    ]
+   },
+   "validation": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0,
+    "mae": 0.0006919178082191781
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 26,
+    "match_rate": 0.3561643835616438,
+    "mae": 0.0006835616438356165
+   },
+   "status": "rejected_by_validation"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "NumGears",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeDrivetrainTransmission",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngine",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngine",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngine",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngine",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngine",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "RedlineRPMScale",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "RobScale",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "TorqueDropOffRPM0",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "TorqueDropOffRPM1",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "TorqueDropOffScale0",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "TorqueDropOffScale1",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCSC",
+   "column": "ZeroRPMScale",
+   "category": "physics",
+   "training_rows": 1,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCamshaft",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCamshaft",
+   "column": "NumRPMEntriesArray",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCamshaft",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCamshaft",
+   "column": "RedlineRPM",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCamshaft",
+   "column": "RedlineWearSpeed",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCamshaft",
+   "column": "StallRPM",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCamshaft",
+   "column": "StartRPM",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineCamshaft",
+   "column": "TorqueCurveMaxRPM",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "RedlineRPMScale",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "RobScale",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "TorqueDropOffRPM0",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "TorqueDropOffRPM1",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "TorqueDropOffScale0",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "TorqueDropOffScale1",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDSC",
+   "column": "ZeroRPMScale",
+   "category": "physics",
+   "training_rows": 12,
+   "validation_rows": 4,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDisplacement",
+   "column": "Disp",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDisplacement",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineDisplacement",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineExhaust",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineExhaust",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineExhaust",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineExhaust",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineExhaust",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineExhaust",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFlywheel",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFlywheel",
+   "column": "MomentInertia",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFlywheel",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFuelSystem",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFuelSystem",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFuelSystem",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFuelSystem",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFuelSystem",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineFuelSystem",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIgnition",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIgnition",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIgnition",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIgnition",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIgnition",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntake",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntake",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntake",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntake",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntake",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntercooler",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 85,
+   "validation_rows": 20,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntercooler",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 85,
+   "validation_rows": 20,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntercooler",
+   "column": "MaxScaleScale",
+   "category": "physics",
+   "training_rows": 85,
+   "validation_rows": 20,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntercooler",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 85,
+   "validation_rows": 20,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntercooler",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 85,
+   "validation_rows": 20,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineIntercooler",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 85,
+   "validation_rows": 20,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineManifold",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 151,
+   "validation_rows": 53,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineManifold",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 151,
+   "validation_rows": 53,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineManifold",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 151,
+   "validation_rows": 53,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineOilCooling",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineOilCooling",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineOilCooling",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineOilCooling",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEnginePistonsCompression",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEnginePistonsCompression",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEnginePistonsCompression",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineRestrictorPlate",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 38,
+   "validation_rows": 6,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineRestrictorPlate",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 38,
+   "validation_rows": 6,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineRestrictorPlate",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 38,
+   "validation_rows": 6,
+   "training_difference_rate": 0.10526315789473684,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "MaxScale",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "MinScale",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "MomentInertia",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "PowerMaxScale",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.023255813953488372,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "PowerMinScale",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "RobScale",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "TorqueDropOffRPM0",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "TorqueDropOffRPM1",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "TorqueDropOffScale0",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "TorqueDropOffScale1",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboSingle",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 43,
+   "validation_rows": 9,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "MaxScale",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "MinScale",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "MomentInertia",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "PowerMaxScale",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "PowerMinScale",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "RobScale",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "TorqueDropOffRPM0",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "TorqueDropOffRPM1",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "TorqueDropOffScale0",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "TorqueDropOffScale1",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineTurboTwin",
+   "column": "WeightDistDiff",
+   "category": "physics",
+   "training_rows": 29,
+   "validation_rows": 7,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineValves",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineValves",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeEngineValves",
+   "column": "TorqueScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRearWing",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRearWing",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRearWing",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRearWing",
+   "column": "Sequence",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRearWing",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeFront",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeFront",
+   "column": "FrontWheelDiameter",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeFront",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeFront",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeFront",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeRear",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeRear",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeRear",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeRear",
+   "column": "RearWheelDiameter",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.012711864406779662,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeRimSizeRear",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeSpringDamper",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeSpringDamper",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeSpringDamper",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeSpringDamper",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeTireCompound",
+   "column": "DragScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeTireCompound",
+   "column": "MassDiff",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeTireCompound",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_UpgradeTireCompound",
+   "column": "WindInstabilityScale",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "ActualColor",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "BrakeDrawOffset",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "CenterCap",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "DisplayName",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.9915254237288136,
+   "accepted": true,
+   "cv": {
+    "identity": {
+     "match_rate": 0.00847457627118644
+    },
+    "lookup": {
+     "match_rate": 1.0
+    }
+   },
+   "rule": {
+    "kind": "lookup",
+    "values": {
+     "\"\"": "NULL"
+    }
+   },
+   "validation": {
+    "n": 73,
+    "match": 73,
+    "match_rate": 1.0
+   },
+   "validation_identity": {
+    "n": 73,
+    "match": 0,
+    "match_rate": 0.0
+   },
+   "status": "accepted"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "IconPath",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "Lip",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "Logo",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "Mass",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "MediaName",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.00423728813559322,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "Price",
+   "category": "part_metadata",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "RGB",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "Type",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "List_Wheels",
+   "column": "WheelColor",
+   "category": "physics",
+   "training_rows": 236,
+   "validation_rows": 73,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "TireMod_FrictionScale",
+   "column": "FrontFrictionScale",
+   "category": "physics",
+   "training_rows": 9,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  },
+  {
+   "table": "TireMod_FrictionScale",
+   "column": "RearFrictionScale",
+   "category": "physics",
+   "training_rows": 9,
+   "validation_rows": 0,
+   "training_difference_rate": 0.0,
+   "accepted": false,
+   "status": "not_systematic"
+  }
+ ],
+ "rules": [
+  {
+   "table": "Data_Car",
+   "column": "AccelerationRating",
+   "category": "stored_performance_metadata",
+   "accepted": true,
+   "kind": "loglinear",
+   "coef": [
+    0.9195152392319881,
+    0.6150020477066384
+   ],
+   "domain": [
+    3.0,
+    9.471461
+   ]
+  },
+  {
+   "table": "Data_Car",
+   "column": "BrakingRating",
+   "category": "stored_performance_metadata",
+   "accepted": true,
+   "kind": "loglinear",
+   "coef": [
+    -0.3972327842194441,
+    1.2299934699074309
+   ],
+   "domain": [
+    3.787833,
+    9.237435
+   ]
+  },
+  {
+   "table": "Data_Car",
+   "column": "GaugeID",
+   "category": "catalog_or_integration",
+   "accepted": true,
+   "kind": "constant",
+   "value": -1,
+   "fm4_rows": 503,
+   "fm4_coverage": 1.0
+  },
+  {
+   "table": "Data_Car",
+   "column": "HandlingRating",
+   "category": "stored_performance_metadata",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    -1.9775161301739175,
+    1.3400130691674164
+   ],
+   "domain": [
+    4.016023,
+    9.231524
+   ]
+  },
+  {
+   "table": "Data_Car",
+   "column": "LaunchRating",
+   "category": "stored_performance_metadata",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    2.3054162117028945,
+    0.8143791181486407
+   ],
+   "domain": [
+    3.533693,
+    9.380437
+   ]
+  },
+  {
+   "table": "Data_Car",
+   "column": "MakeIcon",
+   "category": "catalog_or_integration",
+   "accepted": true,
+   "kind": "constant",
+   "value": "BOING",
+   "fm4_rows": 503,
+   "fm4_coverage": 1.0
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimLatGees120MPH",
+   "category": "stored_performance_metadata",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    0.08347169072596794,
+    0.8153517043847318
+   ],
+   "domain": [
+    0.685601,
+    2.317343
+   ]
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimLatGees60MPH",
+   "category": "stored_performance_metadata",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    0.1376824809231162,
+    0.7567209966370543
+   ],
+   "domain": [
+    0.750237,
+    1.589753
+   ]
+  },
+  {
+   "table": "Data_Car",
+   "column": "SimTimeTo60MPH",
+   "category": "stored_performance_metadata",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    0.5955839708381445,
+    0.9519110364088137
+   ],
+   "domain": [
+    2.549998,
+    8.900036
+   ]
+  },
+  {
+   "table": "Data_Car",
+   "column": "SpeedRating",
+   "category": "stored_performance_metadata",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    -2.5812667908163256,
+    1.4635056151924342
+   ],
+   "domain": [
+    3.228427,
+    8.909677
+   ]
+  },
+  {
+   "table": "List_UpgradeBrakes",
+   "column": "GameFrictionScaleBraking",
+   "category": "physics",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    0.8245290140908844,
+    0.17606247853149767
+   ],
+   "domain": [
+    1.0,
+    1.05
+   ],
+   "grid": 0.0025
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "FrontLatFrictionScale",
+   "category": "physics",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    0.4208652182704622,
+    0.5772989732413673
+   ],
+   "domain": [
+    0.9,
+    1.0
+   ]
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "FrontLongFrictionScale",
+   "category": "physics",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    0.4208652182704622,
+    0.5772989732413673
+   ],
+   "domain": [
+    0.9,
+    1.0
+   ]
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "RearLatFrictionScale",
+   "category": "physics",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    0.3625942915392486,
+    0.6316258919469923
+   ],
+   "domain": [
+    0.95,
+    1.0
+   ]
+  },
+  {
+   "table": "List_UpgradeCarBodyChassisStiffness",
+   "column": "RearLongFrictionScale",
+   "category": "physics",
+   "accepted": true,
+   "kind": "linear",
+   "coef": [
+    0.3625942915392486,
+    0.6316258919469923
+   ],
+   "domain": [
+    0.95,
+    1.0
+   ]
+  },
+  {
+   "table": "List_Wheels",
+   "column": "DisplayName",
+   "category": "part_metadata",
+   "accepted": true,
+   "kind": "lookup",
+   "values": {
+    "\"\"": "NULL"
+   }
+  }
+ ]
+}

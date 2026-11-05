@@ -104,8 +104,10 @@ def closing_db(path):
     return closing(sqlite3.connect(f'file:{path}?mode=ro', uri=True))
 
 
-def build(out=sources.FM2_DLC.parent, bonus_disc=sources.FM2_BONUS_DISC, base_db=sources.FM2_DB):
-    out = Path(out).resolve()
+def build(out=None, bonus_disc=None, base_db=None):
+    """None: the `sources` locations at call time."""
+    out = Path(out or sources.FM2_DLC.parent).resolve()
+    bonus_disc, base_db = bonus_disc or sources.FM2_BONUS_DISC, base_db or sources.FM2_DB
     if out.exists():
         raise c.MappingError('Choose a new output folder')
     media = out / 'Media'

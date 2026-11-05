@@ -36,10 +36,25 @@ hasil setiap jalur melalui audit offline dan pengujian di game. Perbedaan
 satuan, struktur, dan fitur antar-game perlu ditangani pada setiap adapter;
 cakupan dukungan akan dicatat bersama batas validasinya.
 
+## Konversi satu perintah
+
+`fm4_converter.cli` mengonversi semua mobil FM3-only atau FM2-only dari disc pemain
+(folder hasil ekstrak atau `.iso`) menjadi satu paket mod dengan `mod.json` untuk launcher.
+Progres bisa dikirim sebagai JSON lines (`--json`), dan kalibrasinya memakai data beku
+dari paket yang sudah diuji.
+
+```powershell
+python -m fm4_converter.cli convert --game fm3 --disc <FM3 Disc 1> --disc2 <FM3 Disc 2> `
+    --fm4 <folder FM4 Disc 1> --content-root <DLC FM4> --helper <carbin-cpu.exe> --out <paket-baru>
+```
+
+Argumen, event progres, isi `mod.json` dan aturan pemasangan ada di
+[format paket mod](docs/mod-format.md).
+
 ## Struktur repository
 
 ```text
-src/fm4_converter/       Package Python: adapter FM3 dan pembaca arsip bersama
+src/fm4_converter/       Package Python: adapter FM3/FM2, CLI satu perintah, pembaca arsip dan disc
 tests/                  Tes regresi dan verifikasi package
 docs/                   Panduan converter dan struktur project
 tools/                  Source helper CPU C# dan wrapper LZX

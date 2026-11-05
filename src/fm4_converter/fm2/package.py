@@ -375,8 +375,9 @@ def make_for(fm2_db, work, registry, fm2_make):
 
 
 def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUDY, models_root=OUT / 'models',
-          helper=fm4_models.HELPER, donors=None):
-    """`donors`: {car casefold: donor MediaName} replacing the automatic donor of those cars."""
+          helper=fm4_models.HELPER, donors=None, progress=None):
+    """`donors`: {car casefold: donor MediaName} replacing the automatic donor of those cars.
+    `progress`: called after each car with {index, total, car, status, donor, error}."""
     target, out = Path(target).resolve(), Path(out).resolve()
     cars, donors = list(cars or fm2_only()), dict(donors or {})
     unknown = sorted(set(donors) - {car.casefold() for car in cars})
@@ -418,7 +419,7 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
         pool = donor_pool(work)
         tables, _ = ui_names.winning_tables(target_root, content_root, archive_read, c.sha)
         taken = {k for _, _, _, data in tables.values() for k in ui_names.StringTable(data).texts}
-        for car in cars:
+        for index, car in enumerate(cars, 1):
             log, car_keys = {'media': car}, {}
             try:
                 fm2_car = c.one(c.rows(fm2_db, 'Data_Car', 'MediaName=?', (car,)), f'FM2 {car}')
@@ -534,6 +535,9 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
                 failed.append({**log, 'error': f'{type(error).__name__}: {error}',
                                'trace': traceback.format_exc().splitlines()[-3:]})
                 print('FAILED', car, failed[-1]['error'], flush=True)
+                if progress:
+                    progress(dict(index=index, total=len(cars), car=car, status='failed',
+                                  donor=log.get('donor'), error=failed[-1]['error']))
                 continue
             payloads.update(car_payloads)
             origins.update(origin)
@@ -563,6 +567,8 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
                                                      cockpit_paint_scales=paint))
             inputs.update(appearance['inputs'])
             print('packaged', car, donor, log['wheel'], log['audio'], car_row['ClassID'], flush=True)
+            if progress:
+                progress(dict(index=index, total=len(cars), car=car, status='packaged', donor=donor, error=None))
         if work.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
             raise c.MappingError('Package database failed integrity_check')
 

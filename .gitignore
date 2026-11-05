@@ -15,6 +15,9 @@
 !/src/
 !/src/fm4_converter/
 !/src/fm4_converter/archives/
+!/src/fm4_converter/data/
+!/src/fm4_converter/data/fm2/
+!/src/fm4_converter/data/fm3/
 !/src/fm4_converter/fm2/
 !/src/fm4_converter/fm3/
 !/tests/
@@ -34,6 +37,7 @@
 !/docs/fm3.md
 !/docs/fm3-acceptance.md
 !/docs/fm2.md
+!/docs/mod-format.md
 !/pyproject.toml
 !/requirements.txt
 !/research/physics-2026-10-20/METHODS.md
@@ -82,6 +86,16 @@
 !/src/fm4_converter/archives/forza_zip.py
 !/src/fm4_converter/archives/stfs_reader.py
 !/src/fm4_converter/archives/stfs_zip_io.py
+!/src/fm4_converter/archives/xiso.py
+!/src/fm4_converter/cli.py
+!/src/fm4_converter/data/__init__.py
+!/src/fm4_converter/data/fm2/cars.json
+!/src/fm4_converter/data/fm2/study.json
+!/src/fm4_converter/data/fm3/pi-model.json
+!/src/fm4_converter/data/fm3/rules.json
+!/src/fm4_converter/data/fm3/value-scales.json
+!/src/fm4_converter/discs.py
+!/src/fm4_converter/mod.py
 !/src/fm4_converter/fm2/__init__.py
 !/src/fm4_converter/fm2/carbin.py
 !/src/fm4_converter/fm2/dlc.py
@@ -165,6 +179,7 @@
 !/tests/fm3/test_ui_assets.py
 !/tests/fm3/test_value_scales.py
 !/tests/fm3/test_batch_package.py
+!/tests/test_cli.py
 !/tests/test_project_layout.py
 !/tools/carbin_cpu/GPL-3.0.txt
 !/tools/carbin_cpu/MonoGame-LICENSE.txt

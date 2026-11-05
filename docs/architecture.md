@@ -4,7 +4,11 @@
 src/fm4_converter/
   fm3/                 Converter sumber FM3, pengemasan, audit dan studi kalibrasi
   fm2/                 Adapter mobil FM2-only: model, fisika, dan paket overlay
-  archives/            Pembaca ZIP Forza dan STFS yang dipakai bersama
+  archives/            Pembaca ZIP Forza, STFS, dan image disc Xbox 360 (xiso)
+  data/                Data kalibrasi beku untuk CLI (dicek dengan SHA-256)
+  cli.py               Konversi satu perintah dari disc pemain ke paket mod
+  discs.py             Disc sebagai folder atau .iso, dicek dari default.xex
+  mod.py               Format paket mod (mod.json) untuk launcher
   paths.py             Lokasi checkout, tools dan evidence lokal
 tests/
   fm3/                 Regresi konversi, fisika, aset dan UI FM3 → FM4
@@ -12,6 +16,7 @@ tests/
   test_project_layout.py
 docs/
   fm3.md               Panduan dan hasil validasi jalur FM3 → FM4
+  mod-format.md        CLI satu perintah, event progres dan format mod.json
 tools/
   carbin_cpu/          Source helper C# dan lisensi
   lzx_bridge/          Source wrapper decoder LZX
@@ -63,6 +68,14 @@ FM2 → FM4 sendiri; `package` menulis semua mobil ke satu overlay. Riset dan
 batas validasinya ada di
 [`research/cars-fm2-2026-11-02/REPORT.md`](../research/cars-fm2-2026-11-02/REPORT.md);
 cara menjalankannya ada di [panduan FM2](fm2.md).
+
+## CLI satu perintah dan data beku
+
+`cli` memanggil `fm3.batch_package` atau `fm2.package` dengan path disc pemain. Untuk FM2,
+lokasi disc diarahkan lewat `fm2.sources.configure`. Kalibrasi tidak dibaca dari `outputs/`,
+melainkan dari `data/`, salinan beku hasil yang dipakai paket teruji. Bila aturan baru
+diterima, perbarui berkas di `data/` beserta hash dan asalnya di `data/__init__.py`.
+Format keluaran dan aturan pemasangan ada di [format paket mod](mod-format.md).
 
 ## Evidence dan riset
 
