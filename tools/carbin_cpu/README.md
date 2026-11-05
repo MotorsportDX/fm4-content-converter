@@ -34,6 +34,14 @@ git -C <reference-directory> checkout 8807c7d137646dab8d9eecab7e8d5a6602ef58aa
 python -m fm4_converter.fm3.build_carbin_cpu --reference <reference-directory> --out <new-helper-directory>
 ```
 
+Instead of a Git checkout, `--reference` can be GitHub's archive of the same commit, unpacked
+(`https://github.com/FMdangaina/ForzaEditor/archive/8807c7d137646dab8d9eecab7e8d5a6602ef58aa.tar.gz`).
+Git is then not needed. The archive has LF line ends; the build reads every pinned file with
+CRLF line ends, as a Windows checkout has them, and checks it against `REFERENCE_SHA256`. A
+helper built this way from the archive converted Cobalt SS and 333SP to the same bytes as
+`carbin-cpu-v9`, although the helper's own SHA-256 differs (the C# compiler output is not
+reproducible byte for byte).
+
 Build requires Windows .NET Framework 4's C# compiler. No XNA installation,
 .NET SDK, Visual Studio project build, or GPU is needed. Build outputs, the
 external checkout, extracted game assets and converted assets stay outside Git.

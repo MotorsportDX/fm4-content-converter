@@ -2,6 +2,10 @@
 
 Does not launch the resulting helper, the editor, or any game.
 Third-party sources and binaries stay in the selected local build directory.
+
+`--reference` is a Git checkout of the pinned commit or GitHub's archive of it unpacked
+(no Git needed, as on a player's computer). Either way the sources are read with CRLF line
+ends, as a Windows checkout has them, and must match REFERENCE_SHA256.
 """
 import argparse
 import hashlib
@@ -18,6 +22,15 @@ REPOSITORY = "https://github.com/FMdangaina/ForzaEditor"
 MONOGAME_VERSION = "3.6.0.1625"
 MONOGAME_SHA256 = "ec22a974a2b6fa99ed022dc339a82fbecdcf2c5c05db7216ac7a436cfe1ca8fe"
 SOURCES = ("CarbinModel.cs", "CarbinModelMotorsport3.cs", "ObjMesh.cs")
+# SHA-256 of the pinned files with CRLF line ends: a Windows checkout (core.autocrlf) has them,
+# GitHub's archive has LF. carbin-cpu-v9, which built the tested packages, used these bytes.
+REFERENCE_SHA256 = {
+    "ForzaStudio/CarbinModel.cs": "ca4a76b106741c052649acf76b60c9f515b7abae878d5fae417ea3ecd10c58d5",
+    "ForzaStudio/CarbinModelMotorsport3.cs": "89efdac12a0570ffdeb2229c27ed83dfd4fb37306c1a00e82b07591833e2b9be",
+    "ForzaStudio/ObjMesh.cs": "edf7e9ceb62120241bfe557eb673783bcdbe7d1356c4c7e541ee99b014432c8d",
+    "LICENSE": "0b383d5a63da644f628d99c33976ea6487ed89aaa59f0b3257992deac1171e6b",
+    "THIRD-PARTY-NOTICES.md": "221170ff836d4ac05a32c1f9a8bfdb7ff60f3ecc195107210507a14ff6718b23",
+}
 # Exact, reviewed edits to copies of the pinned sources (the checkout stays
 # clean). Each anchor must occur once. Extensions live in tools/carbin_cpu.
 PATCHES = (
@@ -33,15 +46,32 @@ PATCHES = (
 EXTENSIONS = ("Motorsport3Bounds.cs",)
 
 
+def crlf(data):
+    return data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+
+
+def reference_files(reference):
+    """{relative path: CRLF bytes} of the pinned reference files, checked by SHA-256."""
+    files = {}
+    for name, expected in REFERENCE_SHA256.items():
+        data = crlf((reference/name).read_bytes())
+        if hashlib.sha256(data).hexdigest() != expected:
+            raise ValueError(f"{name} of the reference is not the pinned ForzaEditor {COMMIT[:7]} file")
+        files[name] = data
+    return files
+
+
 def build(out, reference):
     out, reference = Path(out).resolve(), Path(reference).resolve()
-    actual = subprocess.check_output(
-        ["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
-    if actual != COMMIT:
-        raise ValueError(f"Expected ForzaEditor commit {COMMIT}, got {actual}")
-    # Local source changes would invalidate the provenance recorded below.
-    if subprocess.check_output(["git", "-C", str(reference), "status", "--porcelain"], text=True).strip():
-        raise ValueError("The reference checkout must be unmodified")
+    if (reference/".git").exists():
+        actual = subprocess.check_output(
+            ["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
+        if actual != COMMIT:
+            raise ValueError(f"Expected ForzaEditor commit {COMMIT}, got {actual}")
+        # Local source changes would invalidate the provenance recorded below.
+        if subprocess.check_output(["git", "-C", str(reference), "status", "--porcelain"], text=True).strip():
+            raise ValueError("The reference checkout must be unmodified")
+    pinned = reference_files(reference)
     out.mkdir(parents=True, exist_ok=False)
     package_url = (f"https://api.nuget.org/v3-flatcontainer/monogame.framework.desktopgl/"
                    f"{MONOGAME_VERSION}/monogame.framework.desktopgl.{MONOGAME_VERSION}.nupkg")
@@ -58,7 +88,7 @@ def build(out, reference):
     originals = [reference/"ForzaStudio"/s for s in SOURCES]
     (out/"src").mkdir()
     for original in originals:
-        data = original.read_bytes()
+        data = pinned["ForzaStudio/"+original.name]
         for patch in PATCHES:
             if patch["file"] == original.name:
                 old, new = patch["old"].encode(), patch["new"].encode()
@@ -77,7 +107,7 @@ def build(out, reference):
     sha = lambda data: hashlib.sha256(data).hexdigest()
     record = {
         "reference_repository": REPOSITORY, "reference_commit": COMMIT,
-        "reference_sources": {str(p):sha(p.read_bytes()) for p in originals},
+        "reference_sources": {str(p):sha(pinned["ForzaStudio/"+p.name]) for p in originals},
         "patches": [{k:v for k,v in p.items() if k in ("file","reason")} for p in PATCHES],
         "sources": {str(p):sha(p.read_bytes()) for p in inputs},
         "package_url":package_url, "package_sha256":sha(package),
@@ -86,8 +116,8 @@ def build(out, reference):
         "graphics_device_created":False,
     }
     (out/"build.json").write_text(json.dumps(record,indent=2)+"\n", encoding="utf-8")
-    (out/"ForzaEditor-LICENSE.txt").write_bytes((reference/"LICENSE").read_bytes())
-    (out/"ForzaEditor-NOTICES.md").write_bytes((reference/"THIRD-PARTY-NOTICES.md").read_bytes())
+    (out/"ForzaEditor-LICENSE.txt").write_bytes(pinned["LICENSE"])
+    (out/"ForzaEditor-NOTICES.md").write_bytes(pinned["THIRD-PARTY-NOTICES.md"])
     (out/"MonoGame-LICENSE.txt").write_bytes(
         (TOOLS_ROOT/"carbin_cpu/MonoGame-LICENSE.txt").read_bytes())
     return record
