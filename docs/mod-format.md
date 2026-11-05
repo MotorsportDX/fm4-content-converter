@@ -130,8 +130,10 @@ tes memakai image XDVDFS sintetis pada offset partisi 0 dan XGD3.
 
 ## Batas
 
-- Converter tetap butuh Python 3.11+, NumPy, Pillow, dan `carbin-cpu.exe`. Menyiapkannya
-  di komputer pemain adalah langkah berikutnya, di sisi launcher.
+- Converter tetap butuh Python 3.11+, NumPy, Pillow, `carbin-cpu.exe`, dan decoder LZX
+  `lzx_bridge.dll` ([`tools/lzx_bridge`](../tools/lzx_bridge/lzx_bridge.c) dengan `lzxd.c`
+  libmspack). Variabel lingkungan `FM4_LZX_BRIDGE` menunjuk DLL itu; tanpa variabel ini
+  dipakai build riset di `outputs/`. Launcher menyiapkan semuanya di komputer pemain.
 - Image FM4 tidak diterima. Launcher sudah punya FM4 Disc 1 yang diekstrak.
 - Data kalibrasi beku hanya mewakili rilis disc yang diuji: FM3 USA, FM2 USA, dan FM4
   USA atau Japan/Asia (database identik).

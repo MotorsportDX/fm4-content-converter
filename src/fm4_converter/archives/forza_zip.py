@@ -1,11 +1,16 @@
-"""Read Forza method-21 ZIP files using local libmspack. Verify exact ZIP CRC32."""
+"""Read Forza method-21 ZIP files using local libmspack. Verify exact ZIP CRC32.
+
+The decoder is tools/lzx_bridge built as lzx_bridge.dll: FM4_LZX_BRIDGE names it (a launcher
+builds it beside the converter), else the research build in outputs/ is used."""
 from ..paths import PHYSICS_RESEARCH_OUTPUT
-import ctypes, struct, zlib, zipfile
+import ctypes, os, struct, zlib, zipfile
 _dll=None
+def bridge_path():
+    return os.environ.get('FM4_LZX_BRIDGE') or str(PHYSICS_RESEARCH_OUTPUT / 'shared/lzx_bridge.dll')
 def decode21(data,size,crc):
     global _dll
     if _dll is None:
-        _dll=ctypes.CDLL(str(PHYSICS_RESEARCH_OUTPUT / 'shared/lzx_bridge.dll'))
+        _dll=ctypes.CDLL(bridge_path())
         _dll.decode_lzx.argtypes=[ctypes.c_void_p,ctypes.c_size_t,ctypes.c_void_p,ctypes.c_size_t,ctypes.c_int]
         _dll.decode_lzx.restype=ctypes.c_int
     pos=0; raw=bytearray(); declared=0
