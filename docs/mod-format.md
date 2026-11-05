@@ -134,6 +134,11 @@ tes memakai image XDVDFS sintetis pada offset partisi 0 dan XGD3.
   `lzx_bridge.dll` ([`tools/lzx_bridge`](../tools/lzx_bridge/lzx_bridge.c) dengan `lzxd.c`
   libmspack). Variabel lingkungan `FM4_LZX_BRIDGE` menunjuk DLL itu; tanpa variabel ini
   dipakai build riset di `outputs/`. Launcher menyiapkan semuanya di komputer pemain.
+- Audit animasi driver membaca empat berkas GR2 `Driver.zip` milik FM4 dengan DLL proprietary
+  XMem dan Granny, yang hanya ada lokal dan tidak pernah dibundel. Tanpa keduanya, audit itu
+  dilewati dan dicatat di `appearance_validation.json` (`driver_animation_validation.skipped`).
+  Konversi penuh tanpa keduanya menghasilkan berkas yang sama: FM3 119 dari 119 dan FM2 103 dari
+  103, dibanding hasil dengan keduanya.
 - Image FM4 tidak diterima. Launcher sudah punya FM4 Disc 1 yang diekstrak.
 - Data kalibrasi beku hanya mewakili rilis disc yang diuji: FM3 USA, FM2 USA, dan FM4
   USA atau Japan/Asia (database identik).

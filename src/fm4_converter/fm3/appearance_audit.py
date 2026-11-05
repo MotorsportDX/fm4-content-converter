@@ -373,25 +373,36 @@ def audit(source, target, target_root, media, wheel, archive_read):
     shared_path, driver_path = target_root/"Cars/Shared.zip", target_root/"Cars/Driver.zip"
     for path in (shared_path, driver_path, target_root/"zipmanifest.xml"):
         inputs[str(path)] = sha(path.read_bytes())
-    decoder = archive_cpu.decoder_path()
-    inputs[str(decoder)] = sha(decoder.read_bytes())
-    if inputs[str(decoder)] != archive_cpu.DECODER_SHA256:
-        raise AppearanceError("Unreviewed CPU archive decoder")
     mounts = {n.attrib["path"].replace("\\", "/").casefold()
               for n in xml((target_root/"zipmanifest.xml").read_bytes()).findall("Zip")}
     for name in ("shared", "driver"):
         if f"game:/media/cars/{name}.zip" not in mounts:
             raise AppearanceError(f"Native {name} archive is not mounted")
-    with zipfile.ZipFile(driver_path) as z:
-        entries = {n.casefold(): n for n in z.namelist() if not n.endswith("/")}
-        for required in ("driverlod0.gr2", "hands.gr2", "driver.anim.bin", "driver01.skinbin", "driver02.skinbin"):
-            if required not in entries:
-                raise AppearanceError(f"Missing native driver dependency: {required}")
-        driver_payloads = {n: archive_read(z, n) for n in sorted(entries.values())}
-        driver_files = [{"path": n, "sha256": sha(b)} for n, b in driver_payloads.items()]
-        driver_animation = driver_audit.audit(attributes, driver_payloads)
-        decoder = granny_audit.decoder_path()
-        inputs[str(decoder)] = sha(decoder.read_bytes())
+    # The native driver audit decodes four GR2 files of Driver.zip that libmspack cannot read
+    # with the proprietary XMem and Granny DLLs, supplied locally and never bundled. Without
+    # both (a player's computer), the audit is skipped and recorded so; it reads FM4's own
+    # driver files and the car's carattribs.xml, and changes no packaged byte.
+    archive_decoder, granny_decoder = archive_cpu.decoder_path(), granny_audit.decoder_path()
+    if not (archive_decoder.is_file() and granny_decoder.is_file()):
+        driver_files = None
+        driver_animation = {"passed": None, "skipped": "The proprietary XMem and Granny decoders are "
+                            "not present; the native driver animation audit did not run"}
+        archive_validation = "Native driver files not decoded (decoders absent)"
+    else:
+        inputs[str(archive_decoder)] = sha(archive_decoder.read_bytes())
+        if inputs[str(archive_decoder)] != archive_cpu.DECODER_SHA256:
+            raise AppearanceError("Unreviewed CPU archive decoder")
+        with zipfile.ZipFile(driver_path) as z:
+            entries = {n.casefold(): n for n in z.namelist() if not n.endswith("/")}
+            for required in ("driverlod0.gr2", "hands.gr2", "driver.anim.bin", "driver01.skinbin",
+                             "driver02.skinbin"):
+                if required not in entries:
+                    raise AppearanceError(f"Missing native driver dependency: {required}")
+            driver_payloads = {n: archive_read(z, n) for n in sorted(entries.values())}
+            driver_files = [{"path": n, "sha256": sha(b)} for n, b in driver_payloads.items()]
+            driver_animation = driver_audit.audit(attributes, driver_payloads)
+            inputs[str(granny_decoder)] = sha(granny_decoder.read_bytes())
+        archive_validation = "Native driver files decoded on CPU; every ZIP size and CRC verified"
 
     bindings, rows, undeclared, checked_overrides, absent, unknown_techniques = {}, [], set(), [], [], []
     with zipfile.ZipFile(shared_path) as shared:
@@ -526,5 +537,5 @@ def audit(source, target, target_root, media, wheel, archive_read):
                                      "unmeasured_techniques_left_at_default": paint_unmeasured},
             "absent_textures_with_native_precedent": absent,
             "techniques_without_effect_native_precedent": unknown_techniques,
-            "archive_validation": "Native driver files decoded on CPU; every ZIP size and CRC verified",
+            "archive_validation": archive_validation,
             "native_driver_assets": driver_files}

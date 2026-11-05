@@ -88,6 +88,18 @@ class LocalAssetTests(unittest.TestCase):
                        c.FM4_DEFAULT.parents[1], "CHE_Cobalt_05", "CHE_Cobalt_05",
                        integration.archive_read)
 
+    def test_driver_audit_is_skipped_without_the_proprietary_decoders(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            absent = {"FM_XCOMPRESS_DLL": str(Path(tmp)/"xcompress64.dll"),
+                      "FM_GRANNY_DLL": str(Path(tmp)/"granny2_x64.dll")}
+            with patch.dict(os.environ, absent):
+                report = self.appearance()
+        self.assertTrue(report["passed"])
+        self.assertIsNone(report["native_driver_assets"])
+        self.assertIsNone(report["driver_animation_validation"]["passed"])
+        self.assertIn("skipped", report["driver_animation_validation"])
+        self.assertEqual(report["mesh_count"], 1250)
+
     def test_all_actual_meshes_textures_and_driver_dependencies(self):
         report = self.appearance()
         self.assertTrue(report["passed"])
