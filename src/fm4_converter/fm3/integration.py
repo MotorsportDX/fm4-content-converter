@@ -230,6 +230,9 @@ def extend_zip_manifest(original, archives, replacements=(), priorities=None):
             if len(nodes)!=1:
                 raise c.MappingError("Ambiguous replacement ZIP mount")
             nodes[0].attrib.update(dirstart=str(start),dirsize=str(size),direntries=str(count))
+            # A stacked package's archive takes over the base's mount, at its own priority.
+            if path in (priorities or {}):
+                nodes[0].attrib["priority"] = str(priorities[path])
         else:
             priority = str((priorities or {}).get(path,80))
             ET.SubElement(tree,"Zip",{"version":"1","path":guest,"priority":priority,

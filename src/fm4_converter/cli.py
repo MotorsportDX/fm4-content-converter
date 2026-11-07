@@ -190,7 +190,8 @@ def convert_fm2(a, events, cache):
     with redirect_stdout(sys.stderr):
         manifest = package.build(a.out, cars, fm4.path / "Media/DB/gamedb.slt", a.content_root,
                                  data.path("fm2/study.json"), models, a.helper,
-                                 progress=lambda p: events.emit("car", **p))
+                                 progress=lambda p: events.emit("car", **p),
+                                 stacked_cars=frozenset(stacked_cars(a.base_packages)))
     records = [dict(media=r["media"], name=r.get("names", {}).get("DisplayName"), status="packaged",
                     requires=r.get("requires", []), donor=r.get("donor"), error=None) for r in manifest["cars"]]
     records += [dict(media=f["media"], name=None, status="failed", requires=[], error=f["error"])
@@ -201,6 +202,17 @@ def convert_fm2(a, events, cache):
 NOTES = ("Experimental: cockpit view, engine sound, paint colours and PI class can differ from the "
          "original game; see the converter's docs.",
          "Install only over the FM4 Disc 1 and DLC packs in built_against; rebuild when they change.")
+
+
+def base_packages(paths):
+    """mod.json of each package the --fm4 folder already carries (a stacked install)."""
+    return [mod.load(path) for path in paths]
+
+
+def stacked_cars(packages):
+    """Case-folded MediaNames of the cars those packages added."""
+    return {car["media"].casefold() for package in packages for car in package.get("cars", ())
+            if car["status"] == "packaged"}
 
 
 def convert(a, events):
@@ -217,10 +229,12 @@ def convert(a, events):
     if cache == out or out in cache.parents or cache in out.parents:
         raise DiscError("The cache folder must be outside the package folder")
     cache.mkdir(parents=True, exist_ok=True)
+    a.base_packages = base_packages(a.base_package or ())
     mod_id, name, game, fm4, discs, cars, requires = (convert_fm3 if a.game == "fm3" else convert_fm2)(a, events, cache)
     events.stage("describe", "Writing mod.json")
     described = mod.describe(out, mod_id, name, game, fm4.path, cars, requires, [d.describe() for d in discs],
-                             built_against(fm4, a.content_root), NOTES)
+                             built_against(fm4, a.content_root), NOTES,
+                             [dict(id=p["id"], created=p["created"]) for p in a.base_packages])
     mod.verify(out)
     if not a.cache:
         shutil.rmtree(cache, ignore_errors=True)
@@ -244,6 +258,9 @@ def main(argv=None):
     c.add_argument("--out", required=True, help="new package folder")
     c.add_argument("--cache", help="keep extracted discs and FM2 models here to resume or rebuild")
     c.add_argument("--cars", nargs="*", help="only these MediaNames")
+    c.add_argument("--base-package", action="append",
+                   help="a package the --fm4 folder already carries over FM4 Disc 1 (a stacked install, "
+                        "fm4_converter.stack); repeat for each, in install order")
     c.add_argument("--json", action="store_true", help="JSON lines on stdout")
     i = sub.add_parser("identify", help="print which game and disc a folder or .iso is")
     i.add_argument("path")

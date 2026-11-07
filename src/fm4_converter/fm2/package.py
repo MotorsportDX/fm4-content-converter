@@ -42,6 +42,7 @@ from ..fm3 import converter as c
 from ..fm3.asset_conversion import convert_texture
 from ..fm3.integration import archive_read
 from ..fm3.texture_audit import Texture
+from .. import stack
 from ..paths import PROJECT_ROOT
 
 CONTENT = sources.CONTENT
@@ -241,14 +242,17 @@ def string_archive(target_root, content_root, keys):
                 raise c.MappingError('Existing localized text changed')
             output.writestr(zipfile.ZipInfo(f'{language}/Data_Car.str', (1980, 1, 1, 0, 0, 0)), encoded)
             reports.append(dict(language=language, winning_table=origin, winning_priority=priority))
+        ui_names.keep_base_tables(output, target_root, {f"{r['language']}/Data_Car.str" for r in reports},
+                                  archive_read)
     priority = max(r['winning_priority'] for r in reports) + 1
     return stream.getvalue(), priority, dict(inputs=inputs, languages=reports, priority=priority)
 
 
-def donor_pool(fm4):
+def donor_pool(fm4, exclude=frozenset()):
     """FM4 disc cars that can be donors: _lod0/_cockpit headers, four calipers and rotors; `wheel` =
     origin of the steering_wheel section in _cockpit, `steer` = its x (negative = left-hand drive),
-    `race` = a race car (CarTypeID RACE)."""
+    `race` = a race car (CarTypeID RACE). `exclude`: MediaNames (case-folded) that packages under
+    this one added to the disc (a stacked install, fm4_converter.stack); they are not FM4's."""
     discs = sources.zips(sources.FM4_CARS)
 
     def usable(media):
@@ -271,6 +275,8 @@ def donor_pool(fm4):
         return wheel[0] if len(wheel) == 1 else False
     pool = []
     for d in physics.fm4_index(fm4):
+        if d['media'].casefold() in exclude:
+            continue
         wheel = usable(d['media'])
         if wheel is not False:
             race = fm4.execute('SELECT CarTypeID FROM Data_Car WHERE Id=?', (d['id'],)).fetchone()[0] == RACE
@@ -375,9 +381,12 @@ def make_for(fm2_db, work, registry, fm2_make):
 
 
 def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUDY, models_root=OUT / 'models',
-          helper=fm4_models.HELPER, donors=None, progress=None):
+          helper=fm4_models.HELPER, donors=None, progress=None, stacked_cars=frozenset()):
     """`donors`: {car casefold: donor MediaName} replacing the automatic donor of those cars.
-    `progress`: called after each car with {index, total, car, status, donor, error}."""
+    `progress`: called after each car with {index, total, car, status, donor, error}.
+    `stacked_cars`: cars that packages under this one added to `target`'s disc (case-folded
+    MediaNames); they are never donors, so a stacked package picks the donors a package on
+    FM4 Disc 1 alone picks."""
     target, out = Path(target).resolve(), Path(out).resolve()
     cars, donors = list(cars or fm2_only()), dict(donors or {})
     unknown = sorted(set(donors) - {car.casefold() for car in cars})
@@ -416,7 +425,7 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
     packaged, failed = [], []
     with closing(c.connect(fm2_database)) as fm2_db, closing(sqlite3.connect(database)) as work:
         work.row_factory = sqlite3.Row
-        pool = donor_pool(work)
+        pool = donor_pool(work, stacked_cars)
         tables, _ = ui_names.winning_tables(target_root, content_root, archive_read, c.sha)
         taken = {k for _, _, _, data in tables.values() for k in ui_names.StringTable(data).texts}
         for index, car in enumerate(cars, 1):
@@ -579,17 +588,29 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
     archives = {CARS / (e['media'] + '.zip'): integration.stored_zip(payloads, CARS / e['media']) for e in packaged}
     archives.update({WHEELS / (w + '.zip'): integration.stored_zip(payloads, WHEELS / w)
                      for w in {e['wheel_media'] for e in packaged if e['wheel'] == 'converted_fm2'}})
-    archives[THUMBNAILS.with_suffix('.zip')] = integration.stored_zip(thumbs, THUMBNAILS)
+    # A package under this one (a stacked install) may have shipped the same archives: theirs
+    # members are kept (stack.extend) and the new archive takes over the mount.
+    stacked = set()
+
+    def cumulative(relative, payloads, root):
+        merged, base = stack.extend(disc, relative, {p.relative_to(root).as_posix(): d for p, d in payloads.items()})
+        if base:
+            stacked.add(relative)
+        return integration.stored_zip({root / n: d for n, d in merged.items()}, root)
+
+    archives[THUMBNAILS.with_suffix('.zip')] = cumulative(THUMBNAILS.with_suffix('.zip'), thumbs, THUMBNAILS)
     archives[ui_names.OVERRIDE] = strings
+    if stack.mounted((target_root / 'zipmanifest.xml').read_bytes(), ui_names.OVERRIDE) is not None:
+        stacked.add(ui_names.OVERRIDE)
     priorities = {ui_names.OVERRIDE: priority}
     if audio:
-        archives[AUDIO] = integration.stored_zip(audio, AUDIO_ROOT)
+        archives[AUDIO] = cumulative(AUDIO, audio, AUDIO_ROOT)
         priorities[AUDIO] = AUDIO_PRIORITY
     for relative in archives:
-        if (disc / relative).exists():
+        if (disc / relative).exists() and relative not in stacked:
             raise c.MappingError(f'Refusing to replace an existing asset: {relative}')
-    manifest_data = integration.extend_zip_manifest((target_root / 'zipmanifest.xml').read_bytes(), archives, (),
-                                                    priorities)
+    manifest_data = integration.extend_zip_manifest((target_root / 'zipmanifest.xml').read_bytes(), archives,
+                                                    tuple(sorted(stacked)), priorities)
     for relative, data in {**archives, Path('Media/zipmanifest.xml'): manifest_data}.items():
         (files / relative).parent.mkdir(parents=True, exist_ok=True)
         with (files / relative).open('xb') as f:

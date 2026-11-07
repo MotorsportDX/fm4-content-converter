@@ -35,11 +35,13 @@ def converter_version():
         return None
 
 
-def describe(package, mod_id, name, source, fm4_root, cars, requires, sources, built_against, notes=()):
+def describe(package, mod_id, name, source, fm4_root, cars, requires, sources, built_against, notes=(),
+             base_packages=()):
     """Write `package/mod.json` for a converter package and return it.
 
     `cars`: [{media, name, status, requires, error}]; `sources`: the discs read
-    (`discs.Disc.describe`); `built_against`: the FM4 inputs the package depends on."""
+    (`discs.Disc.describe`); `built_against`: the FM4 inputs the package depends on;
+    `base_packages`: [{id, created}] of the packages `fm4_root` carried (a stacked install)."""
     package, fm4_root = Path(package), Path(fm4_root)
     files = package / "files"
     entries, replaces, adds = {}, [], []
@@ -64,6 +66,7 @@ def describe(package, mod_id, name, source, fm4_root, cars, requires, sources, b
         "requires": sorted(requires),
         "sources": sources,
         "built_against": built_against,
+        "base_packages": list(base_packages),
         "notes": list(notes),
     }
     (package / "mod.json").write_text(json.dumps(mod, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")

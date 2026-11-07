@@ -29,6 +29,7 @@ from . import integration
 from . import offline_package
 from . import ui_names
 from .integration import archive_read
+from .. import stack
 
 FM3_DISC2_DEFAULT = Path(r"D:\Data\FM3\USA\Forza Motorsport 3 (USA) (Disc 2) (Content Install Disc) (1)"
                          r"\Content\0000000000000000\4D53084D\00000002")
@@ -169,11 +170,14 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
     inputs = {str(source):c.sha(source), str(target):c.sha(target)}
     cars, bindings, thumbnails, wheels, archives = [], {}, {}, {}, {}
 
-    def ship(relative, data):
+    def ship(relative, data, replace=False):
+        # replace: a package under this one (a stacked install) shipped the archive; `data`
+        # holds its members too (stack.extend) and takes over its mount.
         nonlocal manifest_data
-        if (target_root.parent/relative).exists():
+        if (target_root.parent/relative).exists() and not replace:
             raise c.MappingError(f"Refusing to replace an existing asset: {relative}")
-        manifest_data = integration.extend_zip_manifest(manifest_data, {relative:data})
+        manifest_data = integration.extend_zip_manifest(manifest_data, {relative:data},
+                                                        (relative,) if replace else ())
         (files/relative).parent.mkdir(parents=True, exist_ok=True)
         with (files/relative).open("xb") as f:
             f.write(data)
@@ -272,12 +276,17 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
             raise c.MappingError("No car could be packaged")
         if work.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise c.MappingError("Package database failed integrity_check")
-    ship(THUMBNAILS.with_suffix(".zip"), integration.stored_zip(thumbnails, THUMBNAILS))
+    merged, stacked = stack.extend(target_root.parent, THUMBNAILS.with_suffix(".zip"),
+                                   {p.relative_to(THUMBNAILS).as_posix():d for p, d in thumbnails.items()})
+    ship(THUMBNAILS.with_suffix(".zip"), integration.stored_zip({THUMBNAILS/n:d for n, d in merged.items()}, THUMBNAILS),
+         stacked)
     name_archives, name_validation = ui_names.build_archives(
         source_root, target_root, bindings, archive_read, c.sha, content_root)
     inputs.update(name_validation["inputs"])
     priority = name_validation["mount"]["priority"]
-    manifest_data = integration.extend_zip_manifest(manifest_data, name_archives, (),
+    stacked = stack.mounted(manifest_data, ui_names.OVERRIDE) is not None
+    manifest_data = integration.extend_zip_manifest(manifest_data, name_archives,
+                                                    (ui_names.OVERRIDE,) if stacked else (),
                                                     {ui_names.OVERRIDE:priority})
     for relative, data in name_archives.items():
         with (files/relative).open("xb") as f:

@@ -195,9 +195,41 @@ def winning_tables(target_root, content_root, archive_read, sha, table="Data_Car
                     raise NameError(f"Two {language} {table} share priority {priority}")
                 if not current or priority>current[0]:
                     tables[language.casefold()] = (priority,language,f"{path}:{member}",archive_read(z,member))
+    # A package under this one (a stacked install, fm4_converter.stack) mounted its own
+    # override above the tables it extended: those are the tables the game reads now.
+    override = target_root/OVERRIDE.name
+    priority = mounts.get("game:\\media\\stringtables.zip")
+    if override.is_file() and priority is not None:
+        inputs[str(override)] = sha(override)
+        with zipfile.ZipFile(override) as z:
+            for member in z.namelist():
+                language, _, name = member.replace("\\","/").partition("/")
+                if name.casefold()!=table.casefold():
+                    continue
+                current = tables.get(language.casefold())
+                if not current or priority>=current[0]:
+                    tables[language.casefold()] = (priority,language,f"{override}:{member}",archive_read(z,member))
     if "en" not in tables:
         raise NameError(f"No native English {table}")
     return tables, inputs
+
+
+def keep_base_tables(output, target_root, written, archive_read):
+    """Copy into `output` (an open ZipFile) the tables of the override a package under this one
+    mounted (a stacked install) that this package does not rewrite: `written` lists the
+    `<lang>/<table>` members already in `output`. Without such an override, nothing."""
+    override = target_root/OVERRIDE.name
+    if not override.is_file():
+        return []
+    done = {name.casefold() for name in written}
+    kept = []
+    with zipfile.ZipFile(override) as z:
+        for info in z.infolist():
+            if info.is_dir() or info.filename.casefold() in done:
+                continue
+            output.writestr(zipfile.ZipInfo(info.filename,(1980,1,1,0,0,0)),archive_read(z,info))
+            kept.append(info.filename)
+    return kept
 
 
 def rekey(bindings, taken):
@@ -248,6 +280,7 @@ def build_archives(source_root, target_root, bindings, archive_read, sha, conten
             reports.append({"language":language,"winning_table":origin,"winning_priority":priority,
                             "original_names_preserved":len(table.texts),"new_entries":bindings,
                             "optional_metadata_preserved":True})
+        keep_base_tables(output,target_root,{f"{r['language']}/Data_Car.str" for r in reports},archive_read)
     priority = max(r["winning_priority"] for r in reports)+1
     return {OVERRIDE:stream.getvalue()}, {
         "passed":True,"cpu_only":True,"runtime_tested":False,"inputs":inputs,"languages":reports,
