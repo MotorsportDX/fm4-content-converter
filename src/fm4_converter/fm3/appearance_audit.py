@@ -163,6 +163,10 @@ NATIVE_UNKNOWN_TECHNIQUES = {
     "bump_stitching": "as Material__1; FM3 PON_GTO_68 wheel",
     "leather": "as Material__1; FM3 PON_GTO_68 wheel",
     "bump_leather": "as Material__1; FM3 PON_GTO_68 wheel",
+    # The Ultimate Collection's Disc 2 (Forza Ultimate pack): FM3's second chrome on the body
+    # trim and the cockpit's A-pillars. Raced at Le Mans on 7 November 2026, cockpit and chase
+    # camera, nothing missing (docs/mod-format.md).
+    "chrome2": "as Material__1; FM3 AUD_R15Ultimate_09 body and cockpit a_pillar",
 }
 
 

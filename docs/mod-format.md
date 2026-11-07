@@ -179,12 +179,19 @@ Pembacaan `.iso` diuji pada image FM4 USA Disc 1 dan Disc 2 (partisi XGD3): `gam
 hasil baca identik dengan folder ekstrak. Image FM2 dan FM3 belum tersedia untuk diuji;
 tes memakai image XDVDFS sintetis pada offset partisi 0 dan XGD3.
 
-Konversi bertumpuk 7 November 2026 (FM4 Japan/Asia Disc 1, disc USA):
+Konversi 7 November 2026 (FM4 USA Disc 1 dan pack DLC uji Motorsport DX, disc FM3 dan FM2 USA,
+`carbin-cpu-v9`):
 
 | Paket | Di atas | Hasil |
 |---|---|---|
 | FM2 | `fm3-cars` | 55 dari 55 mobil; database berisi semua mobil FM3 dan FM2 tanpa ID ganda; 136 nama terbaca di 18 bahasa; ZIP mobil dan velg FM2 identik dengan build tanpa tumpukan |
 | Track FM3 | `fm3-cars`, `fm2-cars` | 3 environment dan CrownJewel 170 (16 layout baru, 1 environment baru); 639 mobil tetap ada; tidak ada entri nama mobil yang hilang; 1035 mount lama tetap dengan prioritas yang sama. TestTrackinfield dilewati (tanpa disc Ultimate Collection) |
+| FM3 dari disc Ultimate Collection (USA) | FM4 Disc 1 | 91 mobil FM3-only (database UC berisi 510 mobil; disc biasa 415, dengan 81 mobil FM3-only), 36 di antaranya dari 8 paket Disc 2. 90 dari 91 jadi. AUD_R15Ultimate_09 gagal karena teknik `chrome2` (krom kedua FM3 di bodi dan pilar A kokpit) tidak ada di efek mobil FM4; kini `chrome2` diterima seperti `Material__1` (`appearance_audit.NATIVE_UNKNOWN_TECHNIQUES`), dan mobil itu jadi |
+
+Di Motorsport DX, ketiga paket pertama dimainkan bersama dari satu disc mod: Quick Race dengan
+XK coupe (FM2) di Bugatti Circuit dan SRT4 (FM3) di New York Circuit, dengan mobil FM3 dan FM2
+di antara lawan AI, dibalap AI sampai memimpin tanpa crash. Forza Ultimate R15 (FM3) dibalap di
+Le Mans tanpa crash dan tampil utuh di kamera kokpit dan chase.
 
 ## Batas
 
