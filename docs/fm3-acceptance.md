@@ -54,6 +54,10 @@ padding yang dibaca FM4, `TrackSettings` FM4 sebagai donor pencahayaan, serta lo
 ribbon dan gambar FM3. Nama environment baru yang sudah dipakai FM4 diberi tanda
 "(FM3)", sama seperti mobil.
 
+Dari disc pemain, `python -m fm4_converter.cli convert --game fm3 --content tracks` membangun
+paket track tersendiri, juga di atas disc yang sudah membawa paket mobil
+([mod-format.md](mod-format.md#track)).
+
 ## Status
 
 | Item | M1/T1 | M2/T2 | M3 | M4/T3 | T4 | Catatan |

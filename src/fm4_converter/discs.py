@@ -25,6 +25,10 @@ ROLES = {
     "fm2-bonus": (FM2_BONUS, 1, ["content/0000000000000000/FFED2000/FFFFFFFF"]),
     "fm4-disc1": (FM4, 1, None),
 }
+# What the track conversion (fm3.track_env) reads of FM3 Disc 1, beyond the database and names.
+FM3_TRACK_PATHS = ["Media/DB", "Media/StringTables", "Media/UI/Textures.zip", "Media/Tracks/NewYork",
+                   "Media/Tracks/LeMans", "Media/Tracks/CrownJewel", "Media/AI/Tracks",
+                   "Media/Audio/Tracks/NewYork", "Media/Audio/Tracks/LeMans", "Media/Audio/Tracks/CrownJewel"]
 
 
 class DiscError(ValueError):
@@ -75,10 +79,10 @@ class Disc:
                     kind="iso" if self.image else "folder", title_id=f"{self.title:08X}",
                     disc_number=self.number, disc_count=self.count, media_id=f"{self.media_id:08X}")
 
-    def root(self, cache=None, progress=None):
-        """A folder with the disc layout. An image is extracted (only the role's paths) into
-        `cache/<role>`; a later call reuses the files already there."""
-        prefixes = ROLES[self.role][2]
+    def root(self, cache=None, progress=None, prefixes=None, name=None):
+        """A folder with the disc layout. An image is extracted (only the role's paths, or
+        `prefixes`) into `cache/<name or role>`; a later call reuses the files already there."""
+        prefixes = prefixes or ROLES[self.role][2]
         if not self.image:
             missing = [p for p in prefixes or () if not (self.path / PurePosixPath(p)).exists()]
             if missing:
@@ -88,7 +92,7 @@ class Disc:
             raise DiscError(f"Give the extracted {TITLES[ROLES[self.role][0]]} disc folder, not an image")
         if cache is None:
             raise DiscError("Extracting a disc image needs a cache folder")
-        out = Path(cache) / self.role
+        out = Path(cache) / (name or self.role)
         with XISO(self.path) as iso:
             missing = [p for p in prefixes if not iso.files(p)]
             if missing:

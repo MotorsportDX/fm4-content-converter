@@ -1,6 +1,7 @@
 """Stacked installs (fm4_converter.stack): a package built on a disc that already carries others
 keeps their members of the shared archives, reads their string override, and takes over their
 manifest mounts."""
+import argparse
 import io
 from pathlib import Path
 import tempfile
@@ -9,6 +10,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 from fm4_converter import cli, mod, stack
+from fm4_converter.discs import DiscError
 from fm4_converter.fm3 import converter as c
 from fm4_converter.fm3 import integration
 from fm4_converter.fm3 import ui_names
@@ -89,6 +91,29 @@ class StackTests(unittest.TestCase):
             stacked = mod.describe(Path(tmp) / "fm3-cars", "fm2-cars", "FM2 cars", "FM2", fm4, cars, [], [], {},
                                    (), [dict(id="fm3-cars", created=described["created"])])
             self.assertEqual(stacked["base_packages"][0]["id"], "fm3-cars")
+
+    def test_track_overlay_lists_its_environments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            package = Path(tmp) / "fm3-tracks"
+            (package / "files/Media/Tracks").mkdir(parents=True)
+            (package / "files/Media/Tracks/NewYork.zip").write_bytes(b"track")
+            fm4 = Path(tmp) / "fm4"
+            fm4.mkdir()
+            tracks = [dict(media="NewYork", name=None, status="packaged", layouts=[22, 23], error=None),
+                      dict(media="TestTrackinfield", name=None, status="skipped", error="needs a disc")]
+            described = mod.describe(package, "fm3-tracks", "FM3 tracks", "FM3", fm4, tracks, [], [], {}, (),
+                                     [dict(id="fm3-cars", created="2026-11-07T00:00:00+00:00")], "track-overlay")
+            self.assertEqual(described["kind"], "track-overlay")
+            self.assertEqual(described["cars"], [])
+            self.assertEqual([t["media"] for t in described["tracks"]], ["NewYork", "TestTrackinfield"])
+            self.assertEqual((described["packaged"], described["failed"]), (1, 0))
+            # Only FM3's tracks convert.
+            helper = Path(tmp) / "carbin-cpu.exe"
+            helper.write_bytes(b"")
+            a = argparse.Namespace(out=str(Path(tmp) / "out"), helper=str(helper), content_root=None, cache=None,
+                                   game="fm2", content="tracks")
+            with self.assertRaisesRegex(DiscError, "Only FM3's tracks convert"):
+                cli.convert(a, cli.Events(False))
 
 
 @unittest.skipUnless(c.FM4_DEFAULT.exists(), "Local FM4 disc required")

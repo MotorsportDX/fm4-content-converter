@@ -13,7 +13,8 @@ audio and names. What FM4 needs, and why (research/tracks-2026-11-02/REPORT.md):
   mounted ZIP.
 - New files in ZIPs mounted by `zipmanifest.xml`; audio also loose, because FMOD opens
   `<media>.fev` by path. FM3 has no `decisionzones` audio; FM4 Infin's is borrowed.
-- Track logos, mini ribbons and the environment picture are FM4 placeholders.
+- Track logos, mini ribbons and the environment pictures FM4 lacks come from FM3's
+  `UI/Textures.zip` (`ui_textures`).
 
     python -m fm4_converter.fm3.track_env --out <new package> --content-root <...\\4D530910\\00000002>
         [--env NewYork --env Amalfi --env TestTrackinfield] [--base <car package>]
@@ -24,6 +25,7 @@ from pathlib import Path
 
 from . import integration, ui_names, track_grid, track_pvs, track_rmb, track_package
 from .integration import archive_read
+from .. import stack
 from ..archives.stfs_reader import STFS
 from ..archives.stfs_zip_io import STFSFile
 
@@ -153,17 +155,53 @@ class RenamedSource:
         return {**{self._name(n): d for n, d in files.items()}, **files}
 
 
-# media in FM4 -> source, FM4 TrackSettings donor, FM3 MediaName, FM3 track ids (None: all),
-# FM4 environment the layouts join (None: a new environment)
-SOURCES = {
-    "NewYork": (lambda: DiscSource("NewYork"), "Tsukuba", "NewYork", None, None),
-    "Amalfi": (lambda: PackSource("Amalfi", FM3UC2 / "4D53084D0CCF0060", "0060"), "AmalfiGP", "Amalfi", None, "AmalfiGP"),
-    "TestTrackinfield": (lambda: PackSource("TestTrackinfield", FM3UC2 / "4D53084D0CCF0045", "0045"), "Tsukuba",
-                         "TestTrackinfield", None, None),
-    # FM4 keeps LeMans 100/101 with its own models; FM3's Bugatti circuit (102, ribbon 0)
-    # needs FM3's whole LeMans set, so it becomes an environment of its own.
-    "LeMansBugatti": (lambda: RenamedSource(DiscSource("LeMans"), "LeMansBugatti"), "LeMans", "LeMans", (102,), "LeMans"),
-}
+# The FM3 DLC packages that carry environments: Road Racing Track Pack (FM3 Disc 2) and Forza
+# Ultimate Track Pack (Ultimate Collection Disc 2).
+ROAD_RACING_PACK, ULTIMATE_PACK = "4D53084D0CCF0060", "4D53084D0CCF0045"
+
+
+def sources(fm3_media=FM3, packages=(FM3UC2,)):
+    """media in FM4 -> (source, FM4 TrackSettings donor, FM3 MediaName, FM3 track ids (None:
+    all), FM4 environment the layouts join (None: a new environment)), reading FM3 Disc 1's
+    `Media` and the FM3 DLC packages in the `packages` folders."""
+    def pack(name):
+        found = next((Path(folder) / name for folder in packages if (Path(folder) / name).is_file()), None)
+        return found if found is not None else Path(packages[0] if packages else ".") / name
+    return {
+        "NewYork": (lambda: DiscSource("NewYork", fm3_media), "Tsukuba", "NewYork", None, None),
+        "Amalfi": (lambda: PackSource("Amalfi", pack(ROAD_RACING_PACK), "0060"), "AmalfiGP", "Amalfi", None,
+                   "AmalfiGP"),
+        "TestTrackinfield": (lambda: PackSource("TestTrackinfield", pack(ULTIMATE_PACK), "0045"), "Tsukuba",
+                             "TestTrackinfield", None, None),
+        # FM4 keeps LeMans 100/101 with its own models; FM3's Bugatti circuit (102, ribbon 0)
+        # needs FM3's whole LeMans set, so it becomes an environment of its own.
+        "LeMansBugatti": (lambda: RenamedSource(DiscSource("LeMans", fm3_media), "LeMansBugatti"), "LeMans",
+                          "LeMans", (102,), "LeMans"),
+    }
+
+
+SOURCES = sources()
+
+
+def available(fm3_db, fm3_media, packages):
+    """{environment: None if it can be converted from these discs, else why not}."""
+    reasons = {}
+    for media, (_, _, fm3_name, ids, _) in sources(fm3_media, packages).items():
+        rows = fm3_db.execute("select id from Tracks where MediaName=?", (fm3_name,)).fetchall()
+        rows = [r for r in rows if ids is None or r[0] in ids]
+        pack = {"Amalfi": ROAD_RACING_PACK, "TestTrackinfield": ULTIMATE_PACK}.get(media)
+        if pack and not any((Path(folder) / pack).is_file() for folder in packages):
+            reasons[media] = ("needs FM3 Disc 2 (Road Racing Track Pack)" if pack == ROAD_RACING_PACK
+                              else "needs the Ultimate Collection's Disc 2 (Forza Ultimate Track Pack)")
+        elif not rows:
+            reasons[media] = ("needs the Ultimate Collection's Disc 1 (its database has the layouts)"
+                              if media == "TestTrackinfield" else f"FM3's database has no {fm3_name} layouts")
+        elif not pack and not any(p.name.casefold() == fm3_name.casefold()
+                                  for p in (Path(fm3_media) / "Tracks").iterdir()):
+            reasons[media] = f"FM3 Disc 1 lacks Media/Tracks/{fm3_name}"
+        else:
+            reasons[media] = None
+    return reasons
 
 
 def canonical_ai_name(name, media):
@@ -398,13 +436,34 @@ def fm3_string_tables(roots):
 
 
 def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm4=FM4, string_roots=None,
-          layouts=(170,)):
+          layouts=(170,), fm3_media=None, packages=None, progress=None):
+    """`fm4`: the FM4 `Media` folder the package is built on: Disc 1, or a disc that already
+    carries other packages (a stacked install, fm4_converter.stack), whose string override it
+    extends. `base`: a package whose files are copied in (the earlier superset packages).
+    `fm3_media`, `packages`: FM3 Disc 1's `Media` and the folders of the FM3 DLC packages (the
+    research defaults when None). `progress`: called before each environment with {index, total,
+    track}."""
     from . import converter as c
+    research = fm3_media is None
+    fm3_media = FM3 if research else Path(fm3_media)
+    packages = list(packages) if packages is not None else [FM3UC2]
+    env_sources = sources(fm3_media, packages)
+    # The research runs read FM3's logos and images from both FM3 discs here; a player's from theirs.
+    ui_roots = [Path(p) for p in (UI_ROOTS if research else [fm3_media / "UI/Textures.zip"]) if Path(p).is_file()]
     files = Path(out) / "files"
     if Path(out).exists():
         raise SystemExit("Choose a new package directory")
     db_path = files / "Media/DB/gamedb.slt"
     base_names, base_priority = {}, 0
+    stacked = False
+    if base is None and (Path(fm4) / ui_names.OVERRIDE.name).is_file():
+        # A stacked install: the disc's override (the car packages' names) is kept and replaced.
+        priority = stack.mounted((Path(fm4) / "zipmanifest.xml").read_bytes(), ui_names.OVERRIDE)
+        if priority is not None:
+            stacked = True
+            base_priority = priority
+            with zipfile.ZipFile(Path(fm4) / ui_names.OVERRIDE.name) as z:
+                base_names = {n: archive_read(z, n) for n in z.namelist()}
     if base:
         # The car package's files (hard links); the files written below are replaced, not
         # modified, so the base package stays as it is.
@@ -429,18 +488,20 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
     zones_dir = _find(_find(fm4 / "audio/tracks", DECISION_ZONES_DONOR[0]), DECISION_ZONES_DONOR[1])
     zone_file = next(p for p in zones_dir.iterdir() if "decisionzones" in p.name.lower()).read_bytes()
     fm4_ui = {n.lower() for n in zipfile.ZipFile(fm4 / "UI/Textures.zip").namelist()}
-    ui_sources = [zipfile.ZipFile(p) for p in UI_ROOTS if Path(p).exists()]
+    ui_sources = [zipfile.ZipFile(p) for p in ui_roots]
     ui_all = {}
-    for media in envs:
-        make, donor, fm3_media, ids, join = SOURCES[media]
+    for number, media in enumerate(envs, 1):
+        if progress:
+            progress(dict(index=number, total=len(envs), track=media))
+        make, donor, fm3_name, ids, join = env_sources[media]
         source = make()
         settings = _find(fm4 / "tracks" / donor, "TrackSettings.xml").read_bytes()
         ai = {canonical_ai_name(n, media): pad_mlp(d) for n, d in source.ai_files().items()}
         with b:
-            info = add_database(a, b, media, ai, fm3_media, ids, join)
+            info = add_database(a, b, media, ai, fm3_name, ids, join)
         ai_all.update(ai)
-        rows = fm3_tracks(a, fm3_media, ids)
-        env_row = dict(a.execute("select * from Environments where MediaName=?", (fm3_media,)).fetchone())
+        rows = fm3_tracks(a, fm3_name, ids)
+        env_row = dict(a.execute("select * from Environments where MediaName=?", (fm3_name,)).fetchone())
         ui = ui_textures(env_row, rows, fm4_ui, ui_sources, environment=not join)
         ui_all.update(ui)
         # Layout names of the FM4 environment a joined one shares (AmalfiGP: "Full Circuit").
@@ -470,7 +531,7 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         # Layouts on FM4's own geometry (CrownJewel 170): `track_package`'s row and files.
         from contextlib import closing
         from . import converter as cv
-        fm3_src, fm4_src = Path(cv.FM3_DEFAULT).resolve(), (fm4 / "DB/gamedb.slt").resolve()
+        fm3_src, fm4_src = (fm3_media / "DB/gamedb.slt").resolve(), (fm4 / "DB/gamedb.slt").resolve()
         f3, f4 = fm3_src.parents[1], fm4_src.parents[1]
         with closing(cv.connect(fm3_src)) as s3, closing(cv.connect(fm4_src)) as s4:
             row, _ = track_package.plan_row(s3, s4, layout)
@@ -503,13 +564,15 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
     for folder, entries in folders.items():
         archives[Path("Media/UI/Textures") / f"{folder}.zip"] = zip_bytes(entries)
     # Names: FM3 text per language, on top of the winning FM4 (and DLC) tables.
-    fm3 = fm3_string_tables(string_roots or [FM3UC / "StringTables", FM3 / "StringTables"])
+    fm3 = fm3_string_tables(string_roots or ([FM3UC / "StringTables", FM3 / "StringTables"] if research
+                                             else [fm3_media / "StringTables"]))
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_STORED) as zout:
         for name, data in sorted(base_names.items()):
             if name.rsplit("/", 1)[-1].lower() not in ("tracks.str", "environments.str"):
                 zout.writestr(zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0)), data)
         for table in ("Tracks.str", "Environments.str"):
+            # The tables FM4 (and its DLC) show; an override under this package has none of these.
             tables, _ = ui_names.winning_tables(fm4, content_root, archive_read, c.sha, table)
             en = fm3[("en", table.lower())]
             for code, (prio, lang, origin, data) in sorted(tables.items()):
@@ -536,7 +599,7 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
     priorities = {ui_names.OVERRIDE: prio_names, **{p: 80 for p in archives}}
     manifest_src = (Path(base) / "files/Media/zipmanifest.xml") if base else fm4 / "zipmanifest.xml"
     manifest = integration.extend_zip_manifest(manifest_src.read_bytes(), {ui_names.OVERRIDE: names, **archives},
-                                               (ui_names.OVERRIDE,) if base_names else (), priorities)
+                                               (ui_names.OVERRIDE,) if base_names or stacked else (), priorities)
     for media, path in bins.items():
         with open(path, "rb") as f:
             f.seek(-22, 2)

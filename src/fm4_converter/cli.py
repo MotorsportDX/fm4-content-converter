@@ -29,6 +29,7 @@ from contextlib import closing, redirect_stdout
 import json
 from pathlib import Path
 import shutil
+import sqlite3
 import sys
 import time
 
@@ -154,6 +155,52 @@ def convert_fm3(a, events, cache):
     return "fm3-cars", "FM3 cars", "FM3", fm4, discs, records + skipped, manifest["requires"]
 
 
+def convert_fm3_tracks(a, events, cache):
+    """The FM3 environments and layouts FM4 lacks (fm3.track_env): NewYork, the Bugatti circuit,
+    Amalfi (FM3 Disc 2), the Test Track (the Ultimate Collection's discs) and CrownJewel 170."""
+    from .discs import FM3_TRACK_PATHS
+    from .fm3 import track_env
+    events.stage("check", "Checking the discs")
+    disc1, fm4 = Disc(a.disc, "fm3-disc1"), fm4_disc(a.fm4)
+    disc2 = Disc(a.disc2, "fm3-disc2") if a.disc2 else None
+    discs = [d for d in (disc1, disc2) if d]
+    events.stage("extract", "Reading the FM3 discs")
+    root1 = disc1.root(cache, events.extractor(disc1.role), FM3_TRACK_PATHS, "fm3-disc1-tracks")
+    packages = [disc2.root(cache, events.extractor(disc2.role)) / FM3_DISC2_PACKAGES] if disc2 else []
+    fm3_media = root1 / "Media"
+    with closing(sqlite3.connect(f"file:{fm3_media / 'DB/gamedb.slt'}?mode=ro", uri=True)) as fm3_db:
+        reasons = track_env.available(fm3_db, fm3_media, packages)
+    envs = [env for env, reason in reasons.items() if reason is None]
+    skipped = [dict(media=env, name=None, status="skipped", error=reason) for env, reason in reasons.items()
+               if reason is not None]
+    if a.cars:
+        raise DiscError("--cars is for --content cars")
+    if not envs:
+        raise DiscError("No FM3 track to convert: " + "; ".join(f"{s['media']} {s['error']}" for s in skipped))
+    events.stage("package", f"Converting {len(envs)} FM3 environments and the CrownJewel 170 layout")
+    done = []
+
+    def progress(p):
+        # The previous environment is packaged when the next one starts.
+        if done:
+            events.emit("track", index=done[-1]["index"], total=p["total"], track=done[-1]["track"],
+                        status="packaged", error=None)
+        done.append(p)
+
+    with redirect_stdout(sys.stderr):
+        report = track_env.build(a.out, envs, a.content_root, fm3_db=fm3_media / "DB/gamedb.slt",
+                                 fm4=fm4.path / "Media", fm3_media=fm3_media, packages=packages,
+                                 progress=progress)
+    if done:
+        events.emit("track", index=done[-1]["index"], total=len(envs), track=done[-1]["track"],
+                    status="packaged", error=None)
+    records = [dict(media=env, name=None, status="packaged", layouts=report[env].get("tracks"), error=None)
+               for env in envs]
+    records += [dict(media=f"layout_{layout}", name=None, status="packaged", layouts=[layout], error=None)
+                for layout in (170,) if f"layout_{layout}" in report]
+    return "fm3-tracks", "FM3 tracks", "FM3", fm4, discs, records + skipped, []
+
+
 def convert_fm2(a, events, cache):
     from .fm2 import dlc, package, sources
     events.stage("check", "Checking the discs")
@@ -215,6 +262,12 @@ def stacked_cars(packages):
             if car["status"] == "packaged"}
 
 
+TRACK_NOTES = ("Experimental: each environment is lit with an FM4 track's settings, and only a sample of "
+               "the layouts has been raced to the finish; see the converter's docs.",
+               "Install only over the FM4 Disc 1, DLC packs and packages in built_against; rebuild when they "
+               "change.")
+
+
 def convert(a, events):
     out = Path(a.out).resolve()
     if out.exists():
@@ -229,12 +282,18 @@ def convert(a, events):
     if cache == out or out in cache.parents or cache in out.parents:
         raise DiscError("The cache folder must be outside the package folder")
     cache.mkdir(parents=True, exist_ok=True)
-    a.base_packages = base_packages(a.base_package or ())
-    mod_id, name, game, fm4, discs, cars, requires = (convert_fm3 if a.game == "fm3" else convert_fm2)(a, events, cache)
+    a.base_packages = base_packages(getattr(a, "base_package", None) or ())
+    a.content = getattr(a, "content", "cars")
+    if a.content == "tracks" and a.game != "fm3":
+        raise DiscError("Only FM3's tracks convert")
+    convert_game = {("fm3", "cars"): convert_fm3, ("fm2", "cars"): convert_fm2,
+                    ("fm3", "tracks"): convert_fm3_tracks}[a.game, a.content]
+    mod_id, name, game, fm4, discs, cars, requires = convert_game(a, events, cache)
     events.stage("describe", "Writing mod.json")
     described = mod.describe(out, mod_id, name, game, fm4.path, cars, requires, [d.describe() for d in discs],
-                             built_against(fm4, a.content_root), NOTES,
-                             [dict(id=p["id"], created=p["created"]) for p in a.base_packages])
+                             built_against(fm4, a.content_root), TRACK_NOTES if a.content == "tracks" else NOTES,
+                             [dict(id=p["id"], created=p["created"]) for p in a.base_packages],
+                             "track-overlay" if a.content == "tracks" else "car-overlay")
     mod.verify(out)
     if not a.cache:
         shutil.rmtree(cache, ignore_errors=True)
@@ -247,8 +306,10 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="fm4-convert", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="command", required=True)
-    c = sub.add_parser("convert", help="convert the FM2 or FM3 cars FM4 lacks into one mod package")
+    c = sub.add_parser("convert", help="convert the FM2 or FM3 cars (or FM3's tracks) FM4 lacks into one mod package")
     c.add_argument("--game", choices=("fm3", "fm2"), required=True)
+    c.add_argument("--content", choices=("cars", "tracks"), default="cars",
+                   help="cars (FM3 and FM2) or tracks (FM3's environments and layouts FM4 lacks)")
     c.add_argument("--disc", required=True, help="FM3 Disc 1 or the FM2 disc: folder or .iso")
     c.add_argument("--disc2", help="FM3 Disc 2 (Content Install Disc): folder or .iso")
     c.add_argument("--bonus-disc", help="FM2 Bonus Disc: folder or .iso")

@@ -36,12 +36,14 @@ def converter_version():
 
 
 def describe(package, mod_id, name, source, fm4_root, cars, requires, sources, built_against, notes=(),
-             base_packages=()):
+             base_packages=(), kind="car-overlay"):
     """Write `package/mod.json` for a converter package and return it.
 
     `cars`: [{media, name, status, requires, error}]; `sources`: the discs read
     (`discs.Disc.describe`); `built_against`: the FM4 inputs the package depends on;
-    `base_packages`: [{id, created}] of the packages `fm4_root` carried (a stacked install)."""
+    `base_packages`: [{id, created}] of the packages `fm4_root` carried (a stacked install);
+    `kind`: "car-overlay", or "track-overlay", whose `cars` are its environments (also as
+    `tracks`)."""
     package, fm4_root = Path(package), Path(fm4_root)
     files = package / "files"
     entries, replaces, adds = {}, [], []
@@ -53,14 +55,15 @@ def describe(package, mod_id, name, source, fm4_root, cars, requires, sources, b
         raise ModError("The package has no files")
     mod = {
         "format": FORMAT, "format_version": VERSION,
-        "id": mod_id, "name": name, "kind": "car-overlay", "source_game": source,
+        "id": mod_id, "name": name, "kind": kind, "source_game": source,
         "created": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "converter": {"name": CONVERTER, "version": converter_version()},
         "experimental": True,
         "files_root": "files",
         "replaces": replaces, "adds": adds, "writes": sorted(entries),
         "files": entries,
-        "cars": cars,
+        "cars": [] if kind == "track-overlay" else cars,
+        **({"tracks": cars} if kind == "track-overlay" else {}),
         "packaged": sum(c["status"] == "packaged" for c in cars),
         "failed": sum(c["status"] == "failed" for c in cars),
         "requires": sorted(requires),
