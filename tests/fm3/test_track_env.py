@@ -69,6 +69,23 @@ class TrackEnvTests(unittest.TestCase):
         self.assertEqual(track_env.convert_track_file("TrackSettings.xml", b"fm3", b"fm4"), b"fm4")
         self.assertEqual(track_env.convert_track_file("Ribbon_00/CollObjs.xml", b"x", b"fm4"), b"x")
 
+    def test_car_cubemap_comes_from_the_donor(self):
+        # FM3's LDR DXT5 cube reads about ten times too bright in FM4's car shaders.
+        for name in ("staticCarCubemap.xpr", "staticcarcubemap.xpr"):
+            self.assertEqual(track_env.convert_track_file(name, b"fm3", b"settings", b"fm4"), b"fm4")
+        self.assertEqual(track_env.convert_track_file("smoke.dds", b"fm3", b"settings", b"fm4"), b"fm3")
+
+    def test_settings_cap_the_sh_ambient_and_keep_fm3_shadow_direction(self):
+        # Without FM4's SH probes, AmalfiGP's SHTop 0.35 lit the cockpit near white.
+        donor = (b'<SHLighting Version="6" SHTopRed="0.350000" SHTopGreen="0.050000" SHTopBlue="0.400000"'
+                 b' SHBottomBlue="0.030000"/><ShadowLightDirection x="0.600000" y="-0.650000" z="-0.460000"/>')
+        fm3 = b'<ShadowLightDirection x="0.281580" y="-0.626278" z="0.726972"/>'
+        out = track_env.convert_track_file("TrackSettings.xml", fm3, donor)
+        self.assertEqual(out, b'<SHLighting Version="6" SHTopRed="0.070000" SHTopGreen="0.050000"'
+                              b' SHTopBlue="0.070000" SHBottomBlue="0.030000"/>' + fm3)
+        self.assertEqual(track_env.light_settings(donor), donor.replace(b"0.350000", b"0.070000")
+                         .replace(b"0.400000", b"0.070000"))
+
     def test_zip_directory_uses_fm4_dirsize(self):
         data = track_env.zip_bytes({"a.bin": b"1", "b.bin": b"22"})
         start, size, count = track_env.zip_directory(data[-22:])

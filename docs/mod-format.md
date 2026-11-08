@@ -153,6 +153,14 @@ FM3 Disc 2), LeMansBugatti (LeMans 102 sebagai environment sendiri) dan layout C
 (database dan Forza Ultimate Track Pack); tanpa keduanya environment ini dilewati
 (`skipped`) dengan alasannya. Isi dan status uji ada di [fm3-acceptance.md](fm3-acceptance.md).
 
+Pencahayaan setiap environment berasal dari track FM4 donor: `TrackSettings.xml` dan
+`staticCarCubemap.xpr` (NewYork dari Tsukuba, Amalfi dari AmalfiGP, LeMansBugatti dari
+LeMans). Cube FM3 tidak dipakai: formatnya LDR, sedangkan FM4 memakai cube HDR yang diskalakan.
+Dua nilai `TrackSettings.xml` diubah: SHTop dibatasi 0,07, karena track FM3 tidak punya probe
+SH (`<track>_ribbonNN.sh`) yang menjadi pasangan nilai itu di FM4, dan `ShadowLightDirection`
+diambil dari FM3. Tanpa keduanya kokpit menjadi putih (REPORT tahap 9,
+[tracks-2026-11-02/REPORT.md](../research/tracks-2026-11-02/REPORT.md)).
+
 FM2 tidak punya track untuk dikonversi: semua 50 layout aktif FM2 sudah ada di FM4 atau di
 versi FM3-nya. Satu-satunya yang tersisa, TuningTrack (ID 71), tidak aktif di database FM2
 (`Active=0`) dan tidak punya berkas di disc.

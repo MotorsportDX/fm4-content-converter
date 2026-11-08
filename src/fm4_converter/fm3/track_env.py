@@ -7,7 +7,15 @@ audio and names. What FM4 needs, and why (research/tracks-2026-11-02/REPORT.md):
 - RMB v4 -> v5 (`track_rmb.to_v5`), so FM4's main view draws the models (pass 5).
 - `bin.zip` rebuilt with stored members (Python cannot write XMemCompress).
 - `TrackSettings.xml` from an FM4 track: FM4 relit every track and its lighting values do
-  not map from FM3's (`--settings-donor`).
+  not map from FM3's (`--settings-donor`). Two values change (`light_settings`): the SH
+  ambient top is capped at 0.07, since FM4's tracks light the car from SH probes
+  (`<track>_ribbonNN.sh`) that FM3's lack, and without them the donor's SHLighting is the
+  whole ambient (AmalfiGP's 0.35 lit the cockpit near white); and the shadow direction is
+  FM3's own, which matches the environment's sky.
+- `staticCarCubemap.xpr` from the same FM4 track: FM3's is an LDR DXT5 cube (mean texel
+  about 0.25), FM4's an HDR 2_10_10_10 cube scaled about ten times down (mean about
+  0.025). FM4's car shaders read FM3's map about ten times too bright, which washed the
+  cockpit out to white.
 - AI files named `<MediaName>_NN[_R]` and MLP files padded to 1280 bytes: FM4 reads the
   first 1280 bytes of an MLP file in one call, which fails for shorter members of a
   mounted ZIP.
@@ -235,14 +243,36 @@ def skybox_index(settings):
     return int(m.group(1)) if m else None
 
 
-def convert_track_file(name, data, settings):
-    """A file of `Media/Tracks/<media>/` as FM4 needs it."""
+CUBEMAP = "staticcarcubemap.xpr"
+# The SH ambient top of FM4's sunny tracks (LeMans, Tsukuba, Silverstone): with their probes
+# they light the cockpit as the game means it, and without probes 0.07 comes close.
+SH_TOP_MAX = 0.07
+SHADOW_DIRECTION = re.compile(rb"<ShadowLightDirection\s[^>]*/>")
+
+
+def light_settings(settings, fm3_settings=None):
+    """The donor's `TrackSettings.xml` for an environment without SH probes: SHTop* capped at
+    `SH_TOP_MAX`, and FM3's `ShadowLightDirection` when `fm3_settings` has one."""
+    def cap(m):
+        return m.group(1) + b'"%.6f"' % min(float(m.group(2)), SH_TOP_MAX)
+    out = re.sub(rb'(SHTop(?:Red|Green|Blue)=)"([-0-9.eE]+)"', cap, settings)
+    own = SHADOW_DIRECTION.search(fm3_settings or b"")
+    if own:
+        out = SHADOW_DIRECTION.sub(lambda _: own.group(0), out, count=1)
+    return out
+
+
+def convert_track_file(name, data, settings, cubemap=None):
+    """A file of `Media/Tracks/<media>/` as FM4 needs it; `settings` and `cubemap` are the
+    donor's `TrackSettings.xml` and `staticCarCubemap.xpr`."""
     low = name.lower()
     if low.endswith(".pvs"):
         p = track_pvs.to_v27(track_pvs.parse(data), PVS_W3, skybox_index(settings))
         return track_pvs.write(without_road_detail(p))
     if low == "tracksettings.xml" and settings is not None:
-        return settings
+        return light_settings(settings, data)
+    if low == CUBEMAP and cubemap is not None:
+        return cubemap
     return data
 
 
@@ -496,6 +526,7 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         make, donor, fm3_name, ids, join = env_sources[media]
         source = make()
         settings = _find(fm4 / "tracks" / donor, "TrackSettings.xml").read_bytes()
+        cubemap = _find(fm4 / "tracks" / donor, CUBEMAP).read_bytes()
         ai = {canonical_ai_name(n, media): pad_mlp(d) for n, d in source.ai_files().items()}
         with b:
             info = add_database(a, b, media, ai, fm3_name, ids, join)
@@ -511,7 +542,9 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         for k, v in string_additions(rows, None if join else env_row, media, siblings).items():
             wanted[k] += v
         originals = source.track_files()
-        track = {n: convert_track_file(n, d, settings) for n, d in originals.items()}
+        track = {n: convert_track_file(n, d, settings, cubemap) for n, d in originals.items()}
+        if not any(n.lower() == CUBEMAP for n in track):
+            track["staticCarCubemap.xpr"] = cubemap
         skies = sorted({track_pvs.sky_model_index(track_pvs.parse(d)) for n, d in originals.items()
                         if n.lower().endswith(".pvs")})
         archives[Path(f"Media/tracks/{media}.zip")] = zip_bytes(track)

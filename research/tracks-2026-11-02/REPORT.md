@@ -783,6 +783,74 @@ Catatan konvensi: `dirsize` entri `zipmanifest.xml` FM4 = ukuran direktori pusat
 22. `integration.extend_zip_manifest` menulis tanpa +22, dan mount itu tetap bekerja
 (paket mobil, `stringtables.zip`).
 
+### Tahap 9: kokpit putih di track FM3, cubemap dan ambient SH (8–9 November 2026)
+
+Gejala (klip promo mod bertumpuk, 8 November 2026): di NewYork dan Amalfi interior kokpit
+mobil FM4 sendiri (F40, Veyron) pucat sampai putih, dan NewYork tampak terlalu terang. Di
+track FM4 (Le Mans) mobil yang sama, juga mobil mod FM3 seperti Peugeot 908, tampil normal.
+Jadi penyebabnya ada di environment hasil konversi, bukan di mobil. Ada dua penyebab.
+
+**Penyebab 1, cubemap.** `track_env` mengganti `TrackSettings.xml` dengan milik donor FM4,
+tetapi `staticCarCubemap.xpr` FM3 tetap dikirim apa adanya. Kedua game menyimpan cube itu
+dengan format dan skala berbeda (header XPR2 dan texel dibaca dengan `struct`/NumPy):
+
+| Cubemap | Format Xenos | Ukuran | Rata-rata texel RGB |
+|---|---|---|---|
+| FM3 NewYork, Amalfi, LeMans | 20 `DXT4_5`, alpha selalu 1 (LDR) | 256² | 0,22–0,37 |
+| FM4 Tsukuba, AmalfiGP, LeMans | 54 `2_10_10_10_AS_16_16_16_16` (big-endian, alpha 3) | 128² | 0,03 (p99 ≈ 0,1) |
+
+Cube FM4 adalah HDR yang diskalakan turun sekitar sepuluh kali; shader mobil FM4 menaikkannya
+lagi. Map FM3 yang LDR karena itu dibaca 7–12 kali terlalu terang. Di NewYork, interior
+kokpit pucat dan jalan serta lampu meledak putih dengan bloom besar; dengan cube donor
+keduanya normal. Amalfi hampir tidak berubah karena penyebab kedua.
+
+**Penyebab 2, ambient SH tanpa probe.** Setiap track FM4 membawa probe SH per ribbon
+(`<track>_ribbonNN.sh`); track FM3 tidak. Nilai `SHLighting` di `TrackSettings.xml` FM4
+ditala bersama probe itu, dan tanpa probe nilai itu menjadi seluruh ambient mobil. SHTop
+FM4 berkisar 0,05–0,55 (Le Mans, Tsukuba, Silverstone 0,07; AmalfiGP 0,35). Uji di game
+dengan F40, look `pc`, Rally di Positano Stage D Reverse (rata-rata patch kokpit
+`FM4_CAPTURE_STATS` detik 15–60 balapan):
+
+| Varian Amalfi | dashboard | gauges | setir |
+|---|---|---|---|
+| Referensi: AmalfiGP FM4 Full Circuit (dengan probe) | 61 | 63 | 103 |
+| Referensi: Le Mans FM4 | 64 | 83 | 97 |
+| Sebelum perbaikan | 144 | 162 | 194 |
+| Cube donor saja | 140 | 158 | 192 |
+| Cube donor + `AmalfiGP_ribbon01.sh` dipinjam sebagai `Amalfi_ribbon00/11.sh` | 145 | 164 | 197 |
+| Cube donor + SHTop 0 | 39 | 28 | 63 |
+| Cube donor + SHTop 0,07 (perbaikan) | 81 | 92 | 123 |
+
+Probe pinjaman tidak berpengaruh (geometrinya lain atau tidak dimuat), jadi menurunkan SHTop
+adalah jalan yang tersisa. 0,07 adalah nilai track FM4 cerah yang tampil normal; hasil Amalfi
+sedikit di atas referensi karena scene Amalfi yang gelap dan hijau menaikkan exposure. Isi
+`.sh`: header `{4, 4, jumlah irisan, 0}`, lalu per irisan sepanjang ribbon N probe melintang
+`{offset lateral f32, 4 koefisien SH × RGB}`; DC probe AmalfiGP sekitar 0,12–0,18.
+
+Arah bayangan: `ShadowLightDirection` Tsukuba (0,60; −0,65; −0,46) tidak sama dengan NewYork
+FM3 (0,28; −0,63; 0,73), sedangkan langit dan mataharinya dari geometri FM3. Konverter kini
+memakai arah FM3; pada patch kokpit tidak ada perubahan terukur, dan di Amalfi dan LeMans
+nilainya hampir sama dengan donor.
+
+Perbaikan:
+
+- `track_env.convert_track_file` mengambil `staticCarCubemap.xpr` dari donor yang sama dengan
+  `TrackSettings.xml` (Tsukuba untuk NewYork, AmalfiGP untuk Amalfi, LeMans untuk
+  LeMansBugatti); environment tanpa cube FM3 juga diberi cube donor.
+- `track_env.light_settings` membatasi `SHTopRed/Green/Blue` donor di 0,07 dan memasang
+  `ShadowLightDirection` FM3.
+- Tes: `test_car_cubemap_comes_from_the_donor`,
+  `test_settings_cap_the_sh_ambient_and_keep_fm3_shadow_direction`.
+
+Pada paket yang dibangun ulang, hanya tiga ZIP track dan `zipmanifest.xml` yang berubah;
+database, `bin.zip` dan berkas lain identik.
+
+Hasil di game (9 November 2026, look `pc`, 2x, native): kokpit NewYork dan Amalfi gelap
+seperti di Le Mans dan AmalfiGP FM4. Piksel terpotong (min RGB ≥ 250) 0,8–1,1 %, sama dengan
+Le Mans (0,9 %). NewYork sebelum perbaikan detik 40: jalan dan lampu meledak putih. Sisa yang
+masih terbuka: headliner kiri di NewYork dan Amalfi sedikit abu terang, sedangkan di Le Mans
+hitam. Still before/after ada di `D:\FM4-mods-work\e2e\stills-fm3-light` (lokal).
+
 ## Rencana tahap berikut
 
 1. **Tidak ada layout lain dengan pola CrownJewel 170.** `plan_row` menolak 33

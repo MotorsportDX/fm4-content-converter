@@ -50,7 +50,8 @@ python -m fm4_converter.fm3.track_env --base <paket-mobil> --content-root <...\4
 
 `track_env` mengonversi environment NewYork, Amalfi, TestTrackinfield dan LeMansBugatti
 (LeMans 102 sebagai environment sendiri). Isinya: PVS v27, RMB v5, AI dengan nama dan
-padding yang dibaca FM4, `TrackSettings` FM4 sebagai donor pencahayaan, serta logo, mini
+padding yang dibaca FM4, `TrackSettings.xml` (SHTop dibatasi 0,07, arah bayangan FM3) dan
+`staticCarCubemap.xpr` dari track FM4 donor untuk pencahayaan, serta logo, mini
 ribbon dan gambar FM3. Nama environment baru yang sudah dipakai FM4 diberi tanda
 "(FM3)", sama seperti mobil.
 
