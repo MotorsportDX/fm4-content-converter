@@ -7,11 +7,13 @@ audio and names. What FM4 needs, and why (research/tracks-2026-11-02/REPORT.md):
 - RMB v4 -> v5 (`track_rmb.to_v5`), so FM4's main view draws the models (pass 5).
 - `bin.zip` rebuilt with stored members (Python cannot write XMemCompress).
 - `TrackSettings.xml` from an FM4 track: FM4 relit every track and its lighting values do
-  not map from FM3's (`--settings-donor`). Two values change (`light_settings`): the SH
+  not map from FM3's (`--settings-donor`). Three values change (`light_settings`): the SH
   ambient top is capped at 0.07, since FM4's tracks light the car from SH probes
   (`<track>_ribbonNN.sh`) that FM3's lack, and without them the donor's SHLighting is the
-  whole ambient (AmalfiGP's 0.35 lit the cockpit near white); and the shadow direction is
-  FM3's own, which matches the environment's sky.
+  whole ambient (AmalfiGP's 0.35 lit the cockpit near white); the cockpit's direct sun
+  (CockpitDirectionalScalar) is capped at 1.5, since FM4's 5 lit the dash and wheel near white
+  in New York's sunlit stretches; and the shadow direction is FM3's own, which matches the
+  environment's sky.
 - `staticCarCubemap.xpr` from the same FM4 track: FM3's is an LDR DXT5 cube (mean texel
   about 0.25), FM4's an HDR 2_10_10_10 cube scaled about ten times down (mean about
   0.025). FM4's car shaders read FM3's map about ten times too bright, which washed the
@@ -247,15 +249,21 @@ CUBEMAP = "staticcarcubemap.xpr"
 # The SH ambient top of FM4's sunny tracks (LeMans, Tsukuba, Silverstone): with their probes
 # they light the cockpit as the game means it, and without probes 0.07 comes close.
 SH_TOP_MAX = 0.07
+# The cockpit's direct sun: FM4's tracks use 5, but on FM3's New York, whose straights face
+# FM3's sun, 5 lit the dash, wheel and gloves near white in every sunlit stretch; 1.5
+# kept those peaks at those of LeMans and AmalfiGP, 2 still left them pale (REPORT tahap 10).
+COCKPIT_SUN_MAX = 1.5
 SHADOW_DIRECTION = re.compile(rb"<ShadowLightDirection\s[^>]*/>")
 
 
 def light_settings(settings, fm3_settings=None):
     """The donor's `TrackSettings.xml` for an environment without SH probes: SHTop* capped at
-    `SH_TOP_MAX`, and FM3's `ShadowLightDirection` when `fm3_settings` has one."""
-    def cap(m):
-        return m.group(1) + b'"%.6f"' % min(float(m.group(2)), SH_TOP_MAX)
-    out = re.sub(rb'(SHTop(?:Red|Green|Blue)=)"([-0-9.eE]+)"', cap, settings)
+    `SH_TOP_MAX`, CockpitDirectionalScalar at `COCKPIT_SUN_MAX`, and FM3's
+    `ShadowLightDirection` when `fm3_settings` has one."""
+    def cap(limit):
+        return lambda m: m.group(1) + b'"%.6f"' % min(float(m.group(2)), limit)
+    out = re.sub(rb'(SHTop(?:Red|Green|Blue)=)"([-0-9.eE]+)"', cap(SH_TOP_MAX), settings)
+    out = re.sub(rb'(CockpitDirectionalScalar=)"([-0-9.eE]+)"', cap(COCKPIT_SUN_MAX), out)
     own = SHADOW_DIRECTION.search(fm3_settings or b"")
     if own:
         out = SHADOW_DIRECTION.sub(lambda _: own.group(0), out, count=1)

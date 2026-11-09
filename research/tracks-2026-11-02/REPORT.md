@@ -851,6 +851,53 @@ Le Mans (0,9 %). NewYork sebelum perbaikan detik 40: jalan dan lampu meledak put
 masih terbuka: headliner kiri di NewYork dan Amalfi sedikit abu terang, sedangkan di Le Mans
 hitam. Still before/after ada di `D:\FM4-mods-work\e2e\stills-fm3-light` (lokal).
 
+### Tahap 10: kokpit pucat di ruas NewYork yang terkena matahari (9 November 2026)
+
+Gejala (rekaman ulang promo dengan paket tahap 9, F40, kokpit, look `pc`, 2x, native,
+120 fps): di ruas yang terkena matahari dasbor, setir, sarung tangan dan gauge hampir putih,
+dengan gumpalan bloom di pilar A dan headliner; di ruas teduh gambar normal. Rata-rata luma
+bukan pencilan, jadi masalahnya puncak saat matahari, bukan rata-rata.
+
+Ukuran: luma rata-rata bagian atas dasbor F40 di kiri cluster (baris 70–73 %, kolom 25–38 %
+layar, hitam bila tidak kena matahari), di setiap frame terekam detik 5–62 balapan (27 frame
+per run). Rata-rata patch `FM4_CAPTURE_STATS` tidak cukup, karena posisi mobil AI berbeda
+antar-run dan frame pucat hanya sebagian. Dua run look `pc` paket tahap 9 memberi p90 74 dan 80.
+
+| Varian NewYork (paket tahap 9 + perubahan) | p90 dasbor | Hasil |
+|---|---|---|
+| look `pc` (dua run) | 74 / 80 | pucat di ruas bermatahari |
+| look `original` | 73 | sama pucatnya: bukan mod look |
+| look `pc,sun=0` (glare matahari mati) | 81 | sama; frame 42 detik kebetulan teduh |
+| `sunGainScale` dan/atau `SunAdjust` Le Mans, `sunGainScale` 20000 | 74–80 | tidak berubah |
+| `SunHeightOffset` +900 / −900, `skyScale` 0,5 / 0,3 | 77 dan serupa | tidak berubah |
+| `Exp_ExtraDark` exposure 0 | 47 | puncak turun, tetapi kokpit teduh jadi hampir hitam (3–5) |
+| `CockpitDirectionalScalar` 2,5 | 64 | masih pucat |
+| `CockpitDirectionalScalar` 2 (paket fix3) | 56 / 49 | masih pucat di frame terburuk |
+| `CockpitDirectionalScalar` 1,5 | 40; paket fix4 50 | normal |
+| Referensi Le Mans FM4 | 52 | |
+| Referensi AmalfiGP FM4 | 71 | |
+
+Penyebab: matahari langsung di kokpit. Shader interior FM4 menyalakan kokpit dengan
+matahari × N·L × bayangan, dikali `CockpitDirectionalScalar` (5 di semua track FM4). Lurusan
+NewYork menghadap matahari FM3, sehingga cahaya masuk lewat kaca depan ke dasbor, setir dan
+sarung tangan, dan dengan 5 semuanya hampir putih. FM3 sendiri memakai 1,5 untuk NewYork.
+Glare matahari (`sun`, `sunGainScale`, `SunAdjust`), letak sprite matahari, kecerahan langit dan
+mod look tidak berpengaruh terukur. Bahwa track FM4 tidak mengalami ini dengan 5 kemungkinan
+karena lightmap track dan probe SH-nya ikut meredam, tetapi itu belum dibuktikan.
+
+Perbaikan: `light_settings` membatasi `CockpitDirectionalScalar` donor di 1,5 (`COCKPIT_SUN_MAX`)
+untuk semua environment FM3. Tes:
+`test_settings_cap_the_sh_ambient_and_cockpit_sun_and_keep_fm3_shadow_direction`. Pada paket
+yang dibangun ulang (fix4), hanya `TrackSettings.xml` di ZIP NewYork, Amalfi dan
+LeMansBugatti yang berubah. Ukuran berkas sama, jadi `zipmanifest.xml` tidak berubah.
+
+Hasil paket fix4 (look `pc`, 2x, native): p90 dasbor NewYork turun dari 74–80 ke 50 (Le Mans 52).
+Amalfi Stage D Reverse turun dari 108 ke 60 (AmalfiGP FM4 71). Di frame terburuk dasbor tetap
+gelap, dan sarung tangan serta gauge terbaca; bibir setir sedikit abu di bawah matahari,
+seperti di AmalfiGP FM4. Piksel terpotong 1,0–1,1 %. Masih terbuka: langit terang di antara
+gedung NewYork tetap mekar menjadi kabut susu dengan gumpalan bloom di tepi atas kaca.
+`skyScale` 0,3, `windshield=0` dan glare mati tidak menghilangkannya.
+
 ## Rencana tahap berikut
 
 1. **Tidak ada layout lain dengan pola CrownJewel 170.** `plan_row` menolak 33
