@@ -89,6 +89,18 @@ class TrackEnvTests(unittest.TestCase):
         self.assertEqual(track_env.light_settings(donor), donor.replace(b"0.350000", b"0.070000")
                          .replace(b"0.400000", b"0.070000").replace(b"5.000000", b"1.500000"))
 
+    def test_settings_cap_the_cockpit_dark_lift_and_the_bloom(self):
+        # The donor's lift of 1.5 clipped New York's lamps, billboards and sky into a white haze.
+        donor = (b'<ToneMapAdaptiveExposure Key_ExtraDark="4.000000" Exp_ExtraDark="2.000001"/>'
+                 b'<ToneMapCockpitExposure Key_ExtraDark="8.000000" Exp_ExtraDark="1.500000" Exp_Dark="0.000000"/>'
+                 b'<bloomCutoff value="1.299996"/><bloomScale value="5.000001"/>')
+        self.assertEqual(track_env.light_settings(donor),
+                         b'<ToneMapAdaptiveExposure Key_ExtraDark="4.000000" Exp_ExtraDark="2.000001"/>'
+                         b'<ToneMapCockpitExposure Key_ExtraDark="8.000000" Exp_ExtraDark="0.750000" Exp_Dark="0.000000"/>'
+                         b'<bloomCutoff value="2.000000"/><bloomScale value="2.000000"/>')
+        mild = b'<bloomCutoff value="2.500000"/><bloomScale value="1.400000"/>'
+        self.assertEqual(track_env.light_settings(mild), mild)
+
     def test_zip_directory_uses_fm4_dirsize(self):
         data = track_env.zip_bytes({"a.bin": b"1", "b.bin": b"22"})
         start, size, count = track_env.zip_directory(data[-22:])

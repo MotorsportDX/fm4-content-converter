@@ -156,11 +156,14 @@ FM3 Disc 2), LeMansBugatti (LeMans 102 sebagai environment sendiri) dan layout C
 Pencahayaan setiap environment berasal dari track FM4 donor: `TrackSettings.xml` dan
 `staticCarCubemap.xpr` (NewYork dari Tsukuba, Amalfi dari AmalfiGP, LeMansBugatti dari
 LeMans). Cube FM3 tidak dipakai: formatnya LDR, sedangkan FM4 memakai cube HDR yang diskalakan.
-Tiga nilai `TrackSettings.xml` diubah: SHTop dibatasi 0,07, karena track FM3 tidak punya probe
+Beberapa nilai `TrackSettings.xml` diubah: SHTop dibatasi 0,07, karena track FM3 tidak punya probe
 SH (`<track>_ribbonNN.sh`) yang menjadi pasangan nilai itu di FM4; `CockpitDirectionalScalar`
 (matahari langsung di kokpit) dibatasi 1,5, karena nilai FM4 5 membuat dasbor, setir dan sarung
-tangan hampir putih di ruas NewYork yang terkena matahari; dan `ShadowLightDirection` diambil
-dari FM3. Tanpa itu kokpit menjadi putih (REPORT tahap 9 dan 10,
+tangan hampir putih di ruas NewYork yang terkena matahari; angkatan exposure kamera kokpit di
+pemandangan gelap (`Exp_ExtraDark` di `ToneMapCockpitExposure`) dibatasi 0,75 dan bloom
+dibatasi cutoff 2 dan skala 2, karena jalan FM3 gelap dalam satuan FM4 sehingga lampu, papan
+reklame dan langit NewYork terpotong menjadi kabut putih; dan `ShadowLightDirection` diambil
+dari FM3. Tanpa itu kokpit menjadi putih (REPORT tahap 9–11,
 [tracks-2026-11-02/REPORT.md](../research/tracks-2026-11-02/REPORT.md)).
 
 FM2 tidak punya track untuk dikonversi: semua 50 layout aktif FM2 sudah ada di FM4 atau di

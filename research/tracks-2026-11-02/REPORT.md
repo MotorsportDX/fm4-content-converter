@@ -898,6 +898,51 @@ seperti di AmalfiGP FM4. Piksel terpotong 1,0–1,1 %. Masih terbuka: langit ter
 gedung NewYork tetap mekar menjadi kabut susu dengan gumpalan bloom di tepi atas kaca.
 `skyScale` 0,3, `windshield=0` dan glare mati tidak menghilangkannya.
 
+### Tahap 11: kabut putih di NewYork, exposure kokpit (9 November 2026)
+
+Gejala (still paket fix4): di ruas NewYork yang terkena matahari, langit di antara gedung
+mekar menjadi kabut putih dengan gumpalan di tepi atas kaca, mobil AI di bawah matahari
+memutih, dan gedung jauh tampak pudar.
+
+Ukuran: porsi piksel dengan luma > 235 di pemandangan lewat kaca depan (baris 15–60 %
+layar) dan rata-rata luma daerah itu, di setiap frame terekam detik 10–62 balapan. Crop 1:1
+frame terburuk menunjukkan apa yang putih: deretan bohlam di papan reklame dan tepi gedung,
+muka papan reklame (FedEx, Cadillac) yang meledak, dan bloom di sekitarnya.
+
+| Varian NewYork | Putih (rata-rata / p90) | Luma |
+|---|---|---|
+| fix4 (look `pc`) | 5,9 / 11,0 % | 85 |
+| 9 shader `*_GLOW_*` diganti versi tanpa glow | 6,1 / 11,1 % | 86 |
+| `LightAmbient` FM3 (0,45) | 5,8 / 10,8 % | 87 |
+| `LightColor` 0,5 (dengan bloom bl2) | 3,5 / 6,7 % | 59 |
+| `skyScale` 0,3 | 3,9 / 8,1 % | 80 |
+| bloom bl2: `bloomCutoff` 1,3 → 2, `bloomScale` 5 → 2 | 4,4 / 8,1 % | 79 |
+| bl2 + `Exp_ExtraDark` exposure adaptif 1,0 / 0,5 | 4,6 / 5,0 % | 85 / 83 |
+| bl2 + `Key_ExtraDark` exposure kokpit 8 → 0 | 3,1 / 5,2 % | 71 |
+| bl2 + `Exp_ExtraDark` exposure kokpit 1,5 → 0,75 (fix5) | 1,9 / 3,3 % | 61 |
+| `Exp_ExtraDark` adaptif dan kokpit 0 | 1,1 / 1,9 % | 47 |
+| Referensi Le Mans FM4 | 0,7 / 0,8 % | 108 |
+| Referensi AmalfiGP FM4 | 1,0 / 1,7 % | 99 |
+
+Penyebab: exposure kamera kokpit. Kamera kokpit memakai `ToneMapCockpitExposure`. Donor
+Tsukuba menambah 1,5 EV penuh bila kunci luminans pemandangan di bawah 8 (`Key_ExtraDark` 8),
+sedangkan Le Mans dan separuh track FM4 memakai `Key_ExtraDark` 0. Jalan FM3 gelap dalam
+satuan FM4, karena FM3 mengangkat bayangannya dengan kurva tone sendiri (`DarkCurveBoost` 12
+NewYork) yang tidak dipakai FM4. Jadi kokpit NewYork selalu mendapat angkatan penuh, dan
+bohlam, papan reklame serta langit yang memang terang terpotong lalu mekar. Shader glow FM3,
+ambient, warna matahari, langit dan exposure adaptif (kamera luar) bukan penyebabnya.
+
+Perbaikan: `light_settings` membatasi `Exp_ExtraDark` di `ToneMapCockpitExposure` di 0,75
+(`COCKPIT_DARK_LIFT_MAX`), `bloomCutoff` paling kecil 2 dan `bloomScale` paling besar 2
+(nilai FM4 RoadAtlanta dan RoadAmerica), untuk semua environment FM3. Tes:
+`test_settings_cap_the_cockpit_dark_lift_and_the_bloom`. Paket fix5 hanya mengubah
+`TrackSettings.xml` di tiga ZIP track.
+
+Hasil paket fix5 (look `pc`, 2x, native): NewYork putih 1,9 / 3,2 %, luma 64. Papan reklame,
+langit dan mobil AI terbaca, tanpa gumpalan, dan ruas teduh lebih gelap. Puncak dasbor kokpit
+p90 32 (Le Mans 52). Amalfi putih 0,8 / 1,0 %, tetapi lebih gelap dari sebelumnya (luma 101 → 79;
+AmalfiGP FM4 99). Piksel terpotong 0,8–1,0 %.
+
 ## Rencana tahap berikut
 
 1. **Tidak ada layout lain dengan pola CrownJewel 170.** `plan_row` menolak 33

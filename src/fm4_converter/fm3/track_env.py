@@ -7,13 +7,15 @@ audio and names. What FM4 needs, and why (research/tracks-2026-11-02/REPORT.md):
 - RMB v4 -> v5 (`track_rmb.to_v5`), so FM4's main view draws the models (pass 5).
 - `bin.zip` rebuilt with stored members (Python cannot write XMemCompress).
 - `TrackSettings.xml` from an FM4 track: FM4 relit every track and its lighting values do
-  not map from FM3's (`--settings-donor`). Three values change (`light_settings`): the SH
+  not map from FM3's (`--settings-donor`). Some values change (`light_settings`): the SH
   ambient top is capped at 0.07, since FM4's tracks light the car from SH probes
   (`<track>_ribbonNN.sh`) that FM3's lack, and without them the donor's SHLighting is the
   whole ambient (AmalfiGP's 0.35 lit the cockpit near white); the cockpit's direct sun
   (CockpitDirectionalScalar) is capped at 1.5, since FM4's 5 lit the dash and wheel near white
-  in New York's sunlit stretches; and the shadow direction is FM3's own, which matches the
-  environment's sky.
+  in New York's sunlit stretches; the cockpit camera's dark-view exposure lift is capped at
+  0.75 and the bloom at cutoff 2, scale 2, since FM3's streets are dark in FM4's units and
+  the donor's lift clipped New York's lamps, billboards and sky into a white haze; and the
+  shadow direction is FM3's own, which matches the environment's sky.
 - `staticCarCubemap.xpr` from the same FM4 track: FM3's is an LDR DXT5 cube (mean texel
   about 0.25), FM4's an HDR 2_10_10_10 cube scaled about ten times down (mean about
   0.025). FM4's car shaders read FM3's map about ten times too bright, which washed the
@@ -253,17 +255,30 @@ SH_TOP_MAX = 0.07
 # FM3's sun, 5 lit the dash, wheel and gloves near white in every sunlit stretch; 1.5
 # kept those peaks at those of LeMans and AmalfiGP, 2 still left them pale (REPORT tahap 10).
 COCKPIT_SUN_MAX = 1.5
+# The cockpit camera's exposure lift in a dark view (ToneMapCockpitExposure Exp_ExtraDark): FM3's
+# streets are dark in FM4's units (FM3 lifted them with its own tone curve), so the donor's 1.5
+# (Tsukuba, below key 8) always applied, and New York's lamps, billboards and sky clipped and
+# bloomed into a white haze; 0.75 with a bloom of cutoff 2 and scale 2 (FM4's RoadAtlanta and
+# RoadAmerica) took it near AmalfiGP's (REPORT tahap 11).
+COCKPIT_DARK_LIFT_MAX = 0.75
+BLOOM_CUTOFF_MIN = 2.0
+BLOOM_SCALE_MAX = 2.0
 SHADOW_DIRECTION = re.compile(rb"<ShadowLightDirection\s[^>]*/>")
 
 
 def light_settings(settings, fm3_settings=None):
     """The donor's `TrackSettings.xml` for an environment without SH probes: SHTop* capped at
-    `SH_TOP_MAX`, CockpitDirectionalScalar at `COCKPIT_SUN_MAX`, and FM3's
-    `ShadowLightDirection` when `fm3_settings` has one."""
+    `SH_TOP_MAX`, CockpitDirectionalScalar at `COCKPIT_SUN_MAX`, the cockpit's dark-view
+    exposure lift at `COCKPIT_DARK_LIFT_MAX`, the bloom at `BLOOM_CUTOFF_MIN` and
+    `BLOOM_SCALE_MAX`, and FM3's `ShadowLightDirection` when `fm3_settings` has one."""
     def cap(limit):
         return lambda m: m.group(1) + b'"%.6f"' % min(float(m.group(2)), limit)
     out = re.sub(rb'(SHTop(?:Red|Green|Blue)=)"([-0-9.eE]+)"', cap(SH_TOP_MAX), settings)
     out = re.sub(rb'(CockpitDirectionalScalar=)"([-0-9.eE]+)"', cap(COCKPIT_SUN_MAX), out)
+    out = re.sub(rb'(<ToneMapCockpitExposure\s[^>]*?Exp_ExtraDark=)"([-0-9.eE]+)"', cap(COCKPIT_DARK_LIFT_MAX), out)
+    out = re.sub(rb'(<bloomScale value=)"([-0-9.eE]+)"', cap(BLOOM_SCALE_MAX), out)
+    out = re.sub(rb'(<bloomCutoff value=)"([-0-9.eE]+)"',
+                 lambda m: m.group(1) + b'"%.6f"' % max(float(m.group(2)), BLOOM_CUTOFF_MIN), out)
     own = SHADOW_DIRECTION.search(fm3_settings or b"")
     if own:
         out = SHADOW_DIRECTION.sub(lambda _: own.group(0), out, count=1)
