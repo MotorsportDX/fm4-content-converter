@@ -95,7 +95,8 @@
 !/src/fm4_converter/data/fm3/rules.json
 !/src/fm4_converter/data/fm3/value-scales.json
 !/src/fm4_converter/discs.py
-!/src/fm4_converter/mod.py
+!/src/fm4_converter/compose.py
+!/src/fm4_converter/items.py
 !/src/fm4_converter/stack.py
 !/src/fm4_converter/fm2/__init__.py
 !/src/fm4_converter/fm2/carbin.py
@@ -181,6 +182,7 @@
 !/tests/fm3/test_value_scales.py
 !/tests/fm3/test_batch_package.py
 !/tests/test_cli.py
+!/tests/test_compose.py
 !/tests/test_stack.py
 !/tests/test_project_layout.py
 !/tools/carbin_cpu/GPL-3.0.txt

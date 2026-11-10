@@ -232,6 +232,12 @@ def keep_base_tables(output, target_root, written, archive_read):
     return kept
 
 
+def fresh(table, additions):
+    """The additions whose key and symbol the table does not use yet."""
+    names = set(table.names.values())
+    return [a for a in additions if a[0] & 65535 not in table.texts and a[1] not in names]
+
+
 def rekey(bindings, taken):
     """Move bindings whose key a target table already uses to the highest free key.
 
@@ -272,7 +278,9 @@ def build_archives(source_root, target_root, bindings, archive_read, sha, conten
     with zipfile.ZipFile(stream,"w",compression=zipfile.ZIP_STORED) as output:
         for _,(priority,language,origin,data) in sorted(tables.items()):
             table = StringTable(data)
-            encoded = table.add(additions)
+            # The package's working tables only (format 2 ships none): a name a DLC pack already
+            # has under that symbol is that pack's car, which fm4_converter.compose leaves out.
+            encoded = table.add(fresh(table, additions))
             checked = StringTable(encoded)
             if any(checked.texts[k]!=v for k,v in table.texts.items()):
                 raise NameError("Existing localized text changed")

@@ -1,12 +1,11 @@
 # Konversi satu perintah dan format paket mod
 
 `fm4_converter.cli` menjalankan seluruh jalur FM3 → FM4 atau FM2 → FM4 dari disc milik
-pemain dan menghasilkan satu **paket mod**: berkas overlay untuk FM4 Disc 1 beserta
-`mod.json` yang dibaca launcher, misalnya Motorsport DX. Paketnya berisi mobil FM3, mobil
-FM2, atau track FM3 (`--content tracks`). Beberapa paket bisa dipasang bersamaan, seperti
-pack DLC: setiap paket dibangun di atas disc yang sudah membawa paket sebelumnya (lihat
-[Pemasangan bertumpuk](#pemasangan-bertumpuk)). Converter tidak memasang paket dan tidak
-menjalankan game.
+pemain dan menghasilkan satu **paket mod** (format 2): item-item yang ditambahkan paket ke FM4
+Disc 1 beserta `mod.json` yang dibaca launcher, misalnya Motorsport DX. Paketnya berisi mobil
+FM3, mobil FM2, atau track FM3 (`--content tracks`). Setiap paket dibangun di atas FM4 Disc 1
+saja, jadi paket mana pun bisa dimainkan sendiri atau bersama paket lain:
+[`compose`](#komposisi) menggabungkannya saat dimainkan. Converter tidak menjalankan game.
 
 ## Menjalankan
 
@@ -20,11 +19,13 @@ python -m fm4_converter.cli convert --game fm2 `
     --disc "<disc FM2>" --bonus-disc "<Bonus Disc FM2>" `
     --fm4 "<folder FM4 Disc 1>" --content-root "<...>" --helper "<carbin-cpu.exe>" --out "<folder baru>"
 
-# Track FM3, dibangun di atas disc yang sudah membawa paket mobil FM3 dan FM2
 python -m fm4_converter.cli convert --game fm3 --content tracks `
-    --disc "<FM3 Disc 1>" --disc2 "<FM3 Disc 2>" --fm4 "<disc dengan kedua paket mobil>" `
-    --base-package "<paket fm3-cars>" --base-package "<paket fm2-cars>" `
+    --disc "<FM3 Disc 1>" --disc2 "<FM3 Disc 2>" --fm4 "<folder FM4 Disc 1>" `
     --content-root "<...>" --helper "<carbin-cpu.exe>" --out "<folder baru>"
+
+# Disc mod: paket-paket di atas FM4 Disc 1, mobil atau track game yang lebih baru menang
+python -m fm4_converter.compose --fm4 "<folder FM4 Disc 1>" --content-root "<...>" `
+    --out "<folder overlay baru>" "<paket fm2-cars>" "<paket fm3-cars>" "<paket fm3-tracks>"
 
 python -m fm4_converter.cli identify "<folder atau .iso>"   # game, nomor disc, peran
 python -m fm4_converter.cli verify "<folder paket>"         # cek hash setiap berkas
@@ -34,17 +35,20 @@ Setelah `pip install -e .`, perintah yang sama tersedia sebagai `fm4-convert`.
 
 | Argumen | Isi |
 |---|---|
-| `--content` | `cars` (bawaan) atau `tracks`. Track hanya untuk `--game fm3`; semua layout FM2 sudah ada di FM4 atau di versi FM3-nya (lihat [Track](#track)). |
-| `--disc` | FM3 Disc 1 atau disc FM2. Folder hasil ekstrak (berisi `default.xex`), folder `Media`-nya, atau image `.iso` (Redump maupun hasil rebuild). |
-| `--disc2` | FM3 Disc 2 (Content Install Disc), opsional. Tanpa disc ini, 26 mobil yang asetnya hanya ada di Disc 2 dilewati (`skipped`), begitu juga Amalfi pada `--content tracks`. |
-| `--bonus-disc` | Bonus Disc FM2, opsional. Tanpa disc ini, empat mobil DLC FM2 dilewati. |
-| `--fm4` | Folder FM4 Disc 1 yang sudah diekstrak, yaitu folder yang dimainkan launcher. Image FM4 ditolak. Untuk pemasangan bertumpuk: Disc 1 dengan paket di bawahnya sudah terpasang. |
-| `--base-package` | Paket yang sudah dibawa folder `--fm4`, diulang untuk setiap paket menurut urutan pasangnya. Dicatat di `base_packages`. |
-| `--content-root` | DLC FM4 yang terpasang. Kunci database dan tabel nama dari pack ini dihormati, jadi bangun paket terhadap DLC yang benar-benar dimiliki pemain. |
-| `--helper` | `carbin-cpu.exe` hasil [build helper](../tools/carbin_cpu/README.md). Paket yang sudah diuji dibuat dengan `carbin-cpu-v9`. |
-| `--cache` | Folder untuk berkas yang diekstrak dari `.iso`, DLC FM2 dan model FM2. Bila diberikan, folder ini disimpan supaya proses berikutnya bisa melanjutkan. Bila tidak, dipakai `<out>.cache` yang dihapus setelah berhasil. |
+| `--content` | `cars` (bawaan) atau `tracks`. Track hanya untuk `--game fm3`; track FM2 (New York dan Test Track) sedang dikerjakan (lihat [Track](#track)). |
+| `--disc` | FM3 Disc 1 (rilis asli atau Ultimate Collection) atau disc FM2. Folder hasil ekstrak (berisi `default.xex`), folder `Media`-nya, atau image `.iso` (Redump maupun hasil rebuild). Edisi FM3 (`fm3` atau `fm3-uc`) dibaca dari database disc: hanya database Ultimate Collection yang punya Test Track. |
+| `--disc2` | FM3 Disc 2 (Content Install Disc), opsional. Tanpa disc ini, mobil yang asetnya hanya ada di Disc 2 dilewati (`skipped`), begitu juga Amalfi pada `--content tracks`. |
+| `--bonus-disc` | Bonus Disc FM2, opsional. Tanpa disc ini, mobil DLC FM2 dilewati. |
+| `--fm4` | Folder FM4 Disc 1 yang sudah diekstrak, yaitu folder yang dimainkan launcher. Image FM4 ditolak. |
+| `--content-root` | DLC FM4 yang terpasang. Converter mengambil merek dan velg yang hanya ada di pack ini (mobil itu lalu mencatat pack-nya di `requires`); kunci dan tabel nama pack diurus `compose` saat dimainkan. |
+| `--helper` | `carbin-cpu.exe` hasil [build helper](../tools/carbin_cpu/README.md). |
+| `--cache` | Folder untuk berkas yang diekstrak dari `.iso`, DLC FM2, model FM2, dan disc kerja builder (`stage-<game>-<content>`). Bila diberikan, folder ini disimpan supaya proses berikutnya bisa melanjutkan. Bila tidak, dipakai `<out>.cache` yang dihapus setelah berhasil. |
 | `--cars` | Hanya MediaName tertentu. |
 | `--json` | Progres sebagai JSON lines di stdout; log converter pindah ke stderr. |
+
+Mobil yang dikonversi: semua mobil game sumber yang ID-nya tidak ada di FM4 Disc 1, termasuk
+mobil yang juga ada di pack DLC FM4 (`compose` meninggalkannya selama pack itu terpasang).
+Untuk FM2 itu 119 mobil disc dan Bonus Disc, 64 di antaranya juga ada di FM3.
 
 Setiap disc dicek dari `default.xex` (title ID dan nomor disc) sebelum konversi dimulai,
 sehingga disc yang salah ditolak dengan pesan yang jelas. Dari image, hanya folder yang
@@ -80,69 +84,73 @@ paket tetap ditulis selama minimal satu mobil berhasil.
 ```text
 <paket>/
   mod.json         Dibaca launcher
-  files/Media/...  Overlay dengan tata letak FM4 Disc 1
-  manifest.json    Manifest lengkap converter (input, hash, keputusan per mobil)
-  reports/         Laporan audit per mobil
+  items.json       Item paket: baris database, nama, berkas, member arsip bersama
+  files/Media/...  Berkas utuh item (ZIP mobil, velg, track, audio lepas) dengan tata letak FM4 Disc 1
+  files/<arsip>/<member>   Member arsip bersama milik item (thumbnail, audio CMT, AI track, UI)
 ```
 
-## `mod.json`, versi 1
+Builder menulis overlay lengkap (termasuk database kerja) ke `stage-<game>-<content>` di folder
+cache; paket hanya mengambil berkas dan member yang disebut item-itemnya
+([`items`](../src/fm4_converter/items.py)).
+
+## `mod.json`, versi 2
 
 | Field | Isi |
 |---|---|
-| `format`, `format_version` | `"fm4-mod"`, `1` |
+| `format`, `format_version` | `"fm4-mod"`, `2` |
 | `id`, `name`, `kind`, `source_game` | Misalnya `"fm3-cars"`, `"FM3 cars"`, `"car-overlay"`, `"FM3"`; untuk track `"fm3-tracks"`, `"FM3 tracks"`, `"track-overlay"` |
+| `edition` | `fm2`, `fm3` (rilis asli) atau `fm3-uc` (Ultimate Collection) |
+| `priority` | FM2 20, FM3 30: item paket berprioritas lebih tinggi menang |
 | `created`, `converter` | Waktu UTC, nama dan versi converter |
 | `experimental` | Selalu `true` untuk sekarang |
-| `files_root` | `"files"` |
-| `files` | `{path: {sha256, size}}` untuk setiap berkas di `files/` |
-| `replaces` | Path yang sudah ada di FM4 Disc 1 dan diganti (database gabungan, `zipmanifest.xml`) |
-| `adds` | Path baru (ZIP mobil dan velg, `stringtables.zip`, `Thumbnails.zip`, audio) |
-| `writes` | `replaces` + `adds`, untuk cek konflik |
-| `cars` | `[{media, name, status, requires, error}]`, dengan status `packaged`, `failed` atau `skipped`; kosong pada `track-overlay` |
-| `tracks` | Hanya pada `track-overlay`: `[{media, name, status, layouts, error}]` per environment (`layout_170` untuk CrownJewel 170) |
-| `packaged`, `failed` | Jumlah mobil, atau environment pada `track-overlay` |
-| `requires` | Pack DLC FM4 yang dibutuhkan sebagian mobil (misalnya Porsche Expansion) |
+| `files_root`, `files` | `"files"`; `{path: {sha256, size}}` untuk setiap berkas di `files/` |
+| `items_file`, `items_sha256` | `"items.json"` dan hash-nya |
+| `archives` | `{arsip bersama: {priority, root}}`: arsip yang member-nya disimpan per item |
+| `cars`, `tracks` | Ringkasan item: `{key, media, name, status, requires, identity, error}`; status `packaged`, `failed` atau `skipped` |
+| `packaged`, `failed`, `skipped` | Jumlah item |
+| `requires` | Pack DLC FM4 yang dibutuhkan sebagian item (misalnya Porsche Expansion) |
 | `sources` | Disc yang dibaca: peran, path, folder atau iso, title ID, nomor disc, media ID |
-| `built_against` | Disc yang dipakai saat membangun (media ID, hash `gamedb.slt` dan `zipmanifest.xml`; pada pemasangan bertumpuk, hash dari disc yang sudah membawa `base_packages`) dan daftar pack DLC (path relatif dan ukuran) |
-| `base_packages` | `[{id, created}]` paket yang sudah dibawa disc itu, menurut urutan pasang; kosong untuk paket di atas FM4 Disc 1 saja |
+| `built_against` | FM4 Disc 1 (media ID, hash `gamedb.slt` dan `zipmanifest.xml`) dan daftar pack DLC saat konversi; untuk catatan, `compose` tidak memeriksanya |
 | `notes` | Catatan untuk ditampilkan ke pemain |
 
-## Aturan untuk launcher
+## `items.json`
 
-1. Jalankan `verify` (atau cek `files` sendiri) sebelum memasang.
-2. Pasang hanya bila disc di bawahnya dan pack DLC pemain sama dengan `built_against`:
-   FM4 Disc 1 untuk paket tanpa `base_packages`, atau Disc 1 dengan `base_packages`
-   terpasang. Bila berbeda, minta pemain membangun ulang paket: database dan tabel nama di
-   paket adalah salinan gabungan dari keadaan saat dibangun.
-3. Pasang tanpa menulis ke disc asli: salin atau hardlink disc, lalu ganti berkas di
-   `writes` dengan salinan baru, seperti [`fm3.test_disc`](../src/fm4_converter/fm3/test_disc.py).
-4. Paket yang dibangun sendiri-sendiri di atas FM4 Disc 1 tidak bisa dipasang bersamaan
-   (`fm4_converter.mod.conflicts`): paket FM3 dan FM2 sama-sama mengganti `gamedb.slt`,
-   `zipmanifest.xml`, `stringtables.zip` dan `Thumbnails.zip`. Paket bertumpuk bisa: pasang
-   menurut urutan `base_packages`, dan berkas yang ditulis beberapa paket diambil dari paket
-   terakhir.
-5. Tampilkan `notes` dan status `failed`/`skipped` dari `cars` (atau `tracks`) kepada pemain.
+Satu objek per mobil (`car:<Id>`), environment track (`environment:<MediaName>`) atau layout di
+geometri FM4 (`layout:<id>`):
 
-## Pemasangan bertumpuk
+| Field | Isi |
+|---|---|
+| `identity` | ID mobil (`cars`) dan MediaName-nya (`car_media`), ID track (`tracks`), MediaName environment (`environments`). Dua item dengan identitas yang sama adalah mobil atau track yang sama. |
+| `rows`, `updates` | Baris yang disisipkan item dan baris Disc 1 yang diubahnya, `{table, row}`. Dicatat dengan trigger SQLite sementara saat builder menulis database kerja (`items.Recorder`). |
+| `renumber` | Kunci yang boleh dipindah `compose`: `{table, column, rows, refs}`, dengan `rows` indeks baris pemegang kunci dan `refs` pasangan `[indeks baris, kolom]` yang merujuknya (sisi graf stok mobil, atau `EnvironmentId` dan `DefaultStartGridPositionsId` track). `block` (misalnya 100 untuk `Tracks.MPSortOrder`) memindah nilai sekelompok. |
+| `strings` | Nama: `{table, key, page, symbol, texts, refs, reuse}`; `texts` per kode bahasa atau `"*"`; `refs` pasangan `[indeks baris, kolom]` yang memegang referensinya; `reuse` berarti kunci yang sudah dipakai FM4 adalah nama FM4 untuk hal yang sama |
+| `files` | `{path: prioritas mount, atau null untuk berkas lepas}` |
+| `members` | `{arsip bersama: [nama member]}` |
+| `requires`, `status`, `error` | Pack yang dibutuhkan; status dan alasannya |
+
+## Komposisi
 
 FM4 hanya membaca satu `gamedb.slt`, satu `zipmanifest.xml` dan satu `stringtables.zip`.
-Supaya paket mobil FM3, mobil FM2 dan track FM3 aktif bersamaan, setiap paket dibangun di
-atas disc yang sudah membawa paket sebelumnya ([`stack`](../src/fm4_converter/stack.py)):
+[`compose`](../src/fm4_converter/compose.py) menulis overlay itu dari FM4 Disc 1 dan paket-paket
+yang dipilih:
 
-- `--fm4` menunjuk Disc 1 dengan paket di bawahnya terpasang (salinan atau hardlink), dan
-  `--base-package` menyebut paket-paket itu.
-- Database dan `zipmanifest.xml` disc itu menjadi dasar, jadi baris dan mount paket di
-  bawahnya tetap ada. ID mobil FM3 dan FM2 tidak bertabrakan; kunci lain mengambil kunci
-  bebas berikutnya.
-- Arsip kumulatif (`Media/stringtables.zip`, `Media/UI/Textures/Thumbnails.zip`,
-  `Media/audio/Cars.zip`) diperluas: isi paket di bawahnya disalin, anggota baru ditambahkan,
-  dan mount di `zipmanifest.xml` diambil alih dengan prioritas yang sama.
-- Mobil FM2 yang dipakai donor tidak diambil dari mobil yang ditambahkan paket di bawahnya.
-- `built_against` mencatat hash disc bertumpuk itu, jadi launcher bisa menyusun urutan pasang
-  dengan merangkai hash: paket berikutnya cocok dengan keadaan setelah paket sebelumnya
-  terpasang.
+1. **Item.** Item paket berprioritas lebih tinggi menggantikan item paket lain yang berbagi
+   identitas (FM3 atas FM2). Item yang mobil atau track-nya ada di pack DLC terpasang
+   ditinggalkan, dan item yang butuh pack yang tidak terpasang ditinggalkan sebelum paket
+   dibandingkan, sehingga item game yang lebih lama bisa menggantikannya.
+2. **Database.** Salinan database Disc 1 dengan baris dan perubahan item pemenang. Kunci di
+   `renumber` yang sudah dipegang baris lain atau pack DLC dipindah ke kunci bebas berikutnya,
+   di baris pemegang dan baris perujuknya. Kunci lain yang bentrok menghentikan komposisi.
+3. **Nama.** Per tabel (`Data_Car.str`, `Tracks.str`, `Environments.str`), nama pemenang memakai
+   kuncinya sendiri bila bebas, selain itu kunci bebas tertinggi, dan referensinya ditulis ke
+   baris itemnya. `Media/stringtables.zip` membawa tabel yang dibaca game sekarang (Disc 1, Disc
+   2, DLC terpasang) dengan nama tambahan, satu prioritas di atasnya.
+4. **Arsip.** Arsip bersama disusun dari member pemenang (di atas member Disc 1 bila Disc 1
+   punya arsip itu); berkas utuh pemenang di-hardlink; `zipmanifest.xml` me-mount semuanya
+   dengan konvensi FM4 sendiri (`dirsize` termasuk 22 byte rekaman akhir ZIP).
 
-Bila paket di bawah dibangun ulang, paket di atasnya harus dibangun ulang juga.
+`compose.json` di overlay mencatat pemenang, item yang ditinggalkan beserta alasannya, dan asal
+setiap berkas. Launcher menaruh berkas Disc 1 lainnya di sampingnya.
 
 ## Track
 
@@ -166,9 +174,14 @@ reklame dan langit NewYork terpotong menjadi kabut putih; dan `ShadowLightDirect
 dari FM3. Tanpa itu kokpit menjadi putih (REPORT tahap 9–11,
 [tracks-2026-11-02/REPORT.md](../research/tracks-2026-11-02/REPORT.md)).
 
-FM2 tidak punya track untuk dikonversi: semua 50 layout aktif FM2 sudah ada di FM4 atau di
-versi FM3-nya. Satu-satunya yang tersisa, TuningTrack (ID 71), tidak aktif di database FM2
-(`Active=0`) dan tidak punya berkas di disc.
+Track FM2 yang tidak ada di FM4 adalah New York (layout 22 dan 24) dan Test Track (49 sampai 66);
+FM3 dan Ultimate Collection punya keduanya dengan ID dan panjang yang sama. Formatnya dua
+generasi lebih tua dari FM3: PVS versi 11, dan model track berupa kontainer CAFF berisi record
+`rendergraph` 30.06.06.0036 (buffer vertex dan indeks, material dengan shader microcode-nya
+sendiri) tanpa command buffer. Konverternya sedang dikerjakan.
+
+Catatan: verifikasi di bawah ini dibuat dengan format 1 (paket bertumpuk); format 2 menggantikannya
+pada 11 November 2026.
 
 ## Verifikasi 5 November 2026
 

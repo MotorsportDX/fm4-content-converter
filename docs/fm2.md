@@ -1,9 +1,11 @@
-# FM2 → FM4: mobil FM2-only
+# FM2 → FM4: mobil FM2
 
 Jalur FM2 adalah adapter sumber kedua dalam [FM4 Content Converter](../README.md).
-Cakupannya hanya mobil FM2 yang tidak ada di FM3 maupun FM4: 55 dari 349 definisi
-mobil FM2, kebanyakan varian tuner dan livery balap. Mobil FM2 yang juga ada di FM3
-diambil dari jalur [FM3 → FM4](fm3.md) karena aset FM3 lebih lengkap.
+Cakupannya semua mobil FM2 (disc dan Bonus Disc) yang ID-nya tidak ada di FM4 Disc 1: 119
+dari 349 definisi mobil FM2. 55 di antaranya hanya ada di FM2 (kebanyakan varian tuner dan
+livery balap); 64 juga ada di FM3, dan bila paket FM3 ikut dimainkan, `compose` memakai versi
+FM3-nya karena aset FM3 lebih lengkap ([format paket mod](mod-format.md#komposisi)). Sampai 10
+November 2026 jalur ini hanya mengonversi ke-55 mobil FM2-only.
 
 Source berada di [`src/fm4_converter/fm2`](../src/fm4_converter/fm2/). Riset lengkap,
 pengukuran, dan hasil uji game ada di
@@ -79,6 +81,12 @@ kecuali `MediaName`, `CarPartPositions`, `CameraOverrides`, `CarExceptions`,
 CMT audio bila FM4 tidak punya, dan `MakeID` bila FM4 tidak punya merek FM2.
 
 ## Hasil saat ini
+
+Konversi 11 November 2026 (paket format 2, FM4 USA Disc 1, disc FM2 USA dan Bonus Disc): 119 dari
+119 mobil. Empat mobil dengan cermin yang berbagi vertex dengan rumahnya (Pontiac GTO '04 dan
+tiga Corvette Z06 balap) memakai fit UV afin terbaik (`FitMirrorUv`), dan dua teknik material
+baru diterima seperti `Material__1`: `cockpit_rubber_trim` (Peugeot 908 HDi FAP) dan
+`weather_strip` (Porsche Carrera GT '03).
 
 `package-v5` berisi 55 dari 55 mobil FM2-only (bagian 17). Empat mobil DLC FM2 dibaca dari
 Bonus Disc (`fm2.dlc`), dan quad turbo `CHR_ME412_05` dipasang sebagai twin turbo seperti Veyron

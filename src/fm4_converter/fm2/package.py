@@ -42,6 +42,7 @@ from ..fm3 import converter as c
 from ..fm3.asset_conversion import convert_texture
 from ..fm3.integration import archive_read
 from ..fm3.texture_audit import Texture
+from .. import items as it
 from .. import stack
 from ..paths import PROJECT_ROOT
 
@@ -172,7 +173,9 @@ def clone_stock(work, donor, media, car_id, year, reserved):
         table, key = node['table'], node['row'][node['pk']]
         if table not in occupied:
             occupied[table] = {r[0] for r in work.execute(f"SELECT {c.qi(node['pk'])} FROM {c.qi(table)}")}
-            occupied[table] |= set(reserved.get(table, ()))
+            # The car keeps its FM2 Id also when a DLC pack has that car (compose then leaves it out).
+            if table != 'Data_Car':
+                occupied[table] |= set(reserved.get(table, ()))
         if (table, key) in allocation:
             continue
         value = car_id if role == 'car' else 2000
@@ -236,7 +239,9 @@ def string_archive(target_root, content_root, keys):
     with zipfile.ZipFile(stream, 'w', compression=zipfile.ZIP_STORED) as output:
         for _, (priority, language, origin, data) in sorted(tables.items()):
             table = ui_names.StringTable(data)
-            encoded = table.add(additions)
+            # The package's working tables only (format 2 ships none): a name a DLC pack already
+            # has under that symbol is that pack's car, which fm4_converter.compose leaves out.
+            encoded = table.add(ui_names.fresh(table, additions))
             checked = ui_names.StringTable(encoded)
             if any(checked.texts[k] != v for k, v in table.texts.items()):
                 raise c.MappingError('Existing localized text changed')
@@ -422,22 +427,25 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
         raise c.MappingError('Native thumbnail control headers disagree')
 
     payloads, origins, keys, thumbs, audio, shipped_wheels = {}, {}, {}, {}, {}, {}
-    packaged, failed = [], []
+    packaged, failed, records = [], [], []
     with closing(c.connect(fm2_database)) as fm2_db, closing(sqlite3.connect(database)) as work:
         work.row_factory = sqlite3.Row
+        recorder = it.Recorder(work)
         pool = donor_pool(work, stacked_cars)
         tables, _ = ui_names.winning_tables(target_root, content_root, archive_read, c.sha)
         taken = {k for _, _, _, data in tables.values() for k in ui_names.StringTable(data).texts}
         for index, car in enumerate(cars, 1):
             log, car_keys = {'media': car}, {}
+            recorder.start()
             try:
                 fm2_car = c.one(c.rows(fm2_db, 'Data_Car', 'MediaName=?', (car,)), f'FM2 {car}')
                 car_id = fm2_car['Id']
                 if car.lower() not in fm2_zips:
                     raise c.MappingError('No FM2 car archive on the disc')
-                if c.rows(work, 'Data_Car', 'Id=? OR lower(MediaName)=lower(?)', (car_id, car)) or \
-                        car_id in reserved.get('Data_Car', ()):
-                    raise c.MappingError('The FM2 car identity already exists in FM4 or an installed DLC')
+                # A car an installed DLC pack also has is converted: fm4_converter.compose leaves it
+                # out while that pack is installed, and it plays without the pack.
+                if c.rows(work, 'Data_Car', 'Id=? OR lower(MediaName)=lower(?)', (car_id, car)):
+                    raise c.MappingError('The FM2 car identity already exists in FM4')
                 source = physics.extract(fm2_db, car_id, work)
                 # The cockpit camera and driver position follow the donor: a donor with the wheel on the
                 # other side puts the camera on the passenger seat (Evo IX with an Eclipse donor, REPORT 14.5).
@@ -539,10 +547,12 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
                     replay = c.extract_stock(work, car)['nodes']
                     if {r: n['row'] for r, n in replay.items()} != {r: n['row'] for r, n in nodes.items()}:
                         raise c.MappingError('Package database does not reproduce the planned stock graph')
+                added, changed = recorder.take()
             except Exception as error:   # noqa: BLE001 - one failed car does not stop the package
                 taken.difference_update(ui_names.reference(k['reference']) & 65535 for k in car_keys.values())
                 failed.append({**log, 'error': f'{type(error).__name__}: {error}',
                                'trace': traceback.format_exc().splitlines()[-3:]})
+                records.append(it.item(f'car:{car}', 'car', car, status='failed', error=failed[-1]['error']))
                 print('FAILED', car, failed[-1]['error'], flush=True)
                 if progress:
                     progress(dict(index=index, total=len(cars), car=car, status='failed',
@@ -553,6 +563,17 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
             if log['wheel'] == 'converted_fm2':
                 shipped_wheels[wheel.casefold()] = {p: d for p, d in car_payloads.items() if p.is_relative_to(WHEELS / wheel)}
             thumbs[THUMBNAILS / f'Thumbnail_{car_id}.xds'] = thumb
+            entry = it.item(f'car:{car_id}', 'car', car, label['DisplayName'], requires=requires,
+                            identity=it.car_identity(car_id, car))
+            entry.update(rows=added, updates=changed, renumber=it.graph_keys(c.extract_stock(work, car), added, car_id),
+                         strings=[it.car_string(f, k, added, car_id) for f, k in car_keys.items()])
+            entry['files'][f'Media/Cars/{car}.zip'] = 80
+            if log['wheel'] in ('converted_fm2', 'shared_in_package'):
+                entry['files'][f'Media/Wheels/{wheel}.zip'] = 80
+            entry['members'][THUMBNAILS.with_suffix('.zip').as_posix()] = [f'Thumbnail_{car_id}.xds']
+            if log['audio'] != 'native_fm4':
+                entry['members'][AUDIO.as_posix()] = [f'CarModelTuning/{car}_CMT.xml']
+            records.append(entry)
             keys.update({f'{car}/{f}': k for f, k in car_keys.items()})
             car_row = dict(nodes['car']['row'])
             entry = {**log, 'status': 'packaged', 'car_id': car_id, 'names': label, 'wheel_media': wheel,
@@ -578,6 +599,7 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
             print('packaged', car, donor, log['wheel'], log['audio'], car_row['ClassID'], flush=True)
             if progress:
                 progress(dict(index=index, total=len(cars), car=car, status='packaged', donor=donor, error=None))
+        recorder.close()
         if work.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
             raise c.MappingError('Package database failed integrity_check')
 
@@ -622,7 +644,7 @@ def build(out, cars=None, target=c.FM4_DEFAULT, content_root=CONTENT, study=STUD
     c.dump(reports / 'failed.json', failed)
     manifest = {
         'package_type': 'Offline file overlay; not a complete game disc',
-        'cars': packaged, 'failed': [{k: f[k] for k in ('media', 'error')} for f in failed],
+        'cars': packaged, 'items': records, 'failed': [{k: f[k] for k in ('media', 'error')} for f in failed],
         'packaged_count': len(packaged), 'failed_count': len(failed),
         'requires': sorted({x for e in packaged for x in e['requires']}),
         'inputs': inputs, 'sources_unchanged': True, 'overlays_checked': len(overlays),

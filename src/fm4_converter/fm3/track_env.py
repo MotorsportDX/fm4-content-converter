@@ -37,6 +37,7 @@ from pathlib import Path
 
 from . import integration, ui_names, track_grid, track_pvs, track_rmb, track_package
 from .integration import archive_read
+from .. import items as it
 from .. import stack
 from ..archives.stfs_reader import STFS
 from ..archives.stfs_zip_io import STFSFile
@@ -477,6 +478,68 @@ def string_additions(media_rows, env_row, media, siblings=frozenset()):
     return wanted
 
 
+def track_keys(rows):
+    """The movable keys of one environment's or layout's rows (fm4_converter.items): a new
+    environment's Id (Tracks and its time of day refer to it), its time of day's Id, its start
+    grids' id (Tracks refer to it) and its split points' ID; and its tracks' MPSortOrder, which
+    must not repeat another environment's (FM4 then hides one, see add_database)."""
+    where = lambda table: [n for n, r in enumerate(rows) if r["table"] == table]
+    tracks = where("Tracks")
+    specs = []
+    for n in where("Environments"):
+        env = rows[n]["row"]["Id"]
+        refs = [[t, "EnvironmentId"] for t in tracks if rows[t]["row"]["EnvironmentId"] == env]
+        refs += [[t, "EnvironmentId"] for t in where("EnvironmentTimeOfDay") if rows[t]["row"]["EnvironmentId"] == env]
+        specs.append(it.key_spec("Environments", "Id", [n], refs))
+    specs += [it.key_spec("EnvironmentTimeOfDay", "Id", [n]) for n in where("EnvironmentTimeOfDay")]
+    grids = {}
+    for n in where("StartGridPositions"):
+        grids.setdefault(rows[n]["row"]["id"], []).append(n)
+    for grid, held in sorted(grids.items()):
+        refs = [[t, "DefaultStartGridPositionsId"] for t in tracks
+                if rows[t]["row"]["DefaultStartGridPositionsId"] == grid]
+        specs.append(it.key_spec("StartGridPositions", "id", held, refs))
+    specs += [it.key_spec("SplitPoints", "ID", [n]) for n in where("SplitPoints")]
+    if tracks:
+        specs.append({**it.key_spec("Tracks", "MPSortOrder", tracks), "block": 100})
+    return specs
+
+
+def item_strings(records, source_tables, fm4, content_root, fm4_env_keys, label_prefix):
+    """Turn each record's `pending_strings` (string_additions) into item strings with the text of
+    every language the game reads (fm4_converter.items.string), as the names override writes
+    them: the source game's text, marked "(FM3)" when FM4 already shows the same name next to it.
+    `source_tables`: {(language, table): StringTable} of the source game."""
+    from . import converter as c
+    winning = {t: ui_names.winning_tables(fm4, content_root, archive_read, c.sha, t)[0]
+               for t in ("Tracks.str", "Environments.str")}
+    parsed = {t: {code: ui_names.StringTable(entry[3]) for code, entry in tables.items()}
+              for t, tables in winning.items()}
+    for record in records:
+        pending = record.pop("pending_strings", {})
+        rows = record["rows"]
+        for lower, entries in pending.items():
+            table = "Tracks.str" if lower == "tracks.str" else "Environments.str"
+            for k, label, origin, siblings in entries:
+                texts = {}
+                for code, target in parsed[table].items():
+                    english = source_tables[("en", origin)]
+                    text_src = source_tables.get((code, origin), english)
+                    text = text_src.texts.get(k & 65535) or english.texts[k & 65535]
+                    taken = fm4_env_keys if table == "Environments.str" else siblings
+                    if text in {target.texts[e] for e in taken if e in target.texts}:
+                        text += f" ({label_prefix})"
+                    texts[code] = text
+                # Labels: IDS_<field>_<track id> (Tracks.str), IDS_<field>_<game>_<media> (Environments.str).
+                field, _, owner = label[4:].partition("_")
+                if table == "Tracks.str":
+                    number = it.row_index(rows, "Tracks", "id", int(owner))
+                else:
+                    number = next(n for n, r in enumerate(rows) if r["table"] == "Environments")
+                reference = rows[number]["row"][field]
+                record["strings"].append(it.string(table, reference, label, texts, [[number, field]], reuse=True))
+
+
 def fm3_string_tables(roots):
     tables = {}
     for root in roots:
@@ -537,6 +600,7 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
     fm4_env_keys = {ui_names.reference(v) & 65535 for row in b.execute(
         "select DisplayName, ShortDisplayName from Environments") for v in row}
     report, archives, loose, bins, ai_all = {}, {}, {}, {}, {}
+    recorder, records = it.Recorder(b), []
     wanted = {"tracks.str": [], "environments.str": []}
     zones_dir = _find(_find(fm4 / "audio/tracks", DECISION_ZONES_DONOR[0]), DECISION_ZONES_DONOR[1])
     zone_file = next(p for p in zones_dir.iterdir() if "decisionzones" in p.name.lower()).read_bytes()
@@ -551,8 +615,10 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         settings = _find(fm4 / "tracks" / donor, "TrackSettings.xml").read_bytes()
         cubemap = _find(fm4 / "tracks" / donor, CUBEMAP).read_bytes()
         ai = {canonical_ai_name(n, media): pad_mlp(d) for n, d in source.ai_files().items()}
+        recorder.start()
         with b:
             info = add_database(a, b, media, ai, fm3_name, ids, join)
+        added, _ = recorder.take()
         ai_all.update(ai)
         rows = fm3_tracks(a, fm3_name, ids)
         env_row = dict(a.execute("select * from Environments where MediaName=?", (fm3_name,)).fetchone())
@@ -562,7 +628,8 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         siblings = {ui_names.reference(v) & 65535 for r in b.execute(
             "select DisplayName, ShortDisplayName from Tracks where EnvironmentId=? and MediaName!=?",
             (info["environment"], media)) for v in r} if join else set()
-        for k, v in string_additions(rows, None if join else env_row, media, siblings).items():
+        env_strings = string_additions(rows, None if join else env_row, media, siblings)
+        for k, v in env_strings.items():
             wanted[k] += v
         originals = source.track_files()
         track = {n: convert_track_file(n, d, settings, cubemap) for n, d in originals.items()}
@@ -583,6 +650,18 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
         loose.update({Path("Media/audio/tracks") / media / n: d for n, d in audio.items()})
         report[media] = {**info, "ui_textures": sorted(ui), "settings_donor": donor, "models_v5": models, "track_files": len(track),
                          "ai_files": len(ai), "audio_files": len(audio), "bin_members": members}
+        entry = it.item(f"environment:{media}", "environment", media,
+                        identity={"environments": [media], "tracks": list(info["tracks"])})
+        entry.update(rows=added, renumber=track_keys(added))
+        entry["pending_strings"] = env_strings
+        entry["files"].update({f"Media/tracks/{media}.zip": 80, f"Media/tracks/{media}/bin.zip": 80,
+                               f"Media/audio/tracks/{media}.zip": 80,
+                               **{(Path("Media/audio/tracks") / media / n).as_posix(): None for n in audio}})
+        entry["members"]["Media/AI/Tracks.zip"] = sorted(ai)
+        for name in ui:
+            folder, filename = name.rsplit("/", 1)
+            entry["members"].setdefault(f"Media/UI/Textures/{folder}.zip", []).append(filename)
+        records.append(entry)
     for layout in layouts:
         # Layouts on FM4's own geometry (CrownJewel 170): `track_package`'s row and files.
         from contextlib import closing
@@ -601,14 +680,29 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
             if group:
                 archive, data = track_package.mounted_archive(Path(next(iter(group))).parent, group)
                 archives[archive] = data
-        ai_all.update({Path(k).relative_to("Media/AI/Tracks").as_posix(): pad_mlp(v) for k, v in ai.items()})
+        layout_ai = {Path(k).relative_to("Media/AI/Tracks").as_posix(): pad_mlp(v) for k, v in ai.items()}
+        ai_all.update(layout_ai)
+        recorder.start()
         with b:
             b.execute(f"insert into Tracks ({','.join(row)}) values ({','.join('?' * len(row))})", list(row.values()))
+        added, _ = recorder.take()
+        entry = it.item(f"layout:{layout}", "layout", media, identity={"tracks": [layout]})
+        entry.update(rows=added, renumber=track_keys(added))
+        entry["pending_strings"] = {"tracks.str": [
+            (ui_names.reference(row["DisplayName"]), f"IDS_DisplayName_{layout}", "tracks.str", frozenset()),
+            (ui_names.reference(row["ShortDisplayName"]), f"IDS_ShortDisplayName_{layout}", "tracks.str", frozenset())]}
+        for group in (ribbon, sound):
+            if group:
+                archive_path, _ = track_package.mounted_archive(Path(next(iter(group))).parent, group)
+                entry["files"][Path(archive_path).as_posix()] = 80
+        entry["members"]["Media/AI/Tracks.zip"] = sorted(layout_ai)
+        records.append(entry)
         wanted["tracks.str"] += [(ui_names.reference(row["DisplayName"]), f"IDS_DisplayName_{layout}", "tracks.str",
                                   frozenset()),
                                  (ui_names.reference(row["ShortDisplayName"]), f"IDS_ShortDisplayName_{layout}",
                                   "tracks.str", frozenset())]
         report[f"layout_{layout}"] = {"media": media, "ribbon": row["RibbonIndex"], "geometry_ribbon": row["ReverseIndex"]}
+    recorder.close()
     assert b.execute("pragma integrity_check").fetchone()[0] == "ok"
     b.close()
     archives[Path("Media/AI/Tracks.zip")] = zip_bytes(ai_all)
@@ -649,6 +743,8 @@ def build(out, envs, content_root, fm3_db=FM3UC / "DB/gamedb.slt", base=None, fm
                     adds.append((k, label, text))
                 zout.writestr(zipfile.ZipInfo(f"{lang}/{table}", (1980, 1, 1, 0, 0, 0)), target.add(adds))
     names = stream.getvalue()
+    item_strings(records, fm3, fm4, content_root, fm4_env_keys, label_prefix="FM3")
+    report["items"] = records
     prio_names = max(ui_names.winning_tables(fm4, content_root, archive_read, c.sha, t)[0]["en"][0]
                      for t in ("Tracks.str", "Environments.str")) + 1
     prio_names = max(prio_names, base_priority)

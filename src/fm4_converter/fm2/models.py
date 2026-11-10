@@ -152,8 +152,15 @@ def audit_closeup(main, data, donor_head, kind, renames=None):
                     worst['normal_deg'] = max(worst['normal_deg'], math.degrees(math.acos(max(-1, min(1, dot)))))
                     if not mirror:
                         worst['uv'] = max(worst['uv'], max(abs(x - y) for x, y in zip(va[2], vb[2])))
-                    elif not all(-1e-3 <= x <= 1 + 1e-3 for x in vb[2]):
-                        raise carbin_audit.FormatError(f'{kind}/{section["name"]}/{b["name"]}: mirror UV outside 0..1')
+                    else:
+                        # A mirror whose vertices FM2 shares with its housing keeps the best
+                        # affine fit (FitMirrorUv); the shared vertices can then fall a little
+                        # outside the glass's 0..1, recorded here. Far outside, the fit is wrong.
+                        outside = max(max(-x, x - 1, 0) for x in vb[2])
+                        worst['mirror_uv_outside'] = max(worst.get('mirror_uv_outside', 0), outside)
+                        if outside > 1:
+                            raise carbin_audit.FormatError(f'{kind}/{section["name"]}/{b["name"]}: mirror UV far '
+                                                           f'outside 0..1 ({outside:.3f})')
                     if va[3] != vb[3]:
                         raise carbin_audit.FormatError(f'{kind}/{section["name"]}: damage word changed')
                     damage_words += bool(vb[3])

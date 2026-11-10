@@ -9,7 +9,7 @@ import unittest
 import xml.etree.ElementTree as ET
 import zipfile
 
-from fm4_converter import cli, mod, stack
+from fm4_converter import stack
 from fm4_converter.discs import DiscError
 from fm4_converter.fm3 import converter as c
 from fm4_converter.fm3 import integration
@@ -74,46 +74,6 @@ class StackTests(unittest.TestCase):
             (media / "stringtables.zip").unlink()
             with zipfile.ZipFile(io.BytesIO(), "w") as output:
                 self.assertEqual(ui_names.keep_base_tables(output, media, set(), integration.archive_read), [])
-
-    def test_cli_reads_base_packages(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            package = Path(tmp) / "fm3-cars"
-            (package / "files/Media/Cars").mkdir(parents=True)
-            (package / "files/Media/Cars/A.zip").write_bytes(b"car")
-            fm4 = Path(tmp) / "fm4"
-            fm4.mkdir()
-            cars = [dict(media="CHE_A_01", name="A", status="packaged", requires=[], error=None),
-                    dict(media="CHE_B_01", name="B", status="failed", requires=[], error="x")]
-            described = mod.describe(package, "fm3-cars", "FM3 cars", "FM3", fm4, cars, [], [], {})
-            self.assertEqual(described["base_packages"], [])
-            packages = cli.base_packages([package])
-            self.assertEqual(cli.stacked_cars(packages), {"che_a_01"})
-            stacked = mod.describe(Path(tmp) / "fm3-cars", "fm2-cars", "FM2 cars", "FM2", fm4, cars, [], [], {},
-                                   (), [dict(id="fm3-cars", created=described["created"])])
-            self.assertEqual(stacked["base_packages"][0]["id"], "fm3-cars")
-
-    def test_track_overlay_lists_its_environments(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            package = Path(tmp) / "fm3-tracks"
-            (package / "files/Media/Tracks").mkdir(parents=True)
-            (package / "files/Media/Tracks/NewYork.zip").write_bytes(b"track")
-            fm4 = Path(tmp) / "fm4"
-            fm4.mkdir()
-            tracks = [dict(media="NewYork", name=None, status="packaged", layouts=[22, 23], error=None),
-                      dict(media="TestTrackinfield", name=None, status="skipped", error="needs a disc")]
-            described = mod.describe(package, "fm3-tracks", "FM3 tracks", "FM3", fm4, tracks, [], [], {}, (),
-                                     [dict(id="fm3-cars", created="2026-11-07T00:00:00+00:00")], "track-overlay")
-            self.assertEqual(described["kind"], "track-overlay")
-            self.assertEqual(described["cars"], [])
-            self.assertEqual([t["media"] for t in described["tracks"]], ["NewYork", "TestTrackinfield"])
-            self.assertEqual((described["packaged"], described["failed"]), (1, 0))
-            # Only FM3's tracks convert.
-            helper = Path(tmp) / "carbin-cpu.exe"
-            helper.write_bytes(b"")
-            a = argparse.Namespace(out=str(Path(tmp) / "out"), helper=str(helper), content_root=None, cache=None,
-                                   game="fm2", content="tracks")
-            with self.assertRaisesRegex(DiscError, "Only FM3's tracks convert"):
-                cli.convert(a, cli.Events(False))
 
 
 @unittest.skipUnless(c.FM4_DEFAULT.exists(), "Local FM4 disc required")

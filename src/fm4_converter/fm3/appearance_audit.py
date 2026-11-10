@@ -167,6 +167,10 @@ NATIVE_UNKNOWN_TECHNIQUES = {
     # trim and the cockpit's A-pillars. Raced at Le Mans on 7 November 2026, cockpit and chase
     # camera, nothing missing (docs/mod-format.md).
     "chrome2": "as Material__1; FM3 AUD_R15Ultimate_09 body and cockpit a_pillar",
+    # FM2's Bonus Disc (Peugeot 908 HDi FAP): the steering wheel's rubber trim in the cockpit.
+    "cockpit_rubber_trim": "as Material__1; FM2 PEU_908_DLC2 cockpit steering_wheel",
+    # FM2's Porsche Carrera GT '03: the rubber strip of the bumper and the side windows.
+    "weather_strip": "as Material__1; FM2 POR_CarreraGT_03 bumperFa, bumperFrace, glassLTL, glassRTL",
 }
 
 

@@ -8,13 +8,13 @@ meliputi konfigurasi kendaraan, model, tekstur, dan metadata presentasi.
 ## Status dan arah pengembangan
 
 Project masih berupa prototipe riset. Jalur yang saat ini diimplementasikan
-adalah **FM3 → FM4** dan **FM2 → FM4** (mobil FM2-only); dukungan game sumber lain
-masih direncanakan.
+adalah **FM3 → FM4** (mobil dan track) dan **FM2 → FM4** (mobil; track FM2 sedang dikerjakan);
+dukungan game sumber lain masih direncanakan.
 
 | Sumber | Status | Cakupan saat ini |
 |---|---|---|
 | Forza Motorsport 3 | Prototipe | Konversi database mobil stock, model dan tekstur, metadata UI, serta audit offline |
-| Forza Motorsport 2 | Prototipe | Mobil FM2-only: model, fisika terkalibrasi, dan satu paket overlay (55 dari 55 mobil, termasuk DLC FM2) |
+| Forza Motorsport 2 | Prototipe | Semua mobil FM2 yang tidak ada di FM4 Disc 1: model, fisika terkalibrasi, dan satu paket mod (119 dari 119 mobil disc dan Bonus Disc, 64 di antaranya juga ada di FM3) |
 | Game lain | Direncanakan | Format dan cakupan akan ditentukan untuk setiap adapter sumber |
 
 Jalur fisika FM3 telah dievaluasi pada panel 30 mobil. Impor aset dikembangkan
@@ -38,9 +38,12 @@ cakupan dukungan akan dicatat bersama batas validasinya.
 
 ## Konversi satu perintah
 
-`fm4_converter.cli` mengonversi semua mobil FM3-only atau FM2-only dari disc pemain
-(folder hasil ekstrak atau `.iso`) menjadi satu paket mod dengan `mod.json` untuk launcher.
-Progres bisa dikirim sebagai JSON lines (`--json`), dan kalibrasinya memakai data beku
+`fm4_converter.cli` mengonversi semua mobil FM3 atau FM2 (atau track FM3) yang tidak ada di
+FM4 Disc 1 dari disc pemain (folder hasil ekstrak atau `.iso`) menjadi satu paket mod dengan
+`mod.json` untuk launcher. Setiap paket dibangun di atas FM4 Disc 1 saja, dan
+`fm4_converter.compose` menggabungkan paket-paket yang dimainkan bersama: mobil atau track game
+yang lebih baru menggantikan yang sama dari game yang lebih lama, dan pack DLC FM4 menang atas
+keduanya. Progres bisa dikirim sebagai JSON lines (`--json`), dan kalibrasinya memakai data beku
 dari paket yang sudah diuji.
 
 ```powershell
@@ -48,7 +51,7 @@ python -m fm4_converter.cli convert --game fm3 --disc <FM3 Disc 1> --disc2 <FM3 
     --fm4 <folder FM4 Disc 1> --content-root <DLC FM4> --helper <carbin-cpu.exe> --out <paket-baru>
 ```
 
-Argumen, event progres, isi `mod.json` dan aturan pemasangan ada di
+Argumen, event progres, isi `mod.json` dan `items.json`, dan komposisi ada di
 [format paket mod](docs/mod-format.md).
 
 ## Struktur repository

@@ -29,6 +29,7 @@ from . import integration
 from . import offline_package
 from . import ui_names
 from .integration import archive_read
+from .. import items as it
 from .. import stack
 
 FM3_DISC2_DEFAULT = Path(r"D:\Data\FM3\USA\Forza Motorsport 3 (USA) (Disc 2) (Content Install Disc) (1)"
@@ -146,7 +147,10 @@ def native_wheel(target_root, dlc_wheels, wheel):
 
 def build(source, target, out, helper, medias=None, rules=None, pi_model=None, content_root=None,
           scales=None, physics_scales=False, disc2=FM3_DISC2_DEFAULT, log=print, progress=None):
-    """`progress`: called after each car with {index, total, car, status, error}."""
+    """`progress`: called after each car with {index, total, car, status, error}.
+
+    The manifest's `items` are the cars as format 2 items (`fm4_converter.items`): the rows each
+    car inserted into the package database, its names, files and thumbnail."""
     source, target, out = (Path(p).resolve() for p in (source, target, out))
     for original in (source.parents[2], target.parents[2]):
         if out == original or out in original.parents or original in out.parents:
@@ -183,12 +187,15 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
             f.write(data)
         archives[relative.as_posix()] = c.sha(files/relative)
 
+    records = []
     with closing(c.connect(source)) as a, closing(sqlite3.connect(database)) as work:
         work.row_factory = sqlite3.Row
         medias = list(medias or missing_cars(a, work, registry))
+        recorder = it.Recorder(work)
         for number, media in enumerate(medias, 1):
             record = {"media":media}
             cars.append(record)
+            recorder.start()
             try:
                 car_reports = reports/media
                 car_reports.mkdir()
@@ -196,7 +203,7 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
                 label = names(source_root, source_car)
                 src, plan = integration.build_plan(a, work, media, rule_data, label, pi_data, scale_data,
                                                    physics_scales, reserved, registry)
-                collisions = offline_package.overlay_collisions(plan, overlays)
+                collisions = offline_package.overlay_collisions(plan, overlays, strict=False)
                 car_row = plan["candidate"]["nodes"]["car"]["row"]
                 for field, value in ui_names.rekey(plan["integration"]["localized_names"], taken_keys).items():
                     plan["integration"]["metadata_changes"].append(
@@ -240,6 +247,17 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
                     inserted = integration.insert_rows(work, rows)
                     if c.extract_stock(work, media)["nodes"] != plan["candidate"]["nodes"]:
                         raise c.MappingError("Package database does not reproduce the planned stock graph")
+                added, changed = recorder.take()
+                entry = it.item(f"car:{source_car['Id']}", "car", media, label["DisplayName"],
+                                requires=requires, identity=it.car_identity(source_car["Id"], media))
+                entry.update(rows=added, updates=changed,
+                             renumber=it.graph_keys(c.extract_stock(work, media), added, source_car["Id"]))
+                entry["strings"] = [it.car_string(field, row, added, source_car["Id"])
+                                    for field, row in plan["integration"]["localized_names"].items()]
+                entry["files"][f"Media/Cars/{media}.zip"] = 80
+                if wheel_status in ("converted", "shared_in_package"):
+                    entry["files"][f"Media/Wheels/{wheel}.zip"] = 80
+                entry["members"][THUMBNAILS.with_suffix(".zip").as_posix()] = [thumb_path.name]
                 for field, row in plan["integration"]["localized_names"].items():
                     bindings[f"{media}/{field}"] = row
                 thumbnails[thumb_path] = converted.pop(thumb_path)
@@ -256,6 +274,7 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
                                     ("ui_thumbnail_validation", thumbnail), ("validation", validation),
                                     ("dlc_collisions", collisions)):
                     c.dump(car_reports/(name+".json"), value)
+                records.append(entry)
                 record.update(status="packaged", car_id=source_car["Id"], names=label, wheel=wheel,
                               wheel_source=wheel_status, requires=sorted(requires), merged_rows=inserted,
                               class_id=plan["candidate"]["nodes"]["car"]["row"]["ClassID"],
@@ -265,12 +284,14 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
                     progress(dict(index=number, total=len(medias), car=media, status="packaged", error=None))
             except Exception as error:
                 record.update(status="failed", error=f"{type(error).__name__}: {error}"[:2000])
+                records.append(it.item(f"car:{media}", "car", media, status="failed", error=record["error"]))
                 (reports/media).mkdir(exist_ok=True)
                 (reports/media/"error.txt").write_text(traceback.format_exc(), encoding="utf-8")
                 log(f"[{number}/{len(medias)}] {media}: FAILED {record['error'][:200]}")
                 if progress:
                     progress(dict(index=number, total=len(medias), car=media, status="failed",
                                   error=record["error"]))
+        recorder.close()
         packaged = [r for r in cars if r["status"] == "packaged"]
         if not packaged:
             raise c.MappingError("No car could be packaged")
@@ -301,7 +322,7 @@ def build(source, target, out, helper, medias=None, rules=None, pi_model=None, c
     c.dump(reports/"ui_name_validation.json", name_validation)
     manifest = {
         "package_type":"Offline file overlay; not a complete game disc",
-        "cars":cars, "packaged":len(packaged), "failed":len(cars)-len(packaged),
+        "cars":cars, "items":records, "packaged":len(packaged), "failed":len(cars)-len(packaged),
         "requires":sorted({x for r in packaged for x in r["requires"]}),
         "inputs":inputs, "sources_unchanged":True, "overlays_checked":len(overlays),
         "options":{"rules":str(rules) if rules else None, "pi_model":str(pi_model) if pi_model else None,

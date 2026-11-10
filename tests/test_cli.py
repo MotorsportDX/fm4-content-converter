@@ -5,7 +5,7 @@ import struct
 import tempfile
 import unittest
 
-from fm4_converter import data, mod
+from fm4_converter import data, items
 from fm4_converter.archives.xiso import SECTOR, MAGIC, XISO, FormatError
 from fm4_converter.discs import Disc, DiscError, execution_info, FM3, FM4
 
@@ -136,36 +136,34 @@ class FrozenDataTests(unittest.TestCase):
 
 
 class ModTests(unittest.TestCase):
-    def test_describe_verify_and_conflicts(self):
+    def test_write_and_verify(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            fm4 = root / "fm4"
-            (fm4 / "Media/DB").mkdir(parents=True)
-            (fm4 / "Media/DB/gamedb.slt").write_bytes(b"old")
+            stage = root / "stage"
+            (stage / "Media/Cars").mkdir(parents=True)
+            (stage / "Media/DB").mkdir(parents=True)
+            (stage / "Media/DB/gamedb.slt").write_bytes(b"package database")
+            (stage / "Media/Cars/X.zip").write_bytes(b"car")
+            packaged = items.item("car:1", "car", "X", "X (FM3)", identity=items.car_identity(1, "X"))
+            packaged["files"]["Media/Cars/X.zip"] = 80
+            skipped = items.item("car:Y", "car", "Y", status="skipped", error="needs FM3 Disc 2")
             package = root / "package"
-            (package / "files/Media/DB").mkdir(parents=True)
-            (package / "files/Media/Cars").mkdir(parents=True)
-            (package / "files/Media/DB/gamedb.slt").write_bytes(b"new")
-            (package / "files/Media/Cars/X.zip").write_bytes(b"car")
-            cars = [dict(media="X", name="X (FM3)", status="packaged", requires=[], error=None),
-                    dict(media="Y", name=None, status="skipped", requires=[], error="needs FM3 Disc 2")]
-            described = mod.describe(package, "fm3-cars", "FM3 cars", "FM3", fm4, cars, [], [], {})
-            self.assertEqual(described["replaces"], ["Media/DB/gamedb.slt"])
-            self.assertEqual(described["adds"], ["Media/Cars/X.zip"])
-            self.assertEqual((described["packaged"], described["failed"]), (1, 0))
+            described = items.write(package, stage, [packaged, skipped], {},
+                                    dict(id="fm3-cars", name="FM3 cars", kind="car-overlay", source_game="FM3",
+                                         edition="fm3", sources=[], built_against={}, notes=[]))
+            # Only the items' files: the package database stays in the stage.
+            self.assertEqual(sorted(described["files"]), ["Media/Cars/X.zip"])
+            self.assertEqual((described["packaged"], described["failed"], described["skipped"]), (1, 0, 1))
+            self.assertEqual((described["format_version"], described["priority"]), (2, 30))
             self.assertEqual(json.loads((package / "mod.json").read_text(encoding="utf-8"))["format"], "fm4-mod")
-            self.assertEqual(mod.verify(package)["id"], "fm3-cars")
-            other = dict(described, id="fm2-cars")
-            self.assertEqual(mod.conflicts([described, other]),
-                             {"media/cars/x.zip": ["fm3-cars", "fm2-cars"],
-                              "media/db/gamedb.slt": ["fm3-cars", "fm2-cars"]})
+            self.assertEqual(items.verify(package)["id"], "fm3-cars")
             (package / "files/Media/Cars/X.zip").write_bytes(b"changed")
-            with self.assertRaisesRegex(mod.ModError, "changed"):
-                mod.verify(package)
+            with self.assertRaisesRegex(items.ModError, "changed"):
+                items.verify(package)
             (package / "files/Media/Cars/X.zip").write_bytes(b"car")
             (package / "files/extra.txt").write_bytes(b"")
-            with self.assertRaisesRegex(mod.ModError, "not listed"):
-                mod.verify(package)
+            with self.assertRaisesRegex(items.ModError, "not listed"):
+                items.verify(package)
 
 
 if __name__ == "__main__":

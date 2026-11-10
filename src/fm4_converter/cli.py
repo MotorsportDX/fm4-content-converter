@@ -14,7 +14,7 @@ calibration is the frozen data of `fm4_converter.data`.
 
 Cars that need the disc not given (FM3 Disc 2, FM2 Bonus Disc) are listed as skipped. A
 failed car does not stop the others. The output is `<out>/files` (FM4 Disc 1 layout),
-`<out>/mod.json` (`fm4_converter.mod`), and the converter's manifest.json and reports/.
+`<out>/mod.json` and `<out>/items.json` (format 2, `fm4_converter.items`).
 
 With `--json`, stdout carries one JSON object per line and nothing else:
   {"event": "stage", "stage": "check"|"extract"|"dlc"|"package"|"describe", "message": ...}
@@ -33,9 +33,9 @@ import sqlite3
 import sys
 import time
 
-from . import data, mod
+from . import data, items
 from .discs import Disc, DiscError, ROLES
-from .mod import ModError
+from .items import ModError
 
 FM3_DISC2_PACKAGES = Path(ROLES["fm3-disc2"][2][0])
 FM2_BONUS_PACKAGES = Path(ROLES["fm2-bonus"][2][0])
@@ -108,13 +108,13 @@ def built_against(fm4, content_root):
 
 
 def fm3_cars(fm3_media, fm4_media, content_root, disc2):
-    """(cars to package, skipped cars): every FM3 car FM4 and its installed DLC lack; without
-    Disc 2, only those whose assets are on Disc 1."""
+    """(cars to package, skipped cars): every FM3 car FM4's discs lack, also those an FM4 DLC pack
+    has (fm4_converter.compose leaves them out while that pack is installed); without Disc 2,
+    only those whose assets are on Disc 1."""
     from .fm3 import batch_package
     from .fm3 import converter as c
-    _, registry, _, _ = batch_package.installed_content(content_root)
     with closing(c.connect(fm3_media / "DB/gamedb.slt")) as a, closing(c.connect(fm4_media / "DB/gamedb.slt")) as t:
-        missing = batch_package.missing_cars(a, t, registry)
+        missing = batch_package.missing_cars(a, t, {})
     if disc2:
         return missing, []
     on_disc = {p.stem.casefold() for p in (fm3_media / "Cars").glob("*.zip")}
@@ -133,6 +133,7 @@ def convert_fm3(a, events, cache):
     root1 = disc1.root(cache, events.extractor(disc1.role))
     packages = disc2.root(cache, events.extractor(disc2.role)) / FM3_DISC2_PACKAGES if disc2 else None
     fm3_media, fm4_media = root1 / "Media", fm4.path / "Media"
+    a.edition = fm3_edition(fm3_media)
     cars, skipped = fm3_cars(fm3_media, fm4_media, a.content_root, packages)
     if a.cars:
         wanted = {x.casefold() for x in a.cars}
@@ -145,14 +146,13 @@ def convert_fm3(a, events, cache):
     events.stage("package", f"Converting {len(cars)} FM3 cars")
     with redirect_stdout(sys.stderr):
         manifest = batch_package.build(
-            fm3_media / "DB/gamedb.slt", fm4_media / "DB/gamedb.slt", a.out, a.helper, cars,
+            fm3_media / "DB/gamedb.slt", fm4_media / "DB/gamedb.slt", a.stage, a.helper, cars,
             data.path("fm3/rules.json"), data.path("fm3/pi-model.json"), a.content_root,
             data.path("fm3/value-scales.json"), False, packages, log=lambda s: None,
             progress=lambda p: events.emit("car", **p))
-    names = {r["media"]: r.get("names", {}).get("DisplayName") for r in manifest["cars"]}
-    records = [dict(media=r["media"], name=names[r["media"]], status=r["status"],
-                    requires=r.get("requires", []), error=r.get("error")) for r in manifest["cars"]]
-    return "fm3-cars", "FM3 cars", "FM3", fm4, discs, records + skipped, manifest["requires"]
+    records = manifest["items"] + [items.item(f"car:{s['media']}", "car", s["media"], status="skipped",
+                                              error=s["error"]) for s in skipped]
+    return "fm3-cars", "FM3 cars", "FM3", fm4, discs, records, CAR_ARCHIVES
 
 
 def convert_fm3_tracks(a, events, cache):
@@ -168,6 +168,7 @@ def convert_fm3_tracks(a, events, cache):
     root1 = disc1.root(cache, events.extractor(disc1.role), FM3_TRACK_PATHS, "fm3-disc1-tracks")
     packages = [disc2.root(cache, events.extractor(disc2.role)) / FM3_DISC2_PACKAGES] if disc2 else []
     fm3_media = root1 / "Media"
+    a.edition = fm3_edition(fm3_media)
     with closing(sqlite3.connect(f"file:{fm3_media / 'DB/gamedb.slt'}?mode=ro", uri=True)) as fm3_db:
         reasons = track_env.available(fm3_db, fm3_media, packages)
     envs = [env for env, reason in reasons.items() if reason is None]
@@ -188,22 +189,46 @@ def convert_fm3_tracks(a, events, cache):
         done.append(p)
 
     with redirect_stdout(sys.stderr):
-        report = track_env.build(a.out, envs, a.content_root, fm3_db=fm3_media / "DB/gamedb.slt",
+        report = track_env.build(a.stage, envs, a.content_root, fm3_db=fm3_media / "DB/gamedb.slt",
                                  fm4=fm4.path / "Media", fm3_media=fm3_media, packages=packages,
                                  progress=progress)
     if done:
         events.emit("track", index=done[-1]["index"], total=len(envs), track=done[-1]["track"],
                     status="packaged", error=None)
-    records = [dict(media=env, name=None, status="packaged", layouts=report[env].get("tracks"), error=None)
-               for env in envs]
-    records += [dict(media=f"layout_{layout}", name=None, status="packaged", layouts=[layout], error=None)
-                for layout in (170,) if f"layout_{layout}" in report]
-    return "fm3-tracks", "FM3 tracks", "FM3", fm4, discs, records + skipped, []
+    records = report["items"] + [items.item(f"environment:{s['media']}", "environment", s["media"], status="skipped",
+                                            error=s["error"]) for s in skipped]
+    return "fm3-tracks", "FM3 tracks", "FM3", fm4, discs, records, track_archives(records)
+
+
+def track_archives(records):
+    """The shared archives of track items: the AI archive and one archive a UI texture folder."""
+    archives = {}
+    for record in records:
+        for relative in record.get("members", ()):
+            root = relative[:-len(".zip")]
+            archives[relative] = {"priority": 80, "root": root}
+    return archives
+
+
+CAR_ARCHIVES = {"Media/UI/Textures/Thumbnails.zip": {"priority": 80, "root": "Media/UI/Textures/Thumbnails"},
+                "Media/audio/Cars.zip": {"priority": 96, "root": "Media/audio/Cars"}}
+
+
+def fm2_cars(fm2_db, fm4_db):
+    """MediaNames of every FM2 car (with the Bonus Disc's DLC when read) whose ID FM4's discs lack;
+    an FM2 car with an FM4 ID is that FM4 car (some renamed, e.g. FER_612_05 is FM4's FER_612_04)."""
+    with closing(sqlite3.connect(f"file:{fm4_db}?mode=ro", uri=True)) as t:
+        known = {r[0] for r in t.execute("SELECT Id FROM Data_Car")}
+        known_media = {r[0].casefold() for r in t.execute("SELECT MediaName FROM Data_Car")}
+    with closing(sqlite3.connect(f"file:{fm2_db}?mode=ro", uri=True)) as a:
+        return [m for i, m in a.execute("SELECT Id, MediaName FROM Data_Car ORDER BY Id")
+                if i not in known and m.casefold() not in known_media]
 
 
 def convert_fm2(a, events, cache):
     from .fm2 import dlc, package, sources
     events.stage("check", "Checking the discs")
+    a.edition = "fm2"
     disc, fm4 = Disc(a.disc, "fm2-disc"), fm4_disc(a.fm4)
     bonus = Disc(a.bonus_disc, "fm2-bonus") if a.bonus_disc else None
     discs = [d for d in (disc, bonus) if d]
@@ -220,52 +245,34 @@ def convert_fm2(a, events, cache):
                 dlc.build(dlc_out, bonus_root, root / "Media/DB/gamedb.slt")
     sources.configure(fm2_media=root / "Media", bonus_disc=bonus_root, dlc=dlc_out / "Media",
                       fm4_media=fm4.path / "Media")
-    frozen = data.load("fm2/cars.json")["cars"]
+    every = fm2_cars(sources.fm2_db(), fm4.path / "Media/DB/gamedb.slt")
     available = sources.fm2_zips("cars")
-    cars = [m for m in frozen if m.casefold() in available]
-    skipped = [dict(media=m, status="skipped", error="needs the FM2 Bonus Disc") for m in frozen
-               if m.casefold() not in available]
+    cars = [m for m in every if m.casefold() in available]
+    skipped = [items.item(f"car:{m}", "car", m, status="skipped", error="needs the FM2 Bonus Disc")
+               for m in every if m.casefold() not in available]
     if a.cars:
         wanted = {x.casefold() for x in a.cars}
         unknown = wanted - {m.casefold() for m in cars}
         if unknown:
-            raise DiscError(f"Not FM2-only cars with sources here: {sorted(unknown)}")
+            raise DiscError(f"Not FM2 cars FM4 lacks with sources here: {sorted(unknown)}")
         cars, skipped = [m for m in cars if m.casefold() in wanted], []
     events.stage("package", f"Converting {len(cars)} FM2 cars")
     models = cache / "fm2-models"
     models.mkdir(parents=True, exist_ok=True)
     with redirect_stdout(sys.stderr):
-        manifest = package.build(a.out, cars, fm4.path / "Media/DB/gamedb.slt", a.content_root,
+        manifest = package.build(a.stage, cars, fm4.path / "Media/DB/gamedb.slt", a.content_root,
                                  data.path("fm2/study.json"), models, a.helper,
-                                 progress=lambda p: events.emit("car", **p),
-                                 stacked_cars=frozenset(stacked_cars(a.base_packages)))
-    records = [dict(media=r["media"], name=r.get("names", {}).get("DisplayName"), status="packaged",
-                    requires=r.get("requires", []), donor=r.get("donor"), error=None) for r in manifest["cars"]]
-    records += [dict(media=f["media"], name=None, status="failed", requires=[], error=f["error"])
-                for f in manifest["failed"]]
-    return "fm2-cars", "FM2 cars", "FM2", fm4, discs, records + skipped, manifest["requires"]
+                                 progress=lambda p: events.emit("car", **p))
+    return "fm2-cars", "FM2 cars", "FM2", fm4, discs, manifest["items"] + skipped, CAR_ARCHIVES
 
 
 NOTES = ("Experimental: cockpit view, engine sound, paint colours and PI class can differ from the "
          "original game; see the converter's docs.",
-         "Install only over the FM4 Disc 1 and DLC packs in built_against; rebuild when they change.")
-
-
-def base_packages(paths):
-    """mod.json of each package the --fm4 folder already carries (a stacked install)."""
-    return [mod.load(path) for path in paths]
-
-
-def stacked_cars(packages):
-    """Case-folded MediaNames of the cars those packages added."""
-    return {car["media"].casefold() for package in packages for car in package.get("cars", ())
-            if car["status"] == "packaged"}
-
+         "Plays on FM4 Disc 1 alone or with the other packages (fm4_converter.compose).")
 
 TRACK_NOTES = ("Experimental: each environment is lit with an FM4 track's settings, and only a sample of "
                "the layouts has been raced to the finish; see the converter's docs.",
-               "Install only over the FM4 Disc 1, DLC packs and packages in built_against; rebuild when they "
-               "change.")
+               "Plays on FM4 Disc 1 alone or with the other packages (fm4_converter.compose).")
 
 
 def convert(a, events):
@@ -282,24 +289,37 @@ def convert(a, events):
     if cache == out or out in cache.parents or cache in out.parents:
         raise DiscError("The cache folder must be outside the package folder")
     cache.mkdir(parents=True, exist_ok=True)
-    a.base_packages = base_packages(getattr(a, "base_package", None) or ())
     a.content = getattr(a, "content", "cars")
-    if a.content == "tracks" and a.game != "fm3":
-        raise DiscError("Only FM3's tracks convert")
+    # The builders write a whole overlay here (the package database included); the package takes
+    # only its items' files from it.
+    a.stage = cache / f"stage-{a.game}-{a.content}"
+    shutil.rmtree(a.stage, ignore_errors=True)
     convert_game = {("fm3", "cars"): convert_fm3, ("fm2", "cars"): convert_fm2,
-                    ("fm3", "tracks"): convert_fm3_tracks}[a.game, a.content]
-    mod_id, name, game, fm4, discs, cars, requires = convert_game(a, events, cache)
+                    ("fm3", "tracks"): convert_fm3_tracks}.get((a.game, a.content))
+    if convert_game is None:
+        raise DiscError(f"No {a.content} conversion for {a.game}")
+    mod_id, name, game, fm4, discs, records, archives = convert_game(a, events, cache)
     events.stage("describe", "Writing mod.json")
-    described = mod.describe(out, mod_id, name, game, fm4.path, cars, requires, [d.describe() for d in discs],
-                             built_against(fm4, a.content_root), TRACK_NOTES if a.content == "tracks" else NOTES,
-                             [dict(id=p["id"], created=p["created"]) for p in a.base_packages],
-                             "track-overlay" if a.content == "tracks" else "car-overlay")
-    mod.verify(out)
+    header = dict(id=mod_id, name=name, kind="track-overlay" if a.content == "tracks" else "car-overlay",
+                  source_game=game, edition=a.edition,
+                  sources=[d.describe() for d in discs], built_against=built_against(fm4, a.content_root),
+                  notes=list(TRACK_NOTES if a.content == "tracks" else NOTES))
+    described = items.write(out, a.stage / "files", records, archives, header)
+    items.verify(out)
+    shutil.rmtree(a.stage, ignore_errors=True)
     if not a.cache:
         shutil.rmtree(cache, ignore_errors=True)
     events.emit("done", package=str(out), mod=str(out / "mod.json"), packaged=described["packaged"],
-                failed=described["failed"], skipped=sum(c["status"] == "skipped" for c in cars))
+                failed=described["failed"], skipped=described["skipped"])
     return described
+
+
+def fm3_edition(fm3_media):
+    """"fm3-uc" for the Ultimate Collection's Disc 1 (its database has the Test Track, which the
+    original release's lacks), else "fm3". A player converts the FM3 content of one of them."""
+    with closing(sqlite3.connect(f"file:{Path(fm3_media) / 'DB/gamedb.slt'}?mode=ro", uri=True)) as db:
+        found = db.execute("SELECT 1 FROM Tracks WHERE MediaName='TestTrackinfield'").fetchone()
+    return "fm3-uc" if found else "fm3"
 
 
 def main(argv=None):
@@ -319,9 +339,6 @@ def main(argv=None):
     c.add_argument("--out", required=True, help="new package folder")
     c.add_argument("--cache", help="keep extracted discs and FM2 models here to resume or rebuild")
     c.add_argument("--cars", nargs="*", help="only these MediaNames")
-    c.add_argument("--base-package", action="append",
-                   help="a package the --fm4 folder already carries over FM4 Disc 1 (a stacked install, "
-                        "fm4_converter.stack); repeat for each, in install order")
     c.add_argument("--json", action="store_true", help="JSON lines on stdout")
     i = sub.add_parser("identify", help="print which game and disc a folder or .iso is")
     i.add_argument("path")
@@ -346,7 +363,7 @@ def main(argv=None):
             return 1
         return 0
     try:
-        checked = mod.verify(a.package)
+        checked = items.verify(a.package)
     except (ModError, OSError, ValueError) as error:
         print(json.dumps({"ok": False, "error": str(error)}))
         return 1

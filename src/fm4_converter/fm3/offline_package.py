@@ -20,8 +20,10 @@ SCOPES = {"CarPartPositions":"Ordinal","CarExceptions":"CarID",
           "Combo_Colors_Exceptions":"Ordinal","ArcadeCarList":"CarId"}
 
 
-def overlay_collisions(result, paths):
-    """Check effective identities against explicitly supplied installed DLC ZIPs."""
+def overlay_collisions(result, paths, strict=True):
+    """Check effective identities against explicitly supplied installed DLC ZIPs. Not `strict`, the
+    collisions are only reported: a format 2 package (fm4_converter.items) leaves them to
+    fm4_converter.compose, which leaves out a car a pack has and moves keys a pack holds."""
     records = list(result["candidate"]["nodes"].values())+result["integration"]["presentation_rows"]
     reports = []
     for path in paths:
@@ -55,7 +57,7 @@ def overlay_collisions(result, paths):
                             hits.append({"table":table,"key":"ID","value":row["ID"]})
                 reports.append({"path":str(path),"archive_sha256":c.sha(path),
                                 "member":name,"collisions":hits})
-    if any(r["collisions"] for r in reports):
+    if strict and any(r["collisions"] for r in reports):
         raise c.MappingError("DLC identity conflict: "+json.dumps(reports))
     return reports
 

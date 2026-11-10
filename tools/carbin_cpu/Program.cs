@@ -105,8 +105,12 @@ internal static class Program
             sub.Uv[2 * axis] = (float) offset;
             sub.Uv[2 * axis + 1] = (float) slope;
         }
+        // FM2 models share some mirror vertices with the housing and map them off the glass: the
+        // best affine fit is kept (the mirror then shows its reflection slightly stretched), and
+        // the caller records the error instead of losing the car.
         if (worst > 0.05)
-            throw new InvalidDataException("Mirror mesh " + sub.Name + " UVs are not affine in X/Y (" + worst + ")");
+            Console.Error.WriteLine("Mirror mesh " + sub.Name + " UVs are not affine in X/Y (" + worst
+                + "); the best affine fit is used");
         return worst;
     }
 
