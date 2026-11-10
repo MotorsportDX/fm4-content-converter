@@ -12,6 +12,7 @@
 !/research/physics-2026-10-20/fm4/
 !/research/cars-fm2-2026-11-02/
 !/research/tracks-2026-11-02/
+!/research/tracks-fm2-2026-11-11/
 !/src/
 !/src/fm4_converter/
 !/src/fm4_converter/archives/
@@ -235,3 +236,5 @@
 !/third_party/xenonrecomp-dependencies/tomlplusplus/LICENSE
 !/third_party/xenonrecomp-dependencies/xxHash/LICENSE
 !/third_party/xenonrecomp/LICENSE.md
+!/research/tracks-fm2-2026-11-11/fm2_model.py
+!/research/tracks-fm2-2026-11-11/plan_view.py
