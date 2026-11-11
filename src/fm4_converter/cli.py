@@ -200,6 +200,38 @@ def convert_fm3_tracks(a, events, cache):
     return "fm3-tracks", "FM3 tracks", "FM3", fm4, discs, records, track_archives(records)
 
 
+def convert_fm2_tracks(a, events, cache):
+    """FM2's environments FM4 lacks (fm2.track_env): New York and the Test Track, their models
+    written from FM4 Disc 1's own track models."""
+    from .discs import FM2_TRACK_PATHS
+    from .fm2 import sources, track_env
+    events.stage("check", "Checking the discs")
+    a.edition = "fm2"
+    disc, fm4 = Disc(a.disc, "fm2-disc"), fm4_disc(a.fm4)
+    if a.cars:
+        raise DiscError("--cars is for --content cars")
+    events.stage("extract", "Reading the FM2 disc")
+    root = disc.root(cache, events.extractor(disc.role), FM2_TRACK_PATHS, "fm2-disc-tracks")
+    envs = sorted(track_env.ENVIRONMENTS)
+    events.stage("package", f"Converting {len(envs)} FM2 environments")
+    done = []
+
+    def progress(p):
+        if done:
+            events.emit("track", index=done[-1]["index"], total=p["total"], track=done[-1]["track"],
+                        status="packaged", error=None)
+        done.append(p)
+
+    with redirect_stdout(sys.stderr):
+        report = track_env.build(a.stage, envs, a.content_root, fm2_media=root / "Media", fm4=fm4.path / "Media",
+                                 progress=progress)
+    if done:
+        events.emit("track", index=done[-1]["index"], total=len(envs), track=done[-1]["track"],
+                    status="packaged", error=None)
+    records = report["items"]
+    return "fm2-tracks", "FM2 tracks", "FM2", fm4, [disc], records, track_archives(records)
+
+
 def track_archives(records):
     """The shared archives of track items: the AI archive and one archive a UI texture folder."""
     archives = {}
@@ -295,7 +327,7 @@ def convert(a, events):
     a.stage = cache / f"stage-{a.game}-{a.content}"
     shutil.rmtree(a.stage, ignore_errors=True)
     convert_game = {("fm3", "cars"): convert_fm3, ("fm2", "cars"): convert_fm2,
-                    ("fm3", "tracks"): convert_fm3_tracks}.get((a.game, a.content))
+                    ("fm3", "tracks"): convert_fm3_tracks, ("fm2", "tracks"): convert_fm2_tracks}.get((a.game, a.content))
     if convert_game is None:
         raise DiscError(f"No {a.content} conversion for {a.game}")
     mod_id, name, game, fm4, discs, records, archives = convert_game(a, events, cache)
@@ -329,7 +361,7 @@ def main(argv=None):
     c = sub.add_parser("convert", help="convert the FM2 or FM3 cars (or FM3's tracks) FM4 lacks into one mod package")
     c.add_argument("--game", choices=("fm3", "fm2"), required=True)
     c.add_argument("--content", choices=("cars", "tracks"), default="cars",
-                   help="cars (FM3 and FM2) or tracks (FM3's environments and layouts FM4 lacks)")
+                   help="cars (FM3 and FM2) or tracks (the FM3 or FM2 environments and layouts FM4 lacks)")
     c.add_argument("--disc", required=True, help="FM3 Disc 1 or the FM2 disc: folder or .iso")
     c.add_argument("--disc2", help="FM3 Disc 2 (Content Install Disc): folder or .iso")
     c.add_argument("--bonus-disc", help="FM2 Bonus Disc: folder or .iso")

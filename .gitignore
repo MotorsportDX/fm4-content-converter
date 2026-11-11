@@ -38,6 +38,7 @@
 !/docs/fm3.md
 !/docs/fm3-acceptance.md
 !/docs/fm2.md
+!/docs/fm2-tracks.md
 !/docs/mod-format.md
 !/pyproject.toml
 !/requirements.txt
@@ -104,6 +105,8 @@
 !/src/fm4_converter/fm2/dlc.py
 !/src/fm4_converter/fm2/models.py
 !/src/fm4_converter/fm2/package.py
+!/src/fm4_converter/fm2/track_env.py
+!/src/fm4_converter/fm2/track_models.py
 !/src/fm4_converter/fm2/physics.py
 !/src/fm4_converter/fm2/sources.py
 !/src/fm4_converter/fm2/transcode.py
@@ -156,6 +159,7 @@
 !/tests/fm2/test_carbin.py
 !/tests/fm2/test_dlc.py
 !/tests/fm2/test_package.py
+!/tests/fm2/test_track_models.py
 !/tests/fm2/test_physics.py
 !/tests/fm3/__init__.py
 !/tests/fm3/test_appearance.py
@@ -241,3 +245,5 @@
 !/research/tracks-fm2-2026-11-11/pvs11.py
 !/research/tracks-fm2-2026-11-11/fm4_model.py
 !/research/tracks-fm2-2026-11-11/probe_tsukuba.py
+!/research/tracks-fm2-2026-11-11/fm4_rmb.py
+!/research/tracks-fm2-2026-11-11/match_fm3.py

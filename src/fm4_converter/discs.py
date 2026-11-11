@@ -25,6 +25,10 @@ ROLES = {
     "fm2-bonus": (FM2_BONUS, 1, ["content/0000000000000000/FFED2000/FFFFFFFF"]),
     "fm4-disc1": (FM4, 1, None),
 }
+# What the track conversion (fm2.track_env) reads of the FM2 disc.
+FM2_TRACK_PATHS = ["Media/DB", "Media/StringTables", "Media/UI/Textures.zip", "Media/tracks/newyork",
+                   "Media/tracks/testtrackinfield",
+                   "Media/AI/Tracks", "Media/Audio/Tracks/newyork", "Media/Audio/Tracks/testtrackinfield"]
 # What the track conversion (fm3.track_env) reads of FM3 Disc 1, beyond the database and names.
 FM3_TRACK_PATHS = ["Media/DB", "Media/StringTables", "Media/UI/Textures.zip", "Media/Tracks/NewYork",
                    "Media/Tracks/LeMans", "Media/Tracks/CrownJewel", "Media/AI/Tracks",

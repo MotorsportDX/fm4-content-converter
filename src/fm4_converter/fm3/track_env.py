@@ -220,7 +220,7 @@ def available(fm3_db, fm3_media, packages):
 def canonical_ai_name(name, media):
     """FM4 asks for `<MediaName>_NN[_R]` (`%s_%02d%s`), and mounted ZIPs match exact names."""
     name = re.sub(re.escape(media), media, name, flags=re.I)
-    return re.sub(r"_r(?=[./])", "_R", name)
+    return re.sub(r"_r(?=[./]|$)", "_R", name)
 
 
 def pad_mlp(data):
