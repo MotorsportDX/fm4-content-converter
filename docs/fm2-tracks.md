@@ -71,13 +71,46 @@ objek semua model zona itu, ditambah objek langit di setiap zona. Daftar visibil
 
 Seperti track FM3 ([`fm3/track_env.py`](../src/fm4_converter/fm3/track_env.py)): pencahayaan dari
 `TrackSettings.xml` dan `staticCarCubemap.xpr` Tsukuba dengan batas yang sama (track FM2 juga
-tidak punya probe SH), file AI dengan nama FM4 dan dipad 1,280 byte, file collision, crowd, dan
-kamera FM2 apa adanya, audio FM2 dengan decision zones Infineon. Database FM2 tidak punya tabel
+tidak punya probe SH), file collision dan crowd FM2 apa adanya. Database FM2 tidak punya tabel
 environment: setiap environment FM2 mendapat environment FM4 baru (nama dari converter, negara
-dan gambar Road Atlanta sebagai pengganti). Grid start FM2 sama dengan FM3 (12 posisi dunia,
-`fm3.track_grid`). Flying start FM2 mendapat ID baru karena FM4 memakai ID FM2 untuk track lain.
-Nama layout dari `Tracks.str` FM2 per bahasa, pada halaman tabel FM4 (referensi FM2 ada di
-halaman lain).
+dan gambar environment Road Atlanta sebagai pengganti). Grid start FM2 sama dengan FM3 (12 posisi
+dunia, `fm3.track_grid`). Flying start FM2 mendapat ID baru karena FM4 memakai ID FM2 untuk track
+lain. Nama layout dari `Tracks.str` FM2 per bahasa, pada halaman tabel FM4 (referensi FM2 ada di
+halaman lain). Logo dan ribbon mini FM2 (`.xds` di `UI/Textures.zip`, header Xenos yang sama
+dengan FM3 dan FM4) dibawa di folder UI FM2 sendiri.
+
+Yang ditemukan lewat uji game (setiap butir membuat FM4 crash sampai ditangani):
+
+- **AI per level.** Selain file garis AI (`.geo`, `.irt`, `.seg`, `.pit`, dengan nama FM4 dan
+  dipad 1,280 byte), FM4 memuat `AI\Tracks\Level1..3\<track>.bin` dan
+  `AI\Tracks\SegmentProfiles\<track>` saat driver AI dibuat; tanpa itu FM4 membaca level null
+  (`sub_82A94158`, layar pre-race). FM2 punya ketiganya; semua dibawa.
+- **Audio.** Bank FMOD FM2 (FEV versi 0x21 dan FSB3) lebih tua dari yang dibaca FMOD FM4 (FEV
+  0x40), dan XML ribbon-nya memakai nama atribut huruf kecil. Bank Tsukuba (donor yang sama)
+  dipakai; emitter kerumunan dan pantulan FM2 ditaruh di posisi FM2 dengan event bersama FM4
+  (`SharedDynamicAudio`, `SharedStaticAudio`); suara kota khas FM2 (sirene, subway) tidak punya
+  padanan dan dibuang. Decision zones dari Infineon seperti track FM3.
+- **Kamera siaran** (`TrackSegCams.xml`, replay dan pasca-balapan): format FM2 lebih tua (root
+  `TrackSegCams`, key di bawah `Keys`, tanpa `NumCams`); FM4 membaca kamera null di layar
+  pasca-balapan (`sub_8268D4F8`). Kamera animasi FM2 ditulis ulang dalam format FM4 dengan
+  bingkai kamera Tsukuba; potongan bumper, kap, dan roda dibuang.
+- **Kamera pre-race**: FM2 tidak punya; `preracecams.xml` Alps (semua relatif terhadap mobil).
+- **Gamma tekstur.** Tekstur track FM2 linear (`D3DFORMAT` `0x1A200152`), sedangkan tekstur warna dan
+  lightmap FM4 dibaca lewat gamma perangkat keras (`0x1A207F52`, sign X, Y, Z = 3). Shader FM4
+  membaca tekstur FM2 linear terlalu terang: aspal New York tampak putih keabuan. Tanda gamma
+  dipasang di record tekstur warna, lightmap, dan langit di `stx.bin` dan file tekstur tunggal
+  `_0x%08X.bin` (tanpa mengubah ukuran); aspal, gedung, dan langit lalu tampil dengan kontras
+  track FM4 (run `fm2ny2xc`, 2x).
+
+## Hasil, 11 November 2026
+
+FM4 USA Disc 1, disc FM2 USA, BuildRoot `I:\FM4-build-usa`, mod `fm2-cars`, `fm2-tracks`,
+`fm2-career` (karier 307 hari; dengan `fm2-tracks` hari pertamanya di Test Track):
+
+| Environment | Objek | Uji game |
+| --- | --- | --- |
+| New York | 4,645 (2,295 opaque, 1,040 dua sisi, 922 alpha test, 383 tanpa lightmap, 5 langit) | run `fm2ny9`: event karier di layout 22 sampai selesai (AI, 3 lap), layar pasca-balapan, lalu tawaran hari berikutnya |
+| Test Track | 2,918 dari 3,031 draw | run `fm2tt2`: hari pertama karier FM2 (layout 53) sampai selesai, lalu tawaran layout 50 |
 
 ## Batas
 
@@ -88,4 +121,6 @@ halaman lain).
   khusus dan semuanya sebagai objek biasa.
 - 113 draw Test Track (vertex stride 24 dengan tata letak lain, dibaca shader dari dua stream)
   belum dikonversi.
-- Logo, ribbon mini, dan gambar environment FM2 belum dikonversi; pengganti dari Road Atlanta.
+- FM2 tidak punya gambar environment; gambar Road Atlanta dipakai sebagai pengganti.
+- Suara penyiar dan suara kota FM2 tidak ada; hanya kerumunan, pantulan, angin, dan ambience balap.
+- Baru satu layout tiap environment yang dibalap sampai selesai; layout lain berbagi file yang sama.

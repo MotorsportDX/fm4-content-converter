@@ -131,11 +131,20 @@ def convert_models(fm2_bin, ribbons, templates, prefix):
             if draw is not None:
                 sky.append(len(objects))
                 add(draw, first["sky"][1]["textures"], kind="sky")
+    # Colour and lightmap textures of every ribbon's table get FM4's gamma (track_models.with_gamma).
+    gamma = {t[1]: t[0] for r in ribbons for t in r["textures"] if t[6] & (tm.COLOUR_FLAG | tm.LIGHTMAP_FLAG)}
+    gamma.update({r["textures"][i][1]: r["textures"][i][0] for r in ribbons for i in r["sky"][1]["textures"]})
+    singles = {f"_0x{build:08x}.bin" for build in gamma.values()}
     for name in z.namelist():
         low = name.lower()
         if low.endswith(".rmb.bin") or low.endswith(".htm"):
             continue
-        members[name] = archive_read(z, name)
+        data = archive_read(z, name)
+        if low.endswith(".stx.bin"):
+            data = tm.with_gamma(data, set(gamma))
+        elif low in singles:
+            data = tm.with_gamma(data)
+        members[name] = data
     members.update(templates.shaders)
     return objects, sky, members, skipped
 

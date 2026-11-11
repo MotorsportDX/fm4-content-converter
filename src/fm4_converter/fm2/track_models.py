@@ -267,6 +267,53 @@ def draws(model, number=0):
     return out
 
 
+# --- textures ---------------------------------------------------------------------------------
+
+GAMMA_SIGNS = 0x7E00      # D3DFORMAT SignX, SignY, SignZ = 3 (gamma): FM4's colour and lightmap textures
+
+
+def texture_records(data):
+    """Absolute offsets of the `texture` records (`.data` chunks) of a CAFF container, in order."""
+    if not data.startswith(MAGIC):
+        raise FormatError("not a CAFF21.11.05.0034 container")
+    n_names, n_chunks = struct.unpack_from(">II", data, 0x18)
+    names_at, header = struct.unpack_from(">II", data, 0x44)
+    sections, at = [], 0x50
+    while at + 0x28 <= header:
+        name = data[at:at + 8].rstrip(b"\0")
+        if not name.startswith(b"."):
+            break
+        sections.append((name.decode(), struct.unpack_from(">I", data, at + 0x10)[0]))
+        at += 0x28
+    base, cursor = {}, header
+    for name, size in sections:
+        base[name] = cursor
+        cursor += size
+    blob = base[".data"] + names_at
+    chunk_at = blob + 4 + 4 * n_names + struct.unpack_from(">I", data, blob)[0] + 4
+    out = []
+    for i in range(n_chunks):
+        cid, off, size = struct.unpack_from(">III", data, chunk_at + 14 * i)
+        if sections[data[chunk_at + 14 * i + 12] - 1][0] == ".data":
+            start = base[".data"] + off
+            if data[start:start + 8] == b"texture\0":
+                out.append(start)
+    return out
+
+
+def with_gamma(data, records=None):
+    """The container with the gamma signs set in the `D3DFORMAT` (+0x18) of its texture records
+    (`records`: their indexes; None for all). FM2's track textures are linear (`0x1A200152`);
+    FM4's track shaders read colour and lightmap textures through the hardware's gamma
+    (`0x1A207F52`), so FM2's read linear look washed out, a mid grey near white."""
+    buf = bytearray(data)
+    for k, at in enumerate(texture_records(data)):
+        if records is None or k in records:
+            fmt = struct.unpack_from(">I", buf, at + 0x18)[0]
+            struct.pack_into(">I", buf, at + 0x18, fmt | GAMMA_SIGNS)
+    return bytes(buf)
+
+
 # --- FPVS version 11 ------------------------------------------------------------------------
 
 class _Reader:
