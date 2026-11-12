@@ -94,27 +94,147 @@ def roles(draw, textures, model_textures):
     return (rest[0] if rest else None), lightmap
 
 
+def blend_roles(draw, textures, model_textures, formats):
+    """(a, b, value) PVS list indices of a draw that blends colour textures by a mask: bound
+    textures besides the lightmap, the first a single-channel mask (tm.BLEND_CONSTANTS) and
+    then colour textures, of which the first two are blended (one: with itself); else None.
+    `formats`: {texture table entry: texture format}."""
+    bound = [i for _, i in sorted(draw.samplers.items()) if i < len(model_textures)]
+    others = [i for i in bound if not textures[model_textures[i]][6] & tm.LIGHTMAP_FLAG]
+    if not others or formats.get(model_textures[others[0]]) != tm.DXT5A:
+        return None
+    colours = [i for i in others[1:] if formats.get(model_textures[i]) != tm.DXT5A]
+    if not colours:
+        return None
+    return colours[0], (colours + colours)[1], others[0]
+
+
+def shader_coordinates(draw, diffuse, lightmap):
+    """Set a draw's uv0 and uv1 to where its own shaders read its diffuse and lightmap (PVS list
+    indices; track_shader), where they can be followed: the diffuse after its tiling matrix, the
+    lightmap before its atlas, in 0 to 1. Otherwise the vertex layout's stay."""
+    def read(index, base=False):
+        # A texture can sit on several samplers (one of them a shadow projection): the first
+        # whose coordinates can be followed.
+        found = (draw.coordinates(s, base) for s, i in sorted(draw.samplers.items()) if i == index)
+        return next((uv for uv in found if uv is not None), None)
+    uv = read(diffuse) if diffuse is not None else None
+    if uv is not None and np.isfinite(uv).all():
+        draw.uv0 = uv
+    uv = read(lightmap, base=True) if lightmap is not None else None
+    if uv is not None and np.isfinite(uv).all() and uv.min() >= -0.01 and uv.max() <= 1.01:
+        draw.uv1 = np.clip(uv, 0.0, 1.0)
+
+
+def colour_first(diffuse, draw, textures, model_textures, formats):
+    """The diffuse of a draw without a blend: a bound colour texture rather than a mask."""
+    if diffuse is None or formats.get(model_textures[diffuse]) != tm.DXT5A:
+        return diffuse
+    bound = [i for _, i in sorted(draw.samplers.items()) if i < len(model_textures)]
+    colours = [i for i in bound if textures[model_textures[i]][6] & tm.COLOUR_FLAG
+               and not textures[model_textures[i]][6] & tm.LIGHTMAP_FLAG
+               and formats.get(model_textures[i]) != tm.DXT5A]
+    return colours[0] if colours else diffuse
+
+
+# The grey of FM2 materials without a colour texture, drawn as their tiled detail (the Test
+# Track's road, `Road32`: about detail * 0.1 - 0.05 plus its other terms, a dark asphalt).
+MASK_TINT = 0.3
+
+
+def mask_detail(draw, textures, model_textures, formats):
+    """The tiled single-channel detail of a draw whose bound textures besides the lightmap are
+    all masks (`DXT5A`): the one its shaders read at the widest span of coordinates; else None."""
+    others = [(s, i) for s, i in sorted(draw.samplers.items()) if i < len(model_textures)
+              and not textures[model_textures[i]][6] & tm.LIGHTMAP_FLAG]
+    if not others or any(formats.get(model_textures[i]) != tm.DXT5A
+                         for _, i in others if textures[model_textures[i]][6] & tm.COLOUR_FLAG):
+        return None
+    masks = [(s, i) for s, i in others if formats.get(model_textures[i]) == tm.DXT5A]
+    spans = [(float(np.ptp(uv, 0).max()), i) for s, i in masks if (uv := draw.coordinates(s)) is not None]
+    return max(spans)[1] if spans else None
+
+
+def blended_alpha(draw, textures, model_textures, formats):
+    """How an FM2 draw that blends by its alpha converts: "drop" when the alpha is in a texture of
+    its own (a single-channel mask, or a second colour texture: the Test Track's grass edges,
+    `Road_Edge`, and New York's road lines, which FM4's templates cannot read apart from the
+    colour), "alpha_test" when its one colour texture carries it (`DXT5`), else None (vertex or
+    constant alpha: drawn opaque)."""
+    if not draw.alpha_blend:
+        return None
+    bound = [model_textures[i] for _, i in sorted(draw.samplers.items()) if i < len(model_textures)
+             and not textures[model_textures[i]][6] & tm.LIGHTMAP_FLAG]
+    colours = [t for t in bound if textures[t][6] & tm.COLOUR_FLAG and formats.get(t) != tm.DXT5A]
+    if any(formats.get(t) == tm.DXT5A for t in bound) or len(colours) > 1:
+        return "drop"
+    if colours and formats.get(colours[0]) == tm.DXT5:
+        return "alpha_test"
+    return None
+
+
+def texture_formats(z, textures):
+    """{texture table entry: texture format (D3DFORMAT low 6 bits)}: from the `.stx.bin` record
+    of its index, or its own `_0x%08x.bin` file."""
+    names = {n.lower(): n for n in z.namelist()}
+    stx = next((n for n in z.namelist() if n.lower().endswith(".stx.bin")), None)
+    data = archive_read(z, stx) if stx else b""
+    records = tm.texture_records(data) if stx else []
+    out = {}
+    for k, t in enumerate(textures):
+        single = names.get(f"_0x{t[0]:08x}.bin")
+        if single:
+            own = archive_read(z, single)
+            at = tm.texture_records(own)
+            if at:
+                out[k] = struct.unpack_from(">I", own, at[0] + 0x18)[0] & 0x3F
+        elif t[1] < len(records):
+            out[k] = struct.unpack_from(">I", data, records[t[1]] + 0x18)[0] & 0x3F
+    return out
+
+
 def convert_models(fm2_bin, ribbons, templates, prefix):
     """(objects, bin.zip members {name: bytes}): every FM2 model's draws as FM4 models
     `<prefix>.NNNNN.rmb.bin` numbered as the PVS objects, the sky's last, and per object
-    {kind, model, draw, bounds, diffuse, lightmap} (PVS list indices of the first ribbon)."""
+    {kind, model, draw, bounds, diffuse, lightmap, blend} (PVS list indices of the first
+    ribbon; blend (a, b, value) or None)."""
     first = ribbons[0]
     textures = first["textures"]
     z = zipfile.ZipFile(fm2_bin)
     names = {n.lower(): n for n in z.namelist()}
+    formats = texture_formats(z, textures)
     objects, members = [], {}
+    values = set()          # mask textures (stx record indices): read linear, without gamma
 
     def add(draw, model_textures, kind=None):
         diffuse, lightmap = roles(draw, textures, model_textures)
+        blend = None
         if kind is None:
-            kind, data, bounds = tm.fm4_model(draw, templates.models, lightmap)
+            blend = blend_roles(draw, textures, model_textures, formats) if lightmap is not None else None
+            tint = None
+            if blend is None:
+                diffuse = colour_first(diffuse, draw, textures, model_textures, formats)
+                # Alpha to coverage cuts the colour texture's alpha out (tree cards): an alpha test.
+                if draw.alpha_to_mask and diffuse is not None and formats.get(model_textures[diffuse]) == tm.DXT5:
+                    draw.alpha_test = True
+                detail = mask_detail(draw, textures, model_textures, formats) if lightmap is not None else None
+                if detail is not None:
+                    blend, tint = (detail, detail, detail), MASK_TINT
+            shader_coordinates(draw, blend[0] if blend else diffuse, lightmap)
+            kind, data, bounds = tm.fm4_model(draw, templates.models, lightmap, blend is not None, tint)
+            if kind != "blend":
+                blend = None
+            else:
+                values.add(textures[model_textures[blend[2]]][1])
         else:
+            shader_coordinates(draw, diffuse, None)
             data, bounds = sky_model(draw, templates.models[kind])
         members[f"{prefix}.{len(objects):05d}.rmb.bin"] = data
         objects.append(dict(kind=kind, model=draw.model, draw=draw.number, bounds=bounds,
-                            diffuse=diffuse, lightmap=lightmap if kind in ("opaque", "two_sided", "alpha_test") else None))
+                            diffuse=diffuse, blend=blend,
+                            lightmap=lightmap if kind in ("opaque", "two_sided", "alpha_test", "blend") else None))
 
-    skipped = 0
+    skipped = dropped = 0
     for number, record in enumerate(first["models"]):
         name = names.get(f"{prefix}.{number:05d}.rmb.bin".lower())
         if name is None:
@@ -123,18 +243,38 @@ def convert_models(fm2_bin, ribbons, templates, prefix):
             if draw is None:
                 skipped += 1
                 continue
+            alpha = blended_alpha(draw, textures, record["textures"], formats)
+            if alpha == "drop":
+                dropped += 1
+                continue
+            if alpha == "alpha_test":
+                draw.alpha_test = True
             add(draw, record["textures"])
     sky_name = names.get(f"{prefix}.sky.rmb.bin".lower())
     sky = []
     if sky_name:
-        for draw in tm.draws(tm.Model(archive_read(z, sky_name)), -1):
-            if draw is not None:
-                sky.append(len(objects))
-                add(draw, first["sky"][1]["textures"], kind="sky")
+        sky_textures = first["sky"][1]["textures"]
+        draws = [d for d in tm.draws(tm.Model(archive_read(z, sky_name)), -1) if d is not None]
+        # The sun's flare (a quad with a single-channel glow, the Test Track's first sky draw) is
+        # FM2's own effect, not sky; the next draw, the dome, becomes FM4's special sky cell.
+        glow = lambda d: (lambda k: k is not None and formats.get(sky_textures[k]) == tm.DXT5A)(
+            roles(d, textures, sky_textures)[0])
+        # A sky draw whose shaders read no texture (the Test Track's haze ring, a constant colour
+        # FM4's sky technique cannot draw) is left out too.
+        draws = [d for d in draws if not glow(d) and d.textured]
+        # The tallest draw (the Test Track's panorama, its distant hills painted at the bottom)
+        # becomes the special sky cell: drawn as an ordinary object, FM4's fog turns those
+        # hills into a brown haze above the horizon.
+        draws.sort(key=lambda d: -float(np.ptp(d.positions[:, 1])))
+        for draw in draws:
+            sky.append(len(objects))
+            add(draw, sky_textures, kind="sky")
     # Colour and lightmap textures of every ribbon's table get FM4's gamma (track_models.with_gamma).
     gamma = {t[1]: t[0] for r in ribbons for t in r["textures"] if t[6] & (tm.COLOUR_FLAG | tm.LIGHTMAP_FLAG)}
     gamma.update({r["textures"][i][1]: r["textures"][i][0] for r in ribbons for i in r["sky"][1]["textures"]})
+    gamma = {k: v for k, v in gamma.items() if k not in values}   # FM4's blend values are linear too
     singles = {f"_0x{build:08x}.bin" for build in gamma.values()}
+    streamed = {f"_0x{build:08x}.bix" for build in gamma.values()}   # the full size, `_B` its data
     for name in z.namelist():
         low = name.lower()
         if low.endswith(".rmb.bin") or low.endswith(".htm"):
@@ -144,9 +284,11 @@ def convert_models(fm2_bin, ribbons, templates, prefix):
             data = tm.with_gamma(data, set(gamma))
         elif low in singles:
             data = tm.with_gamma(data)
+        elif low in streamed:
+            data = tm.bix_with_gamma(data)
         members[name] = data
     members.update(templates.shaders)
-    return objects, sky, members, skipped
+    return objects, sky, members, skipped + dropped
 
 
 def sky_model(draw, template):
@@ -177,9 +319,13 @@ def pvs27(p, objects, sky, templates, skybox_slot, w3=t3.PVS_W3):
     l36, l52 = [], []
     for number, o in enumerate(objects):
         own = sky_textures if o["kind"] == "sky" else model_textures[o["model"]]["textures"]
-        refs = [own[o["diffuse"]] if o["diffuse"] is not None else (own[0] if own else 0)]
-        if o["lightmap"] is not None:
-            refs.append(own[o["lightmap"]])
+        if o.get("blend"):
+            role = dict(zip(("a", "b", "value"), o["blend"]), lightmap=o["lightmap"])
+            refs = [own[role[r]] for r in tm.BLEND_REFS]
+        else:
+            refs = [own[o["diffuse"]] if o["diffuse"] is not None else (own[0] if own else 0)]
+            if o["lightmap"] is not None:
+                refs.append(own[o["lightmap"]])
         lo, hi = np.array(o["bounds"][0]), np.array(o["bounds"][1])
         centre, size = (lo + hi) / 2, (hi - lo) / 2
         l52.append({"refs": refs, "ids": [techniques.index(templates.techniques[o["kind"]])],
@@ -198,7 +344,9 @@ def pvs27(p, objects, sky, templates, skybox_slot, w3=t3.PVS_W3):
     for zone in p["zones"]:
         inst = sorted({n for m in zone["models"] for n in by_model.get(m, ())} | set(sky))
         zones.append((inst, inst, list(zone["textures"]), list(zone["flags"])))
-    textures = [t[:2] + (abs(t[2]),) + t[3:] if t[6] & tm.LIGHTMAP_FLAG else t for t in p["textures"]]
+    # The lightmap atlas entries as FM2's: its u scale is negative, the tile left of its offset
+    # (the pixel shader reads `ou + su * u` with u in 0 to 1, track_shader).
+    textures = p["textures"]
     q = {"ver": 27, "w2": max(p["cpu"], CPU_DATA_MIN), "w3": w3, "h0": 0, "h2": p["h2"], "l4": zones,
          "l20": textures, "l172": shader_names, "l36": l36, "l52": l52,
          "a84": ([track_pvs.NONE] * skybox_slot + [special]) if special is not None else [],

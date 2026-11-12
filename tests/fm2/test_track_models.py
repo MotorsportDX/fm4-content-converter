@@ -68,6 +68,19 @@ class TemplateTests(unittest.TestCase):
                 self.assertEqual((init >> 16, init & 0x3F, init & 0xFFC0), (6, 4, 0x0800))
                 self.assertEqual(w[w.index(0xC0032201) + 4] & 0xFFFFFF, 6)
 
+    def test_build_replaces_pixel_shader_constants(self):
+        old, new = (15.0, 15.0, 1.0, 0.2), (1.0, 1.0, 1.0, 0.2)
+        data = bytearray(template())
+        t = tm.Template(bytes(data), "diff_1_nocube", 24)
+        at = t.ib_end + 4      # mesh flags, then the "materials": the template's tail
+        data[at:at + 16] = struct.pack(">4f", *old)
+        t = tm.Template(bytes(data), "diff_1_nocube", 24)
+        out = t.build(bytes(24 * 3), [0, 1, 2], ((0, 0, 0), (1, 1, 1)), UVOS, [(old, new)])
+        self.assertNotIn(struct.pack(">4f", *old), out)
+        self.assertIn(struct.pack(">4f", *new), out)
+        with self.assertRaises(tm.FormatError):
+            t.build(bytes(24 * 3), [0, 1, 2], ((0, 0, 0), (1, 1, 1)), UVOS, [((9.0, 9.0, 9.0, 9.0), new)])
+
     def test_template_needs_its_stride(self):
         with self.assertRaises(tm.FormatError):
             tm.Template(template(), "diff_nolm_vclr_1", 20)
@@ -92,6 +105,15 @@ class VertexTests(unittest.TestCase):
 
     def test_fixed_point_coordinates(self):
         self.assertEqual(tm._fixed([0x4000C000]).tolist(), [[1.0, -1.0]])
+
+    def test_streamed_texture_gets_the_gamma_signs(self):
+        # The header of FM2's `_0x00000001.bix` (Test Track), DXT1 linear.
+        bix = bytes.fromhex("42495830000004000000010000000009" "1a200152000300000002000000") + b"\xaa" * 8
+        out = tm.bix_with_gamma(bix)
+        self.assertEqual(struct.unpack_from(">I", out, 0x10)[0], 0x1A207F52)
+        self.assertEqual(out[:0x10] + out[0x14:], bix[:0x10] + bix[0x14:])
+        with self.assertRaises(tm.FormatError):
+            tm.bix_with_gamma(b"CAFF" + bix[4:])
 
 
 class PvsTests(unittest.TestCase):
@@ -119,6 +141,45 @@ class RoleTests(unittest.TestCase):
         self.assertEqual(track_env.roles(draw, textures, [0, 1, 2]), (0, 1))
         draw.samplers = {}
         self.assertEqual(track_env.roles(draw, textures, [1, 2]), (1, None))
+
+    def test_blend_of_a_mask_and_colour_textures(self):
+        textures = [(1, 0, -0.0625, 0.0625, 0.0, 0.0, 0xC), (2, 1, 1.0, 1.0, 0.0, 0.0, 0x4),
+                    (3, 2, 1.0, 1.0, 0.0, 0.0, 0x4), (4, 3, 1.0, 1.0, 0.0, 0.0, 0x4)]
+        formats = {0: tm.DXT5A, 1: tm.DXT5A, 2: 0x14, 3: 0x14}
+        draw = tm.Draw(0, 0, None, None, None, None, None, {0: 0, 1: 1, 2: 2, 3: 3}, False, False)
+        self.assertEqual(track_env.blend_roles(draw, textures, [0, 1, 2, 3], formats), (2, 3, 1))
+        draw.samplers = {0: 0, 1: 1, 2: 2}
+        self.assertEqual(track_env.blend_roles(draw, textures, [0, 1, 2, 3], formats), (2, 2, 1))
+        draw.samplers = {0: 0, 1: 2, 2: 3}
+        self.assertIsNone(track_env.blend_roles(draw, textures, [0, 1, 2, 3], formats))
+        draw.samplers = {0: 0, 1: 1}
+        self.assertIsNone(track_env.blend_roles(draw, textures, [0, 1, 2, 3], formats))
+        draw.samplers = {0: 0, 1: 1, 2: 2}
+        self.assertEqual(track_env.colour_first(1, draw, textures, [0, 1, 2, 3], formats), 2)
+        draw.samplers = {0: 0, 1: 1}
+        self.assertEqual(track_env.colour_first(1, draw, textures, [0, 1, 2, 3], formats), 1)
+
+    def test_alpha_in_a_texture_of_its_own_is_dropped(self):
+        textures = [(1, 0, -0.0625, 0.0625, 0.0, 0.0, 0xC), (2, 1, 1.0, 1.0, 0.0, 0.0, 0x4),
+                    (3, 2, 1.0, 1.0, 0.0, 0.0, 0x4), (4, 3, 1.0, 1.0, 0.0, 0.0, 0x4)]
+        formats = {0: tm.DXT5A, 1: tm.DXT5A, 2: tm.DXT5, 3: 0x12}
+        draw = tm.Draw(0, 0, None, None, None, None, None, {0: 0, 1: 2, 2: 3}, False, False)
+        self.assertIsNone(track_env.blended_alpha(draw, textures, [0, 1, 2, 3], formats))
+        draw.alpha_blend = True
+        self.assertEqual(track_env.blended_alpha(draw, textures, [0, 1, 2, 3], formats), "drop")
+        draw.samplers = {0: 0, 1: 1, 2: 3}
+        self.assertEqual(track_env.blended_alpha(draw, textures, [0, 1, 2, 3], formats), "drop")
+        draw.samplers = {0: 0, 1: 2}
+        self.assertEqual(track_env.blended_alpha(draw, textures, [0, 1, 2, 3], formats), "alpha_test")
+        draw.samplers = {0: 0, 1: 3}
+        self.assertIsNone(track_env.blended_alpha(draw, textures, [0, 1, 2, 3], formats))
+
+    def test_tinted_blend_constants(self):
+        self.assertEqual(tm.blend_constants(), tm.BLEND_CONSTANTS)
+        (c0c1, new), (c2, tint), _ = tm.blend_constants(0.3)
+        self.assertEqual(c0c1[:4], (1.0, 1.0, 1.0, 1.0))
+        self.assertEqual(new[:4], (0.3, 0.3, 0.3, 1.0))
+        self.assertEqual(tint, (0.3, 0.3, 0.3, 1.0))
 
 
 class CameraAndAudioTests(unittest.TestCase):

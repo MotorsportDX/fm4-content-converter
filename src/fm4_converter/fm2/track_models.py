@@ -15,12 +15,15 @@ track shaders do for a track's look; FM4's lighting then lights them as its own 
 Formats (big-endian):
 
 - FM2 model: the `.stream` draw program of records `00 LL OP 00` up to op `0x1d`: op 1 draws
-  (primitive, index count, index buffer object), op `0x2d` with type 0 binds the model's PVS
-  textures to samplers (pairs of list index and sampler << 16), op `0x0c` sets a render state
-  (`0x38` cull mode, 0 none; `0x60` alpha test). The render graph ends with its GPU buffers:
-  vertex buffers as (object, offset, size), then index buffers as (object, offset, size, 1);
-  a draw uses the last vertex buffer that starts before its index buffer. Positions are world
-  space floats; texture coordinates are signed 1.14 fixed point; normals `2_10_10_10`.
+  (primitive, index count, index buffer object), op `0x2d` with type 0 or 2 binds the model's PVS
+  textures to samplers (pairs of list index and sampler << 16; type 2 also the shadow maps),
+  op `0x0c` sets a render state (`0x38` cull mode, 0 none; `0x60` alpha test; `0x48` SRCBLEND;
+  `0x150` alpha to mask), ops `0x2e` and `0x2` set shaders and op `0x5` vertex shader constants
+  (track_shader), ops `0x16` and `0x19` branch between passes. The render graph ends with its
+  GPU buffers: vertex buffers as (object, offset, size), then index buffers as (object, offset,
+  size, 1); a draw uses the last vertex buffer that starts before its index buffer. Positions are
+  world space floats; normals `2_10_10_10`; texture coordinates are raw 16-bit integers its
+  shaders scale (track_shader), read as signed 1.14 fixed point where they cannot be followed.
 - FM4 model (`CTrackModel`, template field names from Forza-X360-IO `FM3_rmb_bin.bt`, GPL-3.0,
   a format reference only): bounds, world transform, ordered sub-models, one sub-model with
   its vertex buffer and one mesh (LOD, primitive, material, `UnpackingData` with
@@ -34,11 +37,14 @@ import numpy as np
 
 from ..fm3 import track_rmb
 from ..fm3.integration import archive_read
+from . import track_shader
 
 MAGIC = b"CAFF21.11.05.0034"
 END = 0x1D
 DRAW, BIND, STATE = 0x01, 0x2D, 0x0C
-CULL, ALPHA_TEST = 0x38, 0x60
+SHADER, SET_SHADER, VS_CONSTANTS = 0x2E, 0x02, 0x05
+CULL, ALPHA_TEST, SRC_BLEND, ALPHA_TO_MASK = 0x38, 0x60, 0x48, 0x150
+BLEND_SRC_ALPHA = 6           # Xenos D3DBLEND_SRCALPHA: the draw blends by its alpha
 LIGHTMAP_FLAG = 0x8        # texture table flags of a lightmap atlas entry (FM2 0x8/0xc, FM4 0x9/0xc)
 COLOUR_FLAG = 0x4
 DRAW_INDX = 0x22
@@ -88,6 +94,17 @@ class Model:
     @property
     def graph(self):
         return self.chunk(".data", 1)
+
+    def constants(self, offset, count):
+        """{register offset: float4} of the vertex shader constants an op `0x5` loads from
+        `offset`, which counts from the `.data` section the render graph nests at its end
+        (the last `.data` name in it, its base at +0x10)."""
+        g = self.graph
+        at = g.rfind(b".data\0")
+        base = struct.unpack_from(">I", g, at + 0x10)[0] if at >= 0 else None
+        if base is None or base + offset + 16 * count > len(g):
+            raise FormatError(f"vertex shader constants at {offset:#x} outside the render graph")
+        return {i: struct.unpack_from(">4f", g, base + offset + 16 * i) for i in range(count)}
 
     def program(self):
         """[(op, body words)] of the `.stream` draw program."""
@@ -146,13 +163,26 @@ class Model:
 class Draw:
     """One FM2 draw as FM4 needs it: positions (n, 3) float, normals (n) `2_10_10_10`, texture
     coordinates uv0 and uv1 (n, 2) in texture units (uv1 None without a lightmap layout),
-    triangle indices, the PVS list indices bound per sampler, and the render state."""
+    triangle indices, the PVS list indices bound per sampler, and the render state.
+    `coords` {sampler: (coordinates, base)} are where its shaders read each texture
+    (track_shader): (n, 2) arrays or None, columns (v, u) as the vertex layout's (`_fixed`), `base` before a constant the program does not set (the lightmap's atlas)."""
 
-    def __init__(self, model, number, positions, normals, uv0, uv1, indices, samplers, alpha_test, two_sided):
+    def __init__(self, model, number, positions, normals, uv0, uv1, indices, samplers, alpha_test, two_sided,
+                 coords=None):
         self.model, self.number = model, number
         self.positions, self.normals, self.uv0, self.uv1 = positions, normals, uv0, uv1
         self.indices, self.samplers = indices, samplers
         self.alpha_test, self.two_sided = alpha_test, two_sided
+        self.coords = coords or {}
+        self.textured = True            # False: its shaders were followed and read no texture
+        self.alpha_blend = False        # blends by its alpha (render state SRCBLEND = SRCALPHA)
+        self.alpha_to_mask = False      # its alpha masks MSAA coverage (FM2's trees and cards)
+
+    def coordinates(self, sampler, base=False):
+        """(n, 2) coordinates its shaders read `sampler` at (`base`: before the unknown
+        constant, else the full map; each falls back to the other), or None."""
+        full, before = self.coords.get(sampler, (None, None))
+        return (before if before is not None else full) if base else (full if full is not None else before)
 
 
 def unpack101010(w):
@@ -218,11 +248,27 @@ def draws(model, number=0):
     gpu = model.chunk(".gpu", 1)
     strides = sorted(model.strides())
     out, bound, state = [], {}, {}
+    # The program branches (op 0x16, 0x19) between passes that set different shaders (ops
+    # 0x2e and 0x2): every shader set since the last draw is a candidate, the draw takes the
+    # pair that reads the most of its textures (track_shader.choose).
+    shaders, constants, candidates, drawn = track_shader.graph_shaders(model), {}, [], False
     for op, body in program:
         if op == STATE:
             state[body[0]] = body[1]
-        elif op == BIND and body[1] & 0xFFFF == 0:
-            for k in range(body[1] >> 16):
+        elif (op == SHADER and len(body) > 4 and body[4] in shaders) or                 (op == SET_SHADER and body and body[0] in shaders):
+            if drawn:
+                candidates, drawn = [], False
+            candidates.append(shaders[body[4] if op == SHADER else body[0]])
+        elif op == VS_CONSTANTS:
+            reg, count = body[1] >> 16, body[1] & 0xFFFF
+            try:
+                for i, value in model.constants(body[0], count).items():
+                    constants[reg + i] = value
+            except FormatError:
+                pass
+        elif op == BIND and body[1] & 0xFFFF in (0, 2):
+            # Type 2 (with the shadow maps, list indices past the model's own) has the same pairs.
+            for k in range((len(body) - 2) // 2):
                 bound[body[3 + 2 * k] >> 16] = body[2 + 2 * k]
         elif op == DRAW:
             prim, count, obj = body
@@ -262,8 +308,27 @@ def draws(model, number=0):
                 pack101010(face_normals(pos, tris.reshape(-1, 3)))
             uv0 = _fixed(words[:, u0]) if u0 is not None else np.zeros((len(pos), 2))
             uv1 = _fixed(words[:, u1]) if u1 is not None else None
-            out.append(Draw(number, len(out), pos, normals, uv0, uv1, tris, samplers,
-                            bool(state.get(ALPHA_TEST)), state.get(CULL, 2) == 0))
+            drawn = True
+            coords = {}
+            chosen = track_shader.choose(candidates, constants, samplers)
+            fetched, ps = chosen if chosen is not None else (None, None)
+            if fetched is not None:
+                for sampler, (u, v) in fetched.items():
+                    pair = []
+                    for base in (False, True):
+                        cu = track_shader.evaluate(u, words, base)
+                        cv = track_shader.evaluate(v, words, base)
+                        pair.append(None if cu is None or cv is None else np.stack([cv, cu], -1))
+                    coords[sampler] = tuple(pair)
+                # Bindings carry over from earlier draws: keep the textures its shader reads.
+                samplers = {s: i for s, i in samplers.items() if s in coords}
+            draw = Draw(number, len(out), pos, normals, uv0, uv1, tris, samplers,
+                        bool(state.get(ALPHA_TEST)) or (ps is not None and ps.kills),
+                        state.get(CULL, 2) == 0, coords)
+            draw.textured = fetched is None or bool(fetched)
+            draw.alpha_blend = state.get(SRC_BLEND) == BLEND_SRC_ALPHA
+            draw.alpha_to_mask = state.get(ALPHA_TO_MASK) == 1
+            out.append(draw)
     return out
 
 
@@ -311,6 +376,17 @@ def with_gamma(data, records=None):
         if records is None or k in records:
             fmt = struct.unpack_from(">I", buf, at + 0x18)[0]
             struct.pack_into(">I", buf, at + 0x18, fmt | GAMMA_SIGNS)
+    return bytes(buf)
+
+
+def bix_with_gamma(data):
+    """A `.bix` (the streamed full-size texture, header `BIX0` with its `D3DFORMAT` at +0x10) with
+    the gamma signs set, as FM4's own `.bix` of colour textures (`0x1A207F52`). Without them the
+    track draws its near textures linear, washed out to white, once they stream in."""
+    if data[:4] != b"BIX0":
+        raise FormatError("not a BIX0 texture")
+    buf = bytearray(data)
+    struct.pack_into(">I", buf, 0x10, struct.unpack_from(">I", buf, 0x10)[0] | GAMMA_SIGNS)
     return bytes(buf)
 
 
@@ -433,11 +509,21 @@ class Template:
             if part[1] and part[1].count(pattern) != 1:
                 raise FormatError(f"slot {k}: UVOffsetScale not found once in the command buffer")
 
-    def build(self, vertices, indices, bounds, uvos):
+    def build(self, vertices, indices, bounds, uvos, constants=()):
         """The model with these vertices (the template's stride), 16-bit triangle-list indices,
-        bounds ((min xyz), (max xyz)) and `UVOffsetScale` (offset u, v, scale u, v)."""
+        bounds ((min xyz), (max xyz)) and `UVOffsetScale` (offset u, v, scale u, v).
+        `constants`: (old, new) pixel shader constants (float4s, or runs of them where one
+        alone is not unique) replaced in the material and in every slot's command buffer, each
+        found once in the material."""
         if len(vertices) % self.stride:
             raise FormatError("vertex data is not of the template's stride")
+        swaps = [(struct.pack(f">{len(old)}f", *old), struct.pack(f">{len(new)}f", *new)) for old, new in constants]
+        material = self.d[self.ib_end:self.group.at]
+        for old, _ in swaps:
+            if material.count(old) != 1:
+                raise FormatError("constant not found once in the template's material")
+        for old, new in swaps:
+            material = material.replace(old, new)
         lo, hi = bounds
         head = bytearray(self.d[:self.vb_at])
         struct.pack_into(">8f", head, self.bounds_at, *lo, 0.0, *hi, 0.0)
@@ -448,12 +534,15 @@ class Template:
         struct.pack_into(">4f", mesh, self.uvos_at - self.vb_end, *uvos)
         out = (bytes(head) + struct.pack(">II", len(vertices) // self.stride, self.stride) + vertices
                + bytes(mesh) + struct.pack(">III", 3, len(indices), 2)
-               + np.asarray(indices, ">u2").tobytes() + self.d[self.ib_end:self.group.at])
+               + np.asarray(indices, ">u2").tobytes() + material)
         g = track_rmb.group(self.d)
         old, new = struct.pack(">4f", *self.uvos), struct.pack(">4f", *uvos)
         for part in g.parts:
             if part[1]:
-                part[1] = patch_draws(part[1].replace(old, new), len(indices))
+                physical = part[1].replace(old, new)
+                for a, b in swaps:
+                    physical = physical.replace(a, b)
+                part[1] = patch_draws(physical, len(indices))
         return out + g.encode()
 
 
@@ -486,8 +575,36 @@ TEMPLATES = {
     "alpha_test": ("Alps", "alpsout.00065.rmb.bin", "diff_opac_2_2sd_nocube", 24),
     "unlit": ("LeMans", "LeMansout.00189.rmb.bin", "diff_nolm_vclr_1", 20),
     "unlit_alpha_test": ("Autopark", "autoparkout.01075.rmb.bin", "diff_opac_nolm_vclr_1", 20),
+    "blend": ("Alps", "alpsout.00699.rmb.bin", "shldr_blnd_spec_3", 36),
 }
 UNLIT_COLOUR = 0xFFB4B4B4     # the vertex colour of FM2 draws without a lightmap (RGBA)
+
+# FM2's ground (the Test Track's grass and dirt) blends two tiled colour textures by a tiled
+# single-channel mask (`DXT5A`) under the lightmap. FM4's `shldr_blnd_spec_3` blends Blend_A
+# (sampler 0, PVS ref 0) to Blend_B (sampler 1, ref 1) by Blend_Value (sampler 5, ref 5, its Y)
+# under the lightmap (sampler 7, ref 2): lerp(A * c0, B * c2, value), A and B at the vertex's
+# first texture coordinates times c1.xy and c3.xy, the value and the lightmap at its second
+# (both through UVOffsetScale; FM4 vertex shaders 4C44CA597B1B46C7 and others, outputs 5 and 6).
+# Its vertex: position, normal, colour, texture coordinates, lightmap coordinates, tangent and
+# binormal (`2_10_10_10`). The template's tints and tiling become 1, FM2's own.
+BLEND_CONSTANTS = (((15.0, 15.0, 1.0, 0.2), (1.0, 1.0, 1.0, 0.2)),
+                   ((0.4735315442085266, 0.5088813304901123, 0.37123778462409973, 1.0), (1.0, 1.0, 1.0, 1.0)),
+                   ((15.0, 15.0, 40.0, 1.0), (1.0, 1.0, 40.0, 1.0)))
+BLEND_REFS = ("a", "b", "lightmap", "value", "value", "value")
+
+
+def blend_constants(tint=None):
+    """BLEND_CONSTANTS, or with both tints (c0, c2) set to the grey `tint`: FM2 materials
+    without a colour texture (the Test Track's road, `Road32`) draw a tiled single-channel
+    detail scaled by constants, here A = B = that detail. c0 (1, 1, 1, 1) is not unique in the
+    command buffers, c0 and c1 together are."""
+    if tint is None:
+        return BLEND_CONSTANTS
+    (c1, c1_new), (c2, _), (c3, c3_new) = BLEND_CONSTANTS
+    return (((1.0, 1.0, 1.0, 1.0) + c1, (tint, tint, tint, 1.0) + c1_new),
+            (c2, (tint, tint, tint, 1.0)), (c3, c3_new))
+BLEND_TANGENT, BLEND_BINORMAL = 0x000001FF, 0x1FF00000     # +x and +z, `2_10_10_10`
+DXT5A, DXT5 = 0x3B, 0x14      # texture formats (D3DFORMAT low 6 bits): a single-channel mask, colour and alpha
 
 
 def _find(folder, name):
@@ -505,7 +622,9 @@ def load_templates(fm4_tracks):
     return templates, shaders
 
 
-def kind_of(draw, lightmap):
+def kind_of(draw, lightmap, blend=False):
+    if blend and lightmap is not None and not draw.alpha_test:
+        return "blend"
     if lightmap is None:
         return "unlit_alpha_test" if draw.alpha_test else "unlit"
     if draw.alpha_test:
@@ -521,11 +640,24 @@ def uv_words(uv):
     return (q[:, 0] << 16) | q[:, 1], (float(lo[0]), float(lo[1]), float(span[0]), float(span[1]))
 
 
-def fm4_model(draw, templates, lightmap):
-    """(kind, FM4 model bytes, bounds) of one FM2 draw; `lightmap` its lightmap's PVS list index."""
-    kind = kind_of(draw, lightmap)
+def fm4_model(draw, templates, lightmap, blend=False, tint=None):
+    """(kind, FM4 model bytes, bounds) of one FM2 draw; `lightmap` its lightmap's PVS list index,
+    `blend` whether it blends two colour textures by a mask (see BLEND_CONSTANTS), `tint` the
+    blend's grey tint (blend_constants)."""
+    kind = kind_of(draw, lightmap, blend)
     t = templates[kind]
     pos = draw.positions.astype(">f4")
+    lo, hi = tuple(map(float, draw.positions.min(0))), tuple(map(float, draw.positions.max(0)))
+    if kind == "blend":
+        # One UVOffsetScale serves both coordinate sets: words over their joint range.
+        lm = draw.uv1 if draw.uv1 is not None else draw.uv0
+        words, uvos = uv_words(np.concatenate([draw.uv0, lm]))
+        v = np.zeros((len(pos), 9), ">u4")
+        v[:, 0:3] = pos.view(">u4")
+        v[:, 3], v[:, 4] = draw.normals, 0xFFFFFFFF
+        v[:, 5], v[:, 6] = words[:len(pos)], words[len(pos):]
+        v[:, 7], v[:, 8] = BLEND_TANGENT, BLEND_BINORMAL
+        return kind, t.build(v.tobytes(), draw.indices, (lo, hi), uvos, blend_constants(tint)), (lo, hi)
     words0, uvos = uv_words(draw.uv0)
     if t.stride == 24:
         lm = draw.uv1 if draw.uv1 is not None else draw.uv0
@@ -536,5 +668,4 @@ def fm4_model(draw, templates, lightmap):
         v = np.zeros((len(pos), 5), ">u4")
         v[:, 3], v[:, 4] = words0, UNLIT_COLOUR
     v[:, 0:3] = pos.view(">u4")
-    lo, hi = tuple(map(float, draw.positions.min(0))), tuple(map(float, draw.positions.max(0)))
     return kind, t.build(v.tobytes(), draw.indices, (lo, hi), uvos), (lo, hi)

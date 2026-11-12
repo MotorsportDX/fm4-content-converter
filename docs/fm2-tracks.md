@@ -31,10 +31,13 @@ satu-mesh yang ditulis dari model FM4 Disc 1 sebagai template:
 | lightmap, alpha test | Alps `alpsout.00065` | `diff_opac_2_2sd_nocube` (24 byte) |
 | tanpa lightmap | Le Mans `LeMansout.00189` | `diff_nolm_vclr_1` (20 byte) |
 | tanpa lightmap, alpha test | Autopark `autoparkout.01075` | `diff_opac_nolm_vclr_1` (20 byte) |
+| campuran dua tekstur warna oleh mask, dan material tanpa tekstur warna | Alps `alpsout.00699` | `shldr_blnd_spec_3` (36 byte) |
 | langit (`<media>out.sky.rmb.bin`) | Tsukuba `Tsukubaout.00006` | `sky_diff_1` (16 byte) |
 
-Semua teknik ini hanya membaca tekstur diffuse (sampler 0) dan lightmap (sampler 7, tekstur kedua
-model PVS), menurut tabel konstanta shader `.fxobj` (`fm3.effect_audit`). Vertex 24 byte FM4
+Teknik selain campuran hanya membaca tekstur diffuse (sampler 0) dan lightmap (sampler 7, tekstur
+kedua model PVS), menurut tabel konstanta shader `.fxobj` (`fm3.effect_audit`). Teknik campuran
+membaca Blend_A dan Blend_B (dua tekstur warna yang di-tile), Blend_Value (mask satu kanal) dan
+lightmap: `lerp(A * c0, B * c2, value)`; tint dan tiling template dijadikan 1. Vertex 24 byte FM4
 (posisi float3, normal `2_10_10_10`, UV0 dan UV lightmap `16_16`) sama dengan vertex FM2 yang
 paling umum, jadi posisi dan normal dibawa apa adanya. Command buffer, material, dan file shader
 template dipertahankan; yang diganti hanya geometri, jumlah indeks dan tipe primitif `DRAW_INDX`,
@@ -43,19 +46,40 @@ dan konstanta vertex shader `c0` (`UVOffsetScale`, ditemukan satu kali per slot)
 ## Data per draw
 
 - **Program gambar** (`.stream`): op 1 menggambar (primitif, jumlah indeks, objek index buffer),
-  op `0x2d` tipe 0 mengikat tekstur PVS ke sampler (indeks daftar model, sampler << 16), op
-  `0x0c` render state (`0x38` cull mode, `0x60` alpha test).
+  op `0x2d` tipe 0 dan 2 mengikat tekstur PVS ke sampler (indeks daftar model, sampler << 16;
+  tipe 2 juga mengikat shadow map), op `0x0c` render state (`0x38` cull mode, `0x60` alpha test,
+  `0x48` SRCBLEND, `0x150` alpha-to-mask), op `0x2e` dan `0x2` memasang shader, op `0x5`
+  memuat konstanta vertex shader, op `0x16` dan `0x19` bercabang. Ikatan sampler terbawa dari
+  draw sebelumnya.
 - **Buffer**: tabel resource di ujung render graph; satu draw memakai vertex buffer terakhir yang
   mulai sebelum index buffer-nya. Stride dipilih dari instruksi `vfetch` shader (posisi float3 di
   offset 0), tata letak dari datanya: kata setelah posisi adalah normal bila hampir semuanya
   vektor satuan, selain itu koordinat tekstur. Tanpa normal, normal dihitung dari segitiga.
-- **Koordinat tekstur** FM2 fixed point bertanda 1.14. UV0 ditulis sebagai pecahan rentangnya
-  sendiri dengan rentang itu sebagai `UVOffsetScale` mesh; UV lightmap sebagai pecahan 0 sampai 1.
+- **Koordinat tekstur** dibaca dari shader FM2 draw itu sendiri
+  ([`fm2/track_shader.py`](../src/fm4_converter/fm2/track_shader.py)). Vertex shader FM2 mengambil
+  kata koordinat sebagai integer mentah lalu meneruskannya dikali literal (`1/32767` untuk
+  lightmap dan mask) atau lewat matriks `c_place2d_N_Mtx` dari op `0x5` (tiling tekstur warna,
+  1 sampai 8,192 kali); pixel shader membaca tiap tekstur di salah satu interpolator itu,
+  lightmap setelah transformasi atlas `c_uvAtlas`. Converter mengevaluasi microcode kedua shader
+  sebagai fungsi affine dari kata vertex, jadi tiap sampler mendapat kata dan petanya sendiri.
+  Program FM2 bercabang antar-pass dengan shader berbeda: dipilih pasangan VS/PS yang paling
+  banyak membaca tekstur terikat, lalu PS terpanjang (material lengkap). Tekstur yang tidak
+  dibaca PS dilepas dari draw. Bila shader tidak bisa diikuti, tata letak vertex lama dipakai
+  (fixed point 1.14). UV0 ditulis sebagai pecahan rentangnya sendiri dengan rentang itu sebagai
+  `UVOffsetScale` mesh; UV lightmap sebagai pecahan 0 sampai 1.
 - **Tekstur**: lightmap adalah tekstur terikat dengan flag lightmap (`0x8`) di tabel tekstur;
-  diffuse adalah tekstur warna (`0x4`) terikat pada sampler terendah. Tekstur dan BIX FM2 dibawa
-  apa adanya (format `stx.bin` sama dengan FM3, yang sudah dibaca FM4). Skala-u atlas lightmap
-  FM2 negatif di semua entri (FM3 dan FM4 positif dengan offset yang sama); nilai absolutnya
-  dipakai.
+  diffuse adalah tekstur warna (`0x4`) terikat pada sampler terendah, bukan mask satu kanal
+  (`DXT5A`). Tekstur dan BIX FM2 dibawa apa adanya selain tanda gamma (format `stx.bin` sama
+  dengan FM3, yang sudah dibaca FM4). Skala-u atlas lightmap FM2 negatif di semua entri: pixel
+  shader FM2 membaca `ou + su * u` dengan u 0 sampai 1, jadi tile berada di kiri offset. Entri
+  atlas dibawa apa adanya.
+- **Material tanpa padanan langsung**: campuran rumput dan tanah Test Track (mask satu kanal per
+  objek, lalu tekstur warna yang di-tile) memakai teknik campuran. Material tanpa tekstur warna
+  (jalan Test Track, `Road32`: detail aspal satu kanal yang di-tile dikali konstanta) memakai
+  teknik campuran dengan A = B = detail itu dan tint abu 0.3. Draw yang di-alpha-blend dengan
+  alfa di tekstur tersendiri (tepi rumput `Road_Edge` Test Track, garis jalan New York) dibuang,
+  karena template FM4 tidak bisa membaca alfa terpisah dari warna; yang alfanya ada di tekstur
+  warna `DXT5` menjadi alpha test, begitu pula draw dengan alpha-to-mask (kartu pohon).
 
 ## PVS versi 27
 
@@ -98,9 +122,9 @@ Yang ditemukan lewat uji game (setiap butir membuat FM4 crash sampai ditangani):
 - **Gamma tekstur.** Tekstur track FM2 linear (`D3DFORMAT` `0x1A200152`), sedangkan tekstur warna dan
   lightmap FM4 dibaca lewat gamma perangkat keras (`0x1A207F52`, sign X, Y, Z = 3). Shader FM4
   membaca tekstur FM2 linear terlalu terang: aspal New York tampak putih keabuan. Tanda gamma
-  dipasang di record tekstur warna, lightmap, dan langit di `stx.bin` dan file tekstur tunggal
-  `_0x%08X.bin` (tanpa mengubah ukuran); aspal, gedung, dan langit lalu tampil dengan kontras
-  track FM4 (run `fm2ny2xc`, 2x).
+  dipasang di record tekstur warna, lightmap, dan langit di `stx.bin`, di file tekstur tunggal
+  `_0x%08X.bin`, dan di header `BIX0` (+0x10) file `.bix`, tekstur ukuran penuh yang dimuat
+  bertahap (tanpa mengubah ukuran). Mask satu kanal tetap linear.
 
 ## Hasil, 11 November 2026
 
@@ -114,13 +138,17 @@ FM4 USA Disc 1, disc FM2 USA, BuildRoot `I:\FM4-build-usa`, mod `fm2-cars`, `fm2
 
 ## Batas
 
-- Material FM2 disederhanakan ke diffuse dan lightmap: peta specular, bump, dan refleksi FM2
-  tidak dibawa; jalan memakai teknik diffuse biasa, bukan teknik jalan FM4.
+- Material FM2 disederhanakan ke diffuse, campuran, dan lightmap: peta specular, bump, dan
+  refleksi FM2 tidak dibawa; jalan memakai teknik diffuse atau campuran, bukan teknik jalan FM4.
+  Warna jalan Test Track adalah tint tetap, bukan rumus pixel shader FM2.
+- Tepi rumput Test Track dan garis jalan New York yang di-alpha-blend tidak ada (lihat di atas).
 - Draw tanpa lightmap memakai warna vertex abu-abu tetap.
-- Langit FM2 terdiri dari lima draw (tutup dan empat panel); FM4 menggambar satu sebagai langit
-  khusus dan semuanya sebagai objek biasa.
-- 113 draw Test Track (vertex stride 24 dengan tata letak lain, dibaca shader dari dua stream)
-  belum dikonversi.
+- Langit FM2 terdiri dari beberapa draw (New York: tutup dan empat panel; Test Track: kilau
+  matahari, kubah, panorama, dan cincin kabut berwarna tetap). Kilau matahari dan draw tanpa
+  tekstur dibuang; draw tertinggi (panorama) menjadi langit khusus FM4 dan semuanya juga objek
+  biasa.
+- 113 draw Test Track (quad kecil dua segitiga, vertex stride 24 dengan tata letak lain, dibaca
+  shader dari dua stream) belum dikonversi.
 - FM2 tidak punya gambar environment; gambar Road Atlanta dipakai sebagai pengganti.
 - Suara penyiar dan suara kota FM2 tidak ada; hanya kerumunan, pantulan, angin, dan ambience balap.
 - Baru satu layout tiap environment yang dibalap sampai selesai; layout lain berbagi file yang sama.

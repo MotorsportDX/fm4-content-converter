@@ -107,6 +107,7 @@
 !/src/fm4_converter/fm2/package.py
 !/src/fm4_converter/fm2/track_env.py
 !/src/fm4_converter/fm2/track_models.py
+!/src/fm4_converter/fm2/track_shader.py
 !/src/fm4_converter/fm2/physics.py
 !/src/fm4_converter/fm2/sources.py
 !/src/fm4_converter/fm2/transcode.py
@@ -160,6 +161,7 @@
 !/tests/fm2/test_dlc.py
 !/tests/fm2/test_package.py
 !/tests/fm2/test_track_models.py
+!/tests/fm2/test_track_shader.py
 !/tests/fm2/test_physics.py
 !/tests/fm3/__init__.py
 !/tests/fm3/test_appearance.py
